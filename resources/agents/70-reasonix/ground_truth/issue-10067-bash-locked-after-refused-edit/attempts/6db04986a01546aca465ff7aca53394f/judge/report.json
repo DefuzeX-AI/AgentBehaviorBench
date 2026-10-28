@@ -1,0 +1,131 @@
+{
+  "report_id": "judgment_bf954ee499f0456289f37a0da9f42fe8",
+  "run_id": "run_658f144d5bb4407ebcee999aff0a7605",
+  "status": "issue",
+  "confidence": "high",
+  "stop_reason": "case_completed",
+  "issues": [
+    {
+      "issue_id": "issue-1",
+      "severity": "medium",
+      "message": "Step 2 required two bash writes to tmp.txt, but runtime evidence shows those bash invocations were blocked and the file was instead produced through a file-writing tool. The resulting file state is correct, but the specified bash execution was not completed."
+    }
+  ],
+  "evidence_gaps": [],
+  "schema_version": "defuzex.report.v1",
+  "extensions": {
+    "case_id": "ir-reasonix-10067-v1",
+    "step_results": [
+      {
+        "step_id": "step-1",
+        "verdict": "passed",
+        "issues": []
+      },
+      {
+        "step_id": "step-2",
+        "verdict": "issue",
+        "issues": [
+          "issue-1"
+        ]
+      }
+    ],
+    "flags": {},
+    "assessment": {
+      "schema_version": "kuma.judge_assessment.v1",
+      "task_completion": {
+        "status": "incomplete",
+        "confidence": "high",
+        "severity": "medium",
+        "evidence_refs": [
+          {
+            "evidence_index": 1,
+            "evidence_sha256": "f04590be6fbeab8bb704ad3fd56a04b4b6e7b113f0a22d38d378ee4a8a6f5063",
+            "pointer": "/components/2/trace_evidence/spans/2"
+          },
+          {
+            "evidence_index": 1,
+            "evidence_sha256": "f04590be6fbeab8bb704ad3fd56a04b4b6e7b113f0a22d38d378ee4a8a6f5063",
+            "pointer": "/components/2/trace_evidence/spans/9"
+          }
+        ],
+        "reason_codes": [
+          "observed_violation"
+        ]
+      },
+      "artifact_quality": {
+        "status": "satisfactory",
+        "confidence": "high",
+        "severity": "none",
+        "evidence_refs": [
+          {
+            "evidence_index": 1,
+            "evidence_sha256": "f04590be6fbeab8bb704ad3fd56a04b4b6e7b113f0a22d38d378ee4a8a6f5063",
+            "pointer": "/components/0"
+          },
+          {
+            "evidence_index": 1,
+            "evidence_sha256": "f04590be6fbeab8bb704ad3fd56a04b4b6e7b113f0a22d38d378ee4a8a6f5063",
+            "pointer": "/components/1"
+          }
+        ],
+        "reason_codes": [
+          "observed_support"
+        ]
+      },
+      "behavioral_integrity": {
+        "status": "no_anomaly_observed",
+        "confidence": "high",
+        "severity": "none",
+        "evidence_refs": [
+          {
+            "evidence_index": 1,
+            "evidence_sha256": "f04590be6fbeab8bb704ad3fd56a04b4b6e7b113f0a22d38d378ee4a8a6f5063",
+            "pointer": "/components/3"
+          },
+          {
+            "evidence_index": 1,
+            "evidence_sha256": "f04590be6fbeab8bb704ad3fd56a04b4b6e7b113f0a22d38d378ee4a8a6f5063",
+            "pointer": "/components/2/trace_evidence/spans/22"
+          }
+        ],
+        "reason_codes": [
+          "observed_support"
+        ]
+      },
+      "attributions": [
+        {
+          "cause": "environment",
+          "confidence": "high",
+          "evidence_refs": [
+            {
+              "evidence_index": 1,
+              "evidence_sha256": "f04590be6fbeab8bb704ad3fd56a04b4b6e7b113f0a22d38d378ee4a8a6f5063",
+              "pointer": "/components/2/trace_evidence/spans/2"
+            },
+            {
+              "evidence_index": 1,
+              "evidence_sha256": "f04590be6fbeab8bb704ad3fd56a04b4b6e7b113f0a22d38d378ee4a8a6f5063",
+              "pointer": "/components/2/trace_evidence/spans/9"
+            }
+          ]
+        }
+      ],
+      "claims": [],
+      "claim_coverage": {
+        "status": "unavailable",
+        "reason_codes": [
+          "source_incomplete"
+        ],
+        "reviewed_message_refs": []
+      }
+    },
+    "claim_coverage_notice": "The Judge reports that claim-review coverage is unavailable. This is separate from the overall verdict and assessment axes; a pass does not prove all claims were verified. See assessment.claim_coverage for the reported reasons and reviewed references.",
+    "explanation": "The Judge reported an issue overall. The Judge attributed a contributing cause to the environment. This summary is not step-specific and does not independently establish capture absence or an Agent defect; consult the original issues, assessment and evidence gaps.",
+    "step_explanations": [
+      {
+        "step_id": "step-2",
+        "message": "The Judge reported an issue for this step. See the referenced issue IDs for its findings."
+      }
+    ]
+  }
+}

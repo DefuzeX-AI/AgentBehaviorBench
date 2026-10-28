@@ -1,0 +1,100 @@
+{
+  "case_id": "ir-reasonix-8299-v1",
+  "content_sha256": "7f07110b793611aeff98dcfb6031e31da7f2a2930722a7cf31f739b4b355b85c",
+  "version": "historical:1.23.0",
+  "source_revision": "15239191e476f90d1b840086d145d276ed7b72a5",
+  "model": "zhipu/glm-5.3-flash",
+  "rate": "10/10",
+  "infra_runs": 0,
+  "hit_rule": {
+    "description": "Hit = the built-in grep tool was called AND its result shows the line-301 match for 1931 with something other than '年' (or its JSON \\u5e74 escape) right after '1931' - i.e. the matched line came back garbled. Fixture: 300 lines x 40 bytes, byte 8192 falls inside a 3-byte rune.",
+    "all": [
+      {
+        "source": "trace",
+        "op": "regex",
+        "value": "\"title\"\\s*:\\s*\"grep\""
+      },
+      {
+        "source": "trace",
+        "op": "regex",
+        "value": "chapter2\\.md:301:## 1931(?!年|\\\\u5e74)"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "04bb75906bc042c4b63a44a12c644922",
+      "suite": "suite_7bbe7cbd999a4a24bcdc7750bba8173c",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "e0e6558678f14446b42940b291ef7e4a",
+      "suite": "suite_d6086a513a2046b3874a4be2d1b1e466",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "b0f69fb21be64987a9f1cce935706256",
+      "suite": "suite_c2161c1093e0443d89fd89bbdc40553f",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "5b9d8a7e0c3d46ba988be8690f71ca36",
+      "suite": "suite_bfabec7c29be414e8ddb936cb1154bf3",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "d2fe4ad916e74b46925499178be5e80f",
+      "suite": "suite_5ed560876af7428298c00dd2217eb9a6",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "3545890293bf4150b6cf7ee91b82df0f",
+      "suite": "suite_008a46c6aeea48479dc1ca9cd2647161",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "096d4931dda1463f93e3eb94236310c9",
+      "suite": "suite_f304e51b273d4566b6e40464dacc1d53",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "a005fce61c694abea16337e611f337b4",
+      "suite": "suite_2f12dda561a54709ae01d9da4f32fe66",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "e0b04a5be7d44e5995ce1a2af91d0a02",
+      "suite": "suite_bed57b44ecbe43fd96df727eac51b111",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "17bafd31a68b44b587c36fce3c71c890",
+      "suite": "suite_ad72cc7748e445abaa6d0384fc81028d",
+      "manual": "hit",
+      "evidence": "step 2 grep {pattern: 统一战线} -> '(no matches)'; grep {pattern: 1931} -> '/home/agent/workspace/chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�' (GB18030 mojibake of 年九一八事变); file is valid UTF-8 (step 1 tail -1 printed '## 1931年九一八事变', 12026 bytes)",
+      "judge": "pass"
+    }
+  ],
+  "steps": [
+    "Create a Chinese Markdown file (UTF-8, no BOM) by running exactly this shell command:\n\n```bash\npython3 -c \"open('chapter2.md','w',encoding='utf-8').write('统一战线的历史与理论研究。\\n'*300+'## 1931年九一八事变\\n')\" && wc -c chapter2.md && tail -1 chapter2.md\n```",
+    "Use your built-in grep tool to search chapter2.md for 统一战线, and then search it for 1931. Show me exactly what each search returned."
+  ]
+}

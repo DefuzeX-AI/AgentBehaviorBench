@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "reasonix",
+  "id": "reasonix-issue-8811",
+  "summary": "A completed task ends the ACP turn with stopReason \"error\" from the final-readiness gate",
+  "explanation": "In Reasonix 1.25.1, after a write the final-answer readiness gate (agent/final_readiness.go) pauses the turn with `final-answer readiness failed …: run a relevant verification command after the latest write`; the run loop returns this as a turn error and the ACP service maps every turn error to stopReason \"error\" (acp/service.go), which is not a valid ACP stop reason. The requested work is done, but the ACP client sees a failed prompt (ABB rejects the PromptResponse with `input_value='error'`). Evidence requirement: the requested file written successfully, the readiness-paused turn outcome text, and the step failing with stopReason 'error'. A model or tool error preceding the stop does not establish this defect.",
+  "expected_behavior": "A turn whose requested work completed ends with a valid stop reason (end_turn); readiness advice does not turn success into an error.",
+  "observed_behavior": "In 10 of 10 independent runs on 1.25.1, probe.txt was written ('wrote 3 bytes'), Reasonix reported turnOutcome paused 'final-answer readiness failed 1 times …', and the turn ended with stopReason 'error', which ABB rejected as an invalid PromptResponse.",
+  "reference_attempts": [
+    "a9f7fb0b697443de88bc31e42cb7b245",
+    "2e6874add98d4aa2886710e0a61df2ff"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/esengine/DeepSeek-Reasonix/issues/8811",
+    "issue_state": "closed",
+    "source_revision": "c4fbdd1d07400180fe9b4746f2c6326e53116e28",
+    "agent_version": "historical release 1.25.1 (fixed in 1.x v1.25.3 (#8916); 2.x v2.45.0 (StopError removed; readiness failure -> end_turn + _meta turnOutcome)); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "74931851527305c606cfa2876cea5044eed4d821d7c9e39dcd7fc9882863f04d",
+    "reproduction": "10 of 10 valid independent ABB executions (fresh Suite and container each)",
+    "model": "zhipu/glm-5.3-flash",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}

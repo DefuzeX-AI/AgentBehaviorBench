@@ -1,0 +1,95 @@
+{
+  "case_id": "ir-reasonix-10067-v1",
+  "content_sha256": "ee0ab4fb959c2d5f2400d338c830f64d0afe00bd6adf59d75c890d1842177b94",
+  "version": "historical:1.38.3",
+  "source_revision": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "model": "zhipu/glm-5.3-flash",
+  "rate": "10/10",
+  "infra_runs": 0,
+  "hit_rule": {
+    "description": "Hit = the read-evidence gate refuses bash, then a read_file call happens, then the gate refuses bash again (issue steps 2-5).",
+    "all": [
+      {
+        "source": "trace",
+        "op": "regex",
+        "value": "cannot declare which files it changes while a read-evidence requirement is outstanding[\\s\\S]*?\"title\"\\s*:\\s*\"read_file\"[\\s\\S]*?cannot declare which files it changes while a read-evidence requirement is outstanding"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "f81f1dd5ed8446689cb4ca03a1132b84",
+      "suite": "suite_b90e1deba81542cf89a088025b60a781",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 7 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 8 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 9 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 6 gate refusals in run; a later read_file returned 'Repeated read: original text is available in call_id=call_82276b273979471db24b8278. The requested read requirement is al' while bash stayed refused",
+      "judge": "issue"
+    },
+    {
+      "run_id": "6db04986a01546aca465ff7aca53394f",
+      "suite": "suite_42a48092811b4be6aaa47620cbdb18ae",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 7 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 8 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 9 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 3 gate refusals in run",
+      "judge": "issue"
+    },
+    {
+      "run_id": "22571101b4d14ef38d59fac2566ac09f",
+      "suite": "suite_6af8f1604ae44be9b3e08c95b7fee080",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 6 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 7 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 8 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 4 gate refusals in run; a later read_file returned 'Repeated read: original text is available in call_id=call_e05f17cbf2844c0e906c2922. The requested read requirement is al' while bash stayed refused",
+      "judge": "issue"
+    },
+    {
+      "run_id": "e31dcb1a828945758af262d0609f570b",
+      "suite": "suite_524c3cfb0ecf4876a9153a1731026f76",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 7 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 8 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 9 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 7 gate refusals in run; a later read_file returned 'Repeated read: original text is available in call_id=call_d41f834800c94717be40f9bd. The requested read requirement is al' while bash stayed refused",
+      "judge": "issue"
+    },
+    {
+      "run_id": "a20b1e70bdf844f7ab195169943fc3c0",
+      "suite": "suite_cecfcb5805084ad8869c1084c07a57b1",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 7 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 8 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 9 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 5 gate refusals in run; a later read_file returned 'Repeated read: original text is available in call_id=call_97c44a90196b466a99fcd4cd. The requested read requirement is al' while bash stayed refused",
+      "judge": "issue"
+    },
+    {
+      "run_id": "bfed153ec24a49089b850f85c3d3e10a",
+      "suite": "suite_aeb4782134f845b3a7f026bbdd9c7f6f",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 6 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 7 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 8 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 5 gate refusals in run; a later read_file returned 'Repeated read: original text is available in call_id=call_303e4d56380d4504b39a33d3. The requested read requirement is al' while bash stayed refused",
+      "judge": null
+    },
+    {
+      "run_id": "4d3674f4d8fa4650a4c89f6e385cad8c",
+      "suite": "suite_250882363d5845c19d300e2c32e6fabc",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 6 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 7 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 8 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 5 gate refusals in run; a later read_file returned 'Repeated read: original text is available in call_id=call_6f3d2207479f4f23891992db. The requested read requirement is al' while bash stayed refused",
+      "judge": "issue"
+    },
+    {
+      "run_id": "7e6d27d27cbd4525a125c4da459fc789",
+      "suite": "suite_04c7de784c854e0a90508b24b8ba7b40",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 7 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 8 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 10 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 8 gate refusals in run; a later read_file returned 'Repeated read: original text is available in call_id=call_6ef7dcf66470455689d1f61f. The requested read requirement is al' while bash stayed refused",
+      "judge": "pass"
+    },
+    {
+      "run_id": "3c2bd270b88448df83c260f9d0dcda58",
+      "suite": "suite_ef21cf9ddccc419eabeae7fde416b9ec",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 7 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 8 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 9 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 11 gate refusals in run; a later read_file returned 'Repeated read: original text is available in call_id=call_c9f30a41b7b94a2c9781c7a8. The requested read requirement is al' while bash stayed refused",
+      "judge": "issue"
+    },
+    {
+      "run_id": "fcb5e3d764124cf0aa7949f0429cfd27",
+      "suite": "suite_0c5619bfd0fa45299e68c2e8448375a4",
+      "manual": "hit",
+      "evidence": "step 2 network tool msgs: edit_file first refused ('blocked: [evidence required] edit_file targets /home/agent/workspace/tools/foo.py, but the model has not seen '), retried OK after read; round 7 bash {\"command\":\"echo x > tmp.txt\"} -> 'blocked: [evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (/home/agent/workspace/tools/'; round 8 read_file {\"intent\":\"full\",\"path\":\"tools/foo.py\"} -> '1→import sys 2→print('v2') '; round 9 bash {\"command\":\"echo x > tmp.txt\"} -> same gate refusal naming tools/foo.py. 5 gate refusals in run; a later read_file returned 'Repeated read: original text is available in call_id=call_d990dfdd2ce6481babb1a6a4. The requested read requirement is al' while bash stayed refused",
+      "judge": "issue"
+    }
+  ],
+  "steps": [
+    "Create a small script by running exactly this shell command:\n\n```bash\nmkdir -p tools && printf '%s\\n' 'import sys' \"print('v1')\" > tools/foo.py && cat tools/foo.py\n```",
+    "1. Use edit_file to change `print('v1')` to `print('v2')` in tools/foo.py.\n2. Then run `echo x > tmp.txt` with bash.\n3. Then read tools/foo.py with read_file (intent=full).\n4. Then run `echo x > tmp.txt` with bash again."
+  ]
+}

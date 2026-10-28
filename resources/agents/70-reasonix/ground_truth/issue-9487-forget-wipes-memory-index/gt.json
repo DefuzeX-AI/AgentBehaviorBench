@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "reasonix",
+  "id": "reasonix-issue-9487",
+  "summary": "`forget` on an unreadable MEMORY.md reports success and wipes every index entry",
+  "explanation": "In Reasonix 1.31.4 the memory store (memory/store.go) ignores the error when reading MEMORY.md, treats the index as empty, removes the requested entry from that empty list and writes the result back, so one forget erases all other entries while reporting success. Evidence requirement: the index entry count before (e.g. 2), a forget tool result reporting success, and the count after on the same path being 0 while the other memory file still exists, with no agent command writing the index. A model that deletes the index itself, or a forget that reports failure, does not establish this defect.",
+  "expected_behavior": "If MEMORY.md cannot be read, forget fails with an error and leaves the index untouched; otherwise it removes only the requested entry.",
+  "observed_behavior": "In 9 of 10 independent runs on 1.31.4, MEMORY.md made unreadable with chmod 000 went from BEFORE=2 entries to AFTER=0 after a single successful-looking forget; preferred-editor.md still existed. The remaining run skipped the chmod and did not reach the path.",
+  "reference_attempts": [
+    "487b6a3a5fb2415c80f4485f99a6327f",
+    "6f93100f16c94e928a4ebfae45cab8aa"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9487",
+    "issue_state": "closed",
+    "source_revision": "97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66",
+    "agent_version": "historical release 1.31.4 (fixed in 1.x v1.39.1 (#10833); studio <= v2.45.0 (indexLinesExceptIn returns error)); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "b9fe6291bf005c78a84446bedf19fdcfddd092085d53e78ddb770756621b7703",
+    "reproduction": "9 of 10 valid independent ABB executions (fresh Suite and container each)",
+    "model": "zhipu/glm-5.3-flash",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}

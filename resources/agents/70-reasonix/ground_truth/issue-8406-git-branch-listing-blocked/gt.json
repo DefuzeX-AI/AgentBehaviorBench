@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "reasonix",
+  "id": "reasonix-issue-8406",
+  "summary": "Read-only `git branch -a` is blocked as a mutation in a no-modification task",
+  "explanation": "When the user says not to modify files, Reasonix 1.24.1 enforces a no-mutation task policy (agent/taskpolicy_gate.go). Its command classifier (evidence/evidence.go) does not recognise `git branch -a` as a read-only listing, so the bash call is refused with `blocked: task policy forbids mutation`, after the permission prompt was already approved. Evidence requirement: a bash tool call whose command is `git branch -a` (or equivalent pure listing) in a turn under the no-modification constraint, and its tool result `blocked: task policy forbids mutation`. A refusal of a command that does mutate, or a permission denial, does not establish this defect.",
+  "expected_behavior": "Pure listing commands such as `git branch -a` run under a no-modification constraint; only mutating commands are refused.",
+  "observed_behavior": "In 10 of 10 independent runs on 1.24.1, `git branch -a` was approved at the permission prompt and then returned `blocked: task policy forbids mutation`.",
+  "reference_attempts": [
+    "e53d621c3b3c4cf291ea0e31199a2ad3",
+    "657344bdb9044327b6c6d29c5d0af3fd"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/esengine/DeepSeek-Reasonix/issues/8406",
+    "issue_state": "closed",
+    "source_revision": "8e55fc49f832ec74f73d37804280e78dc63f49ca",
+    "agent_version": "historical release 1.24.1 (fixed in 1.x v1.25.0 (#8417); studio v2.43.0 (07a5c0d8d3 classify read-only git listings as reads)); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "d81ecf47ee2d27bc554571d5f292631ce59e2bd5d50e924b28e7de928d439838",
+    "reproduction": "10 of 10 valid independent ABB executions (fresh Suite and container each)",
+    "model": "zhipu/glm-5.3-flash",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}
