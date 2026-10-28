@@ -114,9 +114,9 @@ attempts, including ground-truth references.
 
 - `agentbench trajectory show DIR` and `render.py`: `full`, `truncate_middle`
   (requests over 3000 characters keep head and tail) and `response_only`.
-- Judge requests attach `trajectory.json` (`sdk/judges.py`); KUMA hashes it
-  with the other evidence (`judge_tasks.validate_execution`). Whether a Judge
-  reads it is the SDK plugin's decision.
+- Native Judge requests attach `trajectory.json` (`sdk/judges.py`). KUMA uses
+  its committed SDK evidence and does not upload or require the derived file;
+  old queued tasks ignore their legacy trajectory hash entry.
 - `EvaluationService.evidence()` returns it under `trajectory`, raw spans under
   `spans`; the viewer route `trajectory` serves it.
 - Ground-truth matching compares reference and candidate trajectories by step.
