@@ -5,7 +5,7 @@ import secrets
 
 import pytest
 
-UNIT = Path(__file__).resolve().parents[1] / "resources/agents/141-bitterbot"
+UNIT = Path(__file__).resolve().parents[1] / "resources/agents/138-bitterbot"
 spec = importlib.util.spec_from_file_location("bitterbot_abb_launcher", UNIT / "bootstrap/launch.py")
 launcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launcher)
