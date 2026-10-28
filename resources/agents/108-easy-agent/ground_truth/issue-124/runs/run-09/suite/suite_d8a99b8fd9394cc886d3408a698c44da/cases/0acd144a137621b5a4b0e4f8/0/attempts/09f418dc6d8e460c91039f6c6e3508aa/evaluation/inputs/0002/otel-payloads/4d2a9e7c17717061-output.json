@@ -1,9 +1,0 @@
-[
-  {
-    "content": {
-      "text": "Command: cd /workspace/project && python3 -c \"\np='split_lines.sh'\nlines=open(p).read().split('\\n')\nlines[2]=\\\"IFS=\\$'\\\\\\\\n'\\\"\nout='\\n'.join(lines[:7])+'\\n'\nopen(p,'w').write(out)\n\"\ncat -A split_lines.sh; ./split_lines.sh $'a,b\\nc'\nRead-only: false\nSandbox: disabled\nExit code: 0\n\nSTDOUT:\n#!/usr/bin/env bash$\n# split_lines.sh: print every field of the first argument on its own line$\nIFS=$'\\n'$\nread -r -a parts <<< \"$1\"$\nfor p in \"${parts[@]}\"; do$\n  echo \"[$p]\"$\ndone$\n[a,b]\n",
-      "type": "text"
-    },
-    "type": "content"
-  }
-]

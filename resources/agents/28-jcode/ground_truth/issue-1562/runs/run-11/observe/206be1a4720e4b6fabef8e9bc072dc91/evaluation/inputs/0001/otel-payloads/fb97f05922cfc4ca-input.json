@@ -1,4 +1,0 @@
-{
-  "command": "python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('migration.db')\ncur = conn.execute('PRAGMA user_version = 0;')\nconn.commit()\nconn.close()\n\" && ls -la migration.db && file migration.db && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('migration.db')\nprint('SQLite header:', open('migration.db','rb').read(16))\nprint('Tables:', conn.execute(\\\"SELECT name FROM sqlite_master WHERE type='table'\\\").fetchall())\nconn.close()\n\"",
-  "intent": "Initialize database header and verify it is valid SQLite"
-}

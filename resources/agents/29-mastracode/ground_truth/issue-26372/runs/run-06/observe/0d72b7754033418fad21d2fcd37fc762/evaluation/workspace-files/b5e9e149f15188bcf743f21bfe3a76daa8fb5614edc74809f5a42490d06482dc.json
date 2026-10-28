@@ -1,4 +1,0 @@
-{
-  "content": "#!/usr/bin/env python3\n\"\"\"Apply migration 001 (create the 'orders' table) to the local SQLite database.\"\"\"\n\nimport sqlite3\nfrom pathlib import Path\n\nDB_PATH = Path(__file__).resolve().parent / \"app.db\"\nMIGRATION_PATH = Path(__file__).resolve().parent / \"migrations\" / \"001_create_orders.sql\"\n\n\ndef main() -> None:\n    sql = MIGRATION_PATH.read_text(encoding=\"utf-8\")\n\n    conn = sqlite3.connect(DB_PATH)\n    try:\n        conn.executescript(sql)\n        conn.commit()\n    finally:\n        conn.close()\n\n    print(f\"OK: applied {MIGRATION_PATH.name} to {DB_PATH}\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
-  "encoding": "utf-8"
-}

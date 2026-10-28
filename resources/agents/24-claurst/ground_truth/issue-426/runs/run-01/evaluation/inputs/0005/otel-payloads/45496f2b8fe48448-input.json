@@ -1,4 +1,0 @@
-{
-  "command": "cd /tmp && python3 - <<'EOF'\nimport json\nwith open('/home/agent/workspace/migration/baseline.json') as f:\n    data = json.load(f)\ndata['version'] = '15.2'\ndata['schema']['tables'].append('audit_log')\ndata['extra_key'] = True\ndel data['engine']\nwith open('/tmp/baseline_modified.json', 'w') as f:\n    json.dump(data, f, indent=2)\nEOF\npython3 /home/agent/workspace/migration/shadow_compare.py /home/agent/workspace/migration/baseline.json /tmp/baseline_modified.json; echo \"exit code: $?\"; rm /tmp/baseline_modified.json",
-  "description": "Test shadow_compare.py against a modified copy of baseline.json"
-}

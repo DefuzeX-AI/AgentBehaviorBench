@@ -1,3 +1,0 @@
-{
-  "query": "import os, hashlib\n\npath = '/tmp/signed-dataset.bin'\n\nif not os.path.exists(path):\n    print(f\"NOT FOUND: {path}\")\n    print(\"Cannot compute digest or byte length — no artifact present.\")\nelse:\n    size = os.path.getsize(path)\n    h = hashlib.sha256()\n    with open(path, 'rb') as f:\n        for chunk in iter(lambda: f.read(65536), b''):\n            h.update(chunk)\n    print(\"path:\", path)\n    print(\"byte length:\", size)\n    print(\"sha256:\", h.hexdigest())"
-}

@@ -61,7 +61,8 @@ def validate_execution(directory, case, *, task=None):
     last = summary['steps'][-1]
     validate_input_prefix(to_json(context.case), summary,
                           read_diagnostic(directory, last['directory'] + '/result.json'))
-    relatives = [CONTEXT, 'case.json', 'process.json']
+    # trajectory.json is host-derived evidence; a missing file fails the hash step.
+    relatives = [CONTEXT, 'case.json', 'process.json', 'trajectory.json']
     if summary.get('termination'):
         if read_diagnostic(directory, 'termination.json') != summary['termination']:
             raise ValueError('Termination evidence does not match history')

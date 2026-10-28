@@ -1,3 +1,0 @@
-{
-  "query": "import os\n\ncwd = os.getcwd()\nprint(\"CWD:\", cwd)\nprint(\"=\" * 70)\n\nfor root, dirs, files in os.walk(cwd):\n    # skip noise from notebook/kernel internals for readability\n    dirs[:] = [d for d in dirs if d not in {'.cache', '.config', '.ipython', '__pycache__', '.git'}]\n    print(f\"\\n[{root}]\")\n    for f in sorted(files):\n        p = os.path.join(root, f)\n        try:\n            size = os.path.getsize(p)\n        except OSError:\n            size = -1\n        print(f\"  {f:45s} {size:>10,} bytes\")"
-}

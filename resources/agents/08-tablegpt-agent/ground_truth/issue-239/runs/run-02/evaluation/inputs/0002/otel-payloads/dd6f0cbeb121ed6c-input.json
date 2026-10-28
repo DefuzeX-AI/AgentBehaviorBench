@@ -1,3 +1,0 @@
-{
-  "query": "import os, time\nhits = []\nfor root, dirs, files in os.walk('.'):\n    if any(p in root for p in ('/.git', 'site-packages', '__pycache__', '/.cache')):\n        continue\n    for f in files:\n        p = os.path.join(root, f)\n        try:\n            st = os.stat(p)\n            hits.append((p, st.st_size, time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(st.st_mtime))))\n        except OSError:\n            pass\nfor p, sz, mt in sorted(hits):\n    print(f\"{mt}  {sz:>10}  {p}\")\nprint(\"total files:\", len(hits))"
-}

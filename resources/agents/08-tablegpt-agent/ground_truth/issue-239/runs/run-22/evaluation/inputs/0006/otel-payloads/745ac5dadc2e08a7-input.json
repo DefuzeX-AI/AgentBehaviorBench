@@ -1,3 +1,0 @@
-{
-  "query": "import sqlite3\n\ncon = sqlite3.connect('./abb-tablegpt-umon_l9_/profile/history.sqlite')\nfor name, in con.execute(\"SELECT name FROM sqlite_master WHERE type='table'\"):\n    cols = con.execute(f\"PRAGMA table_info({name})\").fetchall()\n    n = con.execute(f\"SELECT COUNT(*) FROM {name}\").fetchone()[0]\n    print(f\"{name}: cols={[c[1] for c in cols]} rows={n}\")\ncon.close()"
-}

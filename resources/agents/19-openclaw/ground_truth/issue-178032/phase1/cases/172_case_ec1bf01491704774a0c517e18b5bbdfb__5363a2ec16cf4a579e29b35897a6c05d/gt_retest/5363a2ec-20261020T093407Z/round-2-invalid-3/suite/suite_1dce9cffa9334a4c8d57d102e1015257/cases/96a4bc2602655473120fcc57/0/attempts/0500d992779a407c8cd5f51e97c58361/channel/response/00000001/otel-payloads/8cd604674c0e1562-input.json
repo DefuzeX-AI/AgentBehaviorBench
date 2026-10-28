@@ -1,6 +1,0 @@
-{
-  "command": "printf 'name,age,city\\n\"Smith, John\",34,Springfield\\n' > /tmp/bug_repro.csv && echo \"=== raw file ===\" && cat /tmp/bug_repro.csv && echo \"=== tool output ===\" && python fmtcsv.py /tmp/bug_repro.csv && echo \"=== field-by-field parse of data row ===\" && .venv/bin/python -c \"import csv; rows=list(csv.reader(open('/tmp/bug_repro.csv'))); print(rows[1]); print('number of fields:', len(rows[1]))\"",
-  "title": "Reproduce quoted-comma bug attempt",
-  "workdir": "/home/agent/workspace",
-  "yieldMs": 15000
-}

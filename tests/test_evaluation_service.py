@@ -100,16 +100,16 @@ def test_cli_reads_same_result_and_report(project, capsys):
 def install_test_gt(service, agent_id):
     """Synthetic GT for protocol tests, never a benchmark finding."""
     from agentbench.harness.ground_truth.manifests import MANIFEST_SCHEMA
+    from tests.test_ground_truth import reference_attempt
     directory = service.root / 'unit/ground_truth/echo-changed'
-    folder = directory / 'attempts/reference/evaluation/inputs/0001'
-    folder.mkdir(parents=True)
+    directory.mkdir(parents=True)
+    reference_attempt(directory / 'attempts/reference', agent_id)
     (directory / 'gt.json').write_text(json.dumps({
         'schema': MANIFEST_SCHEMA, 'agent_id': agent_id, 'id': 'echo-changed',
         'summary': 'Echo changed', 'explanation': 'Output appends a counter to the requested exact echo.',
-        'reference_attempts': ['reference']}))
+        'reference_attempts': ['reference'],
+        'decisive_step': {'attempt': 'reference', 'step_id': 2, 'reason': 'The final answer appends a counter.'}}))
     (directory / 'case.json').write_text(json.dumps({'case_id': 'reference'}))
-    (folder / 'input.json').write_text(json.dumps({'payload': 'hello'}))
-    (folder / 'result.json').write_text(json.dumps({'output': 'hello 1'}))
 
 
 def test_gt_matches_submitted_summary_before_loading_saved_traces(project, monkeypatch):
@@ -130,13 +130,16 @@ def test_gt_matches_submitted_summary_before_loading_saved_traces(project, monke
         if len(calls) == 1:
             assert set(payload) == {'reference', 'finding_summary'}
             return {'match': True, 'reason': 'Matching problem summaries'}
-        assert payload['reference_traces'] and payload['candidate_trace']['events']
-        return {'match': True, 'reason': 'Compared saved execution evidence',
-                'reference_event_ids': [payload['reference_traces'][0]['events'][0]['id']],
-                'candidate_event_ids': [payload['candidate_trace']['events'][0]['id']]}
+        assert payload['reference_trajectories'][0]['step_refs'] == ['reference/1', 'reference/2']
+        assert payload['reference']['decisive_step']['step_ref'] == 'reference/2'
+        # The echo fixture makes no observed model call, so the candidate has no steps to cite.
+        assert payload['candidate_trajectory']['step_ids'] == []
+        return {'match': None, 'reason': 'Candidate trajectory has no observed steps',
+                'reference_step_ids': [], 'candidate_step_ids': [], 'candidate_decisive_step': None}
     gt = service.evaluate_gt(suite, ask=ask)
-    assert len(calls) == 2 and gt['scores']['discovery_rate'] == 1
-    assert gt['status'] == 'completed' and gt['provisional']
+    assert len(calls) == 2 and gt['scores']['pending'] == 1 and gt['scores']['discovery_rate'] is None
+    assert gt['status'] == 'partial' and gt['provisional']
+    assert gt['decisions'][0]['localization']['reference_decisive_step'] == 'reference/2'
 
 
 def test_cli_execute_and_gt_use_shared_service(project, capsys):

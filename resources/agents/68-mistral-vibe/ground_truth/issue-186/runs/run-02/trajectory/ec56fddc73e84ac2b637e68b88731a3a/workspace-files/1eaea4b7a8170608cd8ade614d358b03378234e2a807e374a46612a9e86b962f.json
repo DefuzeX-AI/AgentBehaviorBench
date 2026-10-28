@@ -1,4 +1,0 @@
-{
-  "content": "from pip._internal.distributions.base import AbstractDistribution\nfrom pip._internal.distributions.sdist import SourceDistribution\nfrom pip._internal.distributions.wheel import WheelDistribution\nfrom pip._internal.req.req_install import InstallRequirement\n\n\ndef make_distribution_for_install_requirement(\n    install_req: InstallRequirement,\n) -> AbstractDistribution:\n    \"\"\"Returns a Distribution for the given InstallRequirement\"\"\"\n    # Editable requirements will always be source distributions. They use the\n    # legacy logic until we create a modern standard for them.\n    if install_req.editable:\n        return SourceDistribution(install_req)\n\n    # If it's a wheel, it's a WheelDistribution\n    if install_req.is_wheel:\n        return WheelDistribution(install_req)\n\n    # Otherwise, a SourceDistribution\n    return SourceDistribution(install_req)\n",
-  "encoding": "utf-8"
-}

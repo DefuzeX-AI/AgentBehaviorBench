@@ -1,3 +1,0 @@
-{
-  "command": "PYTHONPATH=/home/agent/workspace/.pydeps python3 << 'EOF'\nimport json\nfrom shapely.geometry import shape\nfrom shapely.validation import explain_validity\n\nwith open('/home/agent/workspace/invalid_polygon.geojson') as f:\n    gj = json.load(f)\n\ngeom = shape(gj['features'][0]['geometry'])\nprint(\"is_valid :\", geom.is_valid)\nprint(\"explain  :\", explain_validity(geom))\next = geom.exterior\nprint(\"ring pts :\", len(ext.coords), \"| closed:\", ext.is_ring, \"| simple:\", ext.is_simple)\nprint(\"coords   :\", list(ext.coords))\nEOF"
-}

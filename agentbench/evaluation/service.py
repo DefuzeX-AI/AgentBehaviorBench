@@ -124,8 +124,14 @@ class EvaluationService:
         if request is None:
             raise ValueError('Run has no retained Judge request')
         validate_evidence(request, api.directory)
-        return {'schema': 'abb.evaluation.evidence.v1', 'run': metadata,
-                'request': request, 'trajectory': api.spans(), 'evaluation': api.evaluation()}
+        from agentbench import trajectory
+        try:
+            derived = trajectory.load(api.directory)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            derived = {'schema': trajectory.SCHEMA, 'status': 'failed', 'run_id': run_id,
+                       'agent_id': metadata.get('agent'), 'error_type': type(exc).__name__, 'error': str(exc)}
+        return {'schema': 'abb.evaluation.evidence.v2', 'run': metadata, 'request': request,
+                'trajectory': derived, 'spans': api.spans(), 'evaluation': api.evaluation()}
 
     def attachment(self, suite, run_id, path):
         api, _ = self._run(suite, run_id)

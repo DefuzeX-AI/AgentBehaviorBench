@@ -276,6 +276,15 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                 if status['cleanup_status'] != 'failed':
                     status['cleanup_status'] = 'succeeded' if session or agent_process else 'not_started'
             finally:
+                if execute_agent:
+                    # Both containers are closed and traces validated: derive the
+                    # trajectory contract now, before SDK diagnostics read the package.
+                    try:
+                        from agentbench import trajectory
+                        status['trajectory'] = trajectory.write(directory, environ=environ)
+                    except Exception as exc:  # noqa: BLE001 - never alter the execution outcome
+                        status['trajectory'] = {'status': 'failed', 'path': 'trajectory.json',
+                                                'error_type': type(exc).__name__, 'error': str(exc)}
                 # The selected SDK may request independent host-side evidence
                 # after both containers stop, while its private workspace exists.
                 # Never recast a capture error as a successful file snapshot.
