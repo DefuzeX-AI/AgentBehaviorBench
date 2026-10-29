@@ -1,0 +1,194 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.25kB 0.0s done
+#1 DONE 0.1s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#2 DONE 0.5s
+
+#3 docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#3 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e 0.0s done
+#3 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 11.98MB / 11.98MB 0.9s done
+#3 extracting sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 1.0s done
+#3 DONE 2.0s
+
+#4 [internal] load metadata for docker.io/library/rust:1.96-slim-trixie
+#4 DONE 0.4s
+
+#5 [internal] load metadata for docker.io/library/python:3.12-slim-trixie
+#5 DONE 0.4s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 229B 0.0s done
+#6 DONE 0.1s
+
+#7 [internal] load build context
+#7 DONE 0.0s
+
+#8 [builder 1/5] FROM docker.io/library/rust:1.96-slim-trixie@sha256:31ee7fc65186be7e0e0ccb3f2ca305f14e4739e7642a1ae65753aa5d7b874523
+#8 resolve docker.io/library/rust:1.96-slim-trixie@sha256:31ee7fc65186be7e0e0ccb3f2ca305f14e4739e7642a1ae65753aa5d7b874523
+#8 resolve docker.io/library/rust:1.96-slim-trixie@sha256:31ee7fc65186be7e0e0ccb3f2ca305f14e4739e7642a1ae65753aa5d7b874523 0.4s done
+#8 DONE 0.4s
+
+#9 [stage-1  1/16] FROM docker.io/library/python:3.12-slim-trixie@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159
+#9 resolve docker.io/library/python:3.12-slim-trixie@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159 0.3s done
+#9 DONE 0.3s
+
+#7 [internal] load build context
+#7 transferring context: 107.26kB 0.4s done
+#7 DONE 0.7s
+
+#10 [builder 2/5] RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates git clang cmake && rm -rf /var/lib/apt/lists/*
+#10 CACHED
+
+#11 [builder 3/5] WORKDIR /src
+#11 CACHED
+
+#12 [builder 4/5] COPY source/ ./
+#12 DONE 2.8s
+
+#13 [builder 5/5] RUN --mount=type=cache,id=abb-gt276-registry,target=/usr/local/cargo/registry --mount=type=cache,id=abb-gt276-git,target=/usr/local/cargo/git --mount=type=cache,id=abb-gt276-target,target=/src/target     cargo build --locked -p code-assistant --no-default-features --features acp-frontend && cp target/debug/code-assistant /code-assistant     && (cargo test --locked -p fs_explorer --lib > /regression.log 2>&1; echo $? > /regression.exit)
+#13 20.20    Compiling code_assistant_core v0.2.16 (/src/crates/code_assistant_core)
+#13 50.03    Compiling ui_acp v0.2.16 (/src/crates/ui_acp)
+#13 55.48    Compiling code-assistant v0.2.16 (/src/crates/code_assistant)
+#13 86.59     Finished `dev` profile [unoptimized] target(s) in 1m 22s
+#13 DONE 95.1s
+
+#14 [stage-1  2/16] RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git ripgrep libssl3t64 && rm -rf /var/lib/apt/lists/*
+#14 CACHED
+
+#15 [stage-1  3/16] WORKDIR /opt/agent
+#15 CACHED
+
+#16 [stage-1  4/16] COPY --from=builder /code-assistant /opt/code-assistant/bin/code-assistant
+#16 DONE 2.4s
+
+#17 [stage-1  5/16] COPY --from=builder /regression.log /regression.exit /opt/
+#17 DONE 0.5s
+
+#18 [stage-1  6/16] RUN code-assistant --version && python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2' && useradd --create-home --uid 10001 agent && mkdir -p /home/agent/workspace && chown -R agent:agent /home/agent
+#18 0.471 code-assistant v0.2.16 (debug build)
+#18 0.471 commit: unknown (clean git tree)
+#18 0.471 built:  2026-10-29T05:13:43Z
+#18 0.471 rust:   rustc 1.96.1 (31fca3adb 2026-06-26) x86_64-unknown-linux-gnu
+#18 3.458 Collecting opentelemetry-sdk<2,>=1.30
+#18 3.533   Downloading opentelemetry_sdk-1.45.1-py3-none-any.whl.metadata (1.6 kB)
+#18 3.568 Collecting jsonschema<5,>=4.23
+#18 3.590   Downloading jsonschema-4.26.0-py3-none-any.whl.metadata (7.6 kB)
+#18 3.618 Collecting python-dotenv<2,>=1
+#18 3.650   Downloading python_dotenv-1.2.4-py3-none-any.whl.metadata (29 kB)
+#18 3.683 Collecting opentelemetry-api==1.45.1 (from opentelemetry-sdk<2,>=1.30)
+#18 3.703   Downloading opentelemetry_api-1.45.1-py3-none-any.whl.metadata (1.4 kB)
+#18 3.727 Collecting opentelemetry-semantic-conventions==0.66b1 (from opentelemetry-sdk<2,>=1.30)
+#18 3.749   Downloading opentelemetry_semantic_conventions-0.66b1-py3-none-any.whl.metadata (2.4 kB)
+#18 3.774 Collecting typing-extensions>=4.5.0 (from opentelemetry-sdk<2,>=1.30)
+#18 3.795   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+#18 3.818 Collecting attrs>=22.2.0 (from jsonschema<5,>=4.23)
+#18 3.840   Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+#18 3.860 Collecting jsonschema-specifications>=2023.03.6 (from jsonschema<5,>=4.23)
+#18 3.883   Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl.metadata (2.9 kB)
+#18 3.933 Collecting referencing>=0.28.4 (from jsonschema<5,>=4.23)
+#18 3.955   Downloading referencing-0.37.0-py3-none-any.whl.metadata (2.8 kB)
+#18 4.949 Collecting rpds-py>=0.25.0 (from jsonschema<5,>=4.23)
+#18 4.978   Downloading rpds_py-2026.9.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.1 kB)
+#18 5.018 Downloading opentelemetry_sdk-1.45.1-py3-none-any.whl (140 kB)
+#18 5.336 Downloading opentelemetry_api-1.45.1-py3-none-any.whl (60 kB)
+#18 5.370 Downloading opentelemetry_semantic_conventions-0.66b1-py3-none-any.whl (206 kB)
+#18 5.423 Downloading jsonschema-4.26.0-py3-none-any.whl (90 kB)
+#18 5.451 Downloading python_dotenv-1.2.4-py3-none-any.whl (23 kB)
+#18 5.473 Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+#18 5.498 Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+#18 5.519 Downloading referencing-0.37.0-py3-none-any.whl (26 kB)
+#18 5.543 Downloading rpds_py-2026.9.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (371 kB)
+#18 5.644 Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+#18 5.677 Installing collected packages: typing-extensions, rpds-py, python-dotenv, attrs, referencing, opentelemetry-api, opentelemetry-semantic-conventions, jsonschema-specifications, opentelemetry-sdk, jsonschema
+#18 6.571 Successfully installed attrs-26.1.0 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 opentelemetry-api-1.45.1 opentelemetry-sdk-1.45.1 opentelemetry-semantic-conventions-0.66b1 python-dotenv-1.2.4 referencing-0.37.0 rpds-py-2026.9.1 typing-extensions-4.16.0
+#18 6.571 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#18 6.692 
+#18 6.692 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+#18 6.692 [notice] To update, run: pip install --upgrade pip
+#18 DONE 7.3s
+
+#19 [stage-1  7/16] COPY .abb-runtime/ /opt/abb-runtime/
+#19 DONE 1.0s
+
+#20 [stage-1  8/16] COPY agent.toml provenance.json ./
+#20 DONE 0.4s
+
+#21 [stage-1  9/16] COPY network/ ./network/
+#21 DONE 0.3s
+
+#22 [stage-1 10/16] COPY bootstrap/ ./bootstrap/
+#22 DONE 0.4s
+
+#23 [stage-1 11/16] COPY .abb-adapter/requirements.txt /opt/abb-adapter/requirements.txt
+#23 DONE 0.2s
+
+#24 [stage-1 12/16] RUN python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip
+#24 DONE 1.2s
+
+#25 [stage-1 13/16] RUN python -m pip --isolated install --no-cache-dir --index-url https://pypi.org/simple -r /opt/abb-adapter/requirements.txt
+#25 1.217 Collecting agent-client-protocol==0.12.1 (from -r /opt/abb-adapter/requirements.txt (line 1))
+#25 1.278   Downloading agent_client_protocol-0.12.1-py3-none-any.whl.metadata (5.8 kB)
+#25 1.449 Collecting pydantic>=2.7 (from agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1))
+#25 1.458   Downloading pydantic-2.14.1-py3-none-any.whl.metadata (133 kB)
+#25 1.530 Collecting annotated-types>=0.6.0 (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1))
+#25 1.539   Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+#25 3.240 Collecting pydantic-core==2.50.1 (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1))
+#25 3.251   Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.5 kB)
+#25 3.255 Requirement already satisfied: typing-extensions>=4.16.0 in /usr/local/lib/python3.12/site-packages (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1)) (4.16.0)
+#25 3.267 Collecting typing-inspection>=0.4.4 (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1))
+#25 3.274   Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+#25 3.311 Downloading agent_client_protocol-0.12.1-py3-none-any.whl (85 kB)
+#25 3.322 Downloading pydantic-2.14.1-py3-none-any.whl (488 kB)
+#25 3.370 Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
+#25 4.239    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 2.8 MB/s eta 0:00:00
+#25 4.247 Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+#25 4.255 Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+#25 4.354 Installing collected packages: typing-inspection, pydantic-core, annotated-types, pydantic, agent-client-protocol
+#25 5.429 Successfully installed agent-client-protocol-0.12.1 annotated-types-0.8.0 pydantic-2.14.1 pydantic-core-2.50.1 typing-inspection-0.4.4
+#25 5.430 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#25 5.590 
+#25 5.590 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+#25 5.590 [notice] To update, run: pip install --upgrade pip
+#25 DONE 6.4s
+
+#26 [stage-1 14/16] COPY .abb-runtime/agentbench/runtime/docker/requirements.txt /opt/abb-runtime-deps/requirements.txt
+#26 DONE 0.3s
+
+#27 [stage-1 15/16] RUN python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip
+#27 DONE 1.3s
+
+#28 [stage-1 16/16] RUN python -m pip --isolated install --no-cache-dir --index-url https://pypi.org/simple -r /opt/abb-runtime-deps/requirements.txt
+#28 1.138 Ignoring tomli: markers 'python_version < "3.11"' don't match your environment
+#28 1.231 Collecting filelock<4,>=3.32.7 (from -r /opt/abb-runtime-deps/requirements.txt (line 5))
+#28 1.304   Downloading filelock-3.32.7-py3-none-any.whl.metadata (2.0 kB)
+#28 1.365 Collecting PyYAML<7,>=6 (from -r /opt/abb-runtime-deps/requirements.txt (line 6))
+#28 1.394   Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+#28 1.414 Downloading filelock-3.32.7-py3-none-any.whl (100 kB)
+#28 1.451 Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+#28 1.533    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 807.9/807.9 kB 10.3 MB/s eta 0:00:00
+#28 1.566 Installing collected packages: PyYAML, filelock
+#28 1.957 Successfully installed PyYAML-6.0.3 filelock-3.32.7
+#28 1.958 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#28 2.088 
+#28 2.088 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+#28 2.088 [notice] To update, run: pip install --upgrade pip
+#28 DONE 2.6s
+
+#29 exporting to image
+#29 exporting layers
+#29 exporting layers 8.7s done
+#29 exporting manifest sha256:f6931a609cc2a5ea3850e9b6b240004838c69f551eda1a5227466e4f7f7c3b2e 0.1s done
+#29 exporting config sha256:de691a866830427977cdef980e4565764575fa5bc70a651a552db756a93c7b40 0.1s done
+#29 exporting attestation manifest sha256:5b7bc9c853317e0351a2ef32218584b05526386d896f48b3b7227cd057c34383
+#29 exporting attestation manifest sha256:5b7bc9c853317e0351a2ef32218584b05526386d896f48b3b7227cd057c34383 0.2s done
+#29 exporting manifest list sha256:6f371dc6de52cb60dc819d35863afe2941b0fcc4f889aca8b992727000264c76
+#29 exporting manifest list sha256:6f371dc6de52cb60dc819d35863afe2941b0fcc4f889aca8b992727000264c76 0.1s done
+#29 naming to docker.io/library/abb-gt-repair:c1 done
+#29 unpacking to docker.io/library/abb-gt-repair:c1
+#29 unpacking to docker.io/library/abb-gt-repair:c1 7.5s done
+#29 DONE 17.0s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/7cycanrtt0vct1p7frtzqal6u

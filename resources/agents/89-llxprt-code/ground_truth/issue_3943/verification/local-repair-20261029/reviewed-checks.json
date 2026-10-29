@@ -1,0 +1,33 @@
+{
+  "verdict": "reproduced_and_locally_fixed",
+  "assertions": [
+    {
+      "label": "l0-flash",
+      "run_id": "f8b49ac0dd734641a5abcaa4963f88d9",
+      "call": {
+        "id": "call_00_ET_YQFaTrEw704oMjF2V95T1736",
+        "name": "run_shell_command",
+        "arguments": {
+          "command": "python3 -c \"import sys; print('to-stdout'); print('to-stderr', file=sys.stderr)\"",
+          "description": "Run a python one-liner printing to stdout and stderr"
+        }
+      },
+      "model_received_tool_result": "status:\nsuccess\n\ntoolName:\nrun_shell_command\n\nerror:\n\n\noutput:\nCommand: python3 -c \"import sys; print('to-stdout'); print('to-stderr', file=sys.stderr)\"\nDirectory: (root)\nStdout: to-stderr\nto-stdout\n\nStderr: (empty)\nError: (none)\nExit Code: 0\nSignal: (none)\nBackground PIDs: (none)\nProcess Group PGID: (none)"
+    },
+    {
+      "label": "l1-flash",
+      "run_id": "c7dc5cbb6c0a4003922081f21f6b0b19",
+      "call": {
+        "id": "call_00_ET_TMd14bTDqRmaZfzZdPuR6104",
+        "name": "run_shell_command",
+        "arguments": {
+          "command": "python3 -c \"import sys; print('to-stdout'); print('to-stderr', file=sys.stderr)\"",
+          "description": "Run a Python one-liner that prints to stdout and stderr"
+        }
+      },
+      "model_received_tool_result": "status:\nsuccess\n\ntoolName:\nrun_shell_command\n\nerror:\n\n\noutput:\nCommand: python3 -c \"import sys; print('to-stdout'); print('to-stderr', file=sys.stderr)\"\nDirectory: (root)\nOutput (stdout and stderr combined): to-stderr\nto-stdout\n\nError: (none)\nExit Code: 0\nSignal: (none)\nBackground PIDs: (none)\nProcess Group PGID: (none)"
+    }
+  ],
+  "regression": "The new formatter contract fails before and passes after; all 17 existing shell tests pass on both variants.",
+  "scope": "Truthful labeling of combined output, explicitly accepted by the upstream issue. Separate stream capture was not added."
+}

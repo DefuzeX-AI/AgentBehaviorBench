@@ -1,0 +1,325 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.75kB 0.0s done
+#1 DONE 0.1s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#2 DONE 0.4s
+
+#3 docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#3 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e 0.1s done
+#3 CACHED
+
+#4 [internal] load metadata for docker.io/library/node:24-bookworm
+#4 DONE 0.2s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 229B done
+#5 DONE 0.1s
+
+#6 [internal] load build context
+#6 DONE 0.0s
+
+#7 [ 1/18] FROM docker.io/library/node:24-bookworm@sha256:e7add2a490bb17d97b485b8641bd88455fff7839ade0f5eba493c3508124d413
+#7 resolve docker.io/library/node:24-bookworm@sha256:e7add2a490bb17d97b485b8641bd88455fff7839ade0f5eba493c3508124d413 0.1s done
+#7 DONE 0.1s
+
+#8 [ 2/18] RUN apt-get update && apt-get install -y --no-install-recommends python3-venv python3-pip ripgrep git build-essential && rm -rf /var/lib/apt/lists/* && python3 -m venv /opt/venv && npm install -g bun@1.3.14
+#8 CACHED
+
+#9 [ 3/18] WORKDIR /opt/agent
+#9 CACHED
+
+#6 [internal] load build context
+#6 transferring context: 44.61MB 1.3s done
+#6 DONE 1.3s
+
+#10 [ 4/18] COPY source.zip /tmp/source.zip
+#10 DONE 0.6s
+
+#11 [ 5/18] RUN python -m zipfile -e /tmp/source.zip /opt/agent/source && rm /tmp/source.zip
+#11 DONE 5.6s
+
+#12 [ 6/18] RUN cd source && bun install --frozen-lockfile && bun run generate && bun scripts/bun-build.config.ts --cli-only
+#12 0.482 bun install v1.3.14 (0d9b296a)
+#12 0.577 Resolving dependencies
+#12 6.714 Resolved, downloaded and extracted [350]
+#12 6.715 148 |     "jsonwebtoken": {
+#12 6.715                           ^
+#12 6.715 warn: Bun currently does not support nested "overrides"
+#12 6.715    at /opt/agent/source/package.json:148:21
+#12 33.36 
+#12 33.36 $ node scripts/preinstall.cjs
+#12 33.41 $ node scripts/postinstall.cjs
+#12 34.49 patch-package 8.0.1
+#12 34.49 Applying patches...
+#12 34.50 ink@6.4.8 ✔
+#12 34.52 
+#12 34.52 + @types/bun@1.3.14
+#12 34.52 + @types/debug@4.1.13
+#12 34.52 + @types/html-to-text@9.0.4
+#12 34.52 + @types/marked@5.0.2
+#12 34.52 + @types/mime-types@3.0.1
+#12 34.52 + @types/minimatch@5.1.2 (v6.0.0 available)
+#12 34.52 + @types/mock-fs@4.13.4
+#12 34.52 + @types/node@24.13.2 (v26.6.6 available)
+#12 34.52 + @types/semver@7.7.1 (v7.8.0 available)
+#12 34.52 + @types/shell-quote@1.7.5
+#12 34.52 + @types/turndown@5.0.6
+#12 34.52 + @types/update-notifier@6.0.8
+#12 34.52 + concurrently@9.2.3
+#12 34.52 + cross-env@7.0.3
+#12 34.52 + depcheck@1.4.7
+#12 34.52 + eslint@9.29.0 (v10.13.0 available)
+#12 34.52 + eslint-config-prettier@10.1.5
+#12 34.52 + eslint-plugin-eslint-comments@3.2.0
+#12 34.52 + eslint-plugin-headers@1.3.4
+#12 34.52 + eslint-plugin-import@2.32.0
+#12 34.52 + eslint-plugin-jest@28.14.0
+#12 34.52 + eslint-plugin-react@7.37.5
+#12 34.52 + eslint-plugin-react-hooks@5.2.0
+#12 34.52 + eslint-plugin-sonarjs@4.0.2
+#12 34.52 + fast-check@4.5.3 (v4.10.2 available)
+#12 34.52 + globals@16.5.0
+#12 34.52 + json@11.0.0
+#12 34.52 + jsonc-parser@3.3.1
+#12 34.52 + lodash@4.18.1
+#12 34.52 + memfs@4.57.8
+#12 34.52 + mock-fs@5.5.0
+#12 34.52 + patch-package@8.0.1
+#12 34.52 + prettier@3.6.1
+#12 34.52 + react-devtools-core@6.1.5
+#12 34.52 + semver@7.8.5
+#12 34.52 + ts-prune@0.10.3
+#12 34.52 + typescript-eslint@8.35.0
+#12 34.52 + @lydell/node-pty@1.1.0 (v1.2.0-beta.18 available)
+#12 34.52 + @lydell/node-pty-linux-x64@1.1.0 (v1.2.0-beta.18 available)
+#12 34.52 + @napi-rs/keyring@1.3.0 (v2.1.2 available)
+#12 34.52 + @oven/bun-linux-x64@1.3.14 (v1.4.4 available)
+#12 34.52 + @oven/bun-linux-x64-baseline@1.3.14 (v1.4.4 available)
+#12 34.52 + @oven/bun-linux-x64-musl@1.3.14 (v1.4.4 available)
+#12 34.52 + @oven/bun-linux-x64-musl-baseline@1.3.14 (v1.4.4 available)
+#12 34.52 + @x70102/ink@6.4.0-hotfix-flicker-scroll-merge
+#12 34.52 + node-pty@1.1.0
+#12 34.52 + @agentclientprotocol/sdk@1.2.1 (v2.1.0 available)
+#12 34.52 + @ai-sdk/openai@2.0.109 (v4.0.104 available)
+#12 34.52 + @ai-sdk/provider-utils@2.2.8 (v5.0.70 available)
+#12 34.52 + @anthropic-ai/sdk@0.55.1 (v1.3.0 available)
+#12 34.52 + @ast-grep/lang-c@0.0.5 (v0.0.6 available)
+#12 34.52 + @ast-grep/lang-cpp@0.0.5 (v0.0.6 available)
+#12 34.52 + @ast-grep/lang-csharp@0.0.5 (v0.0.6 available)
+#12 34.52 + @ast-grep/lang-go@0.0.5 (v0.0.6 available)
+#12 34.52 + @ast-grep/lang-java@0.0.6 (v0.0.7 available)
+#12 34.52 + @ast-grep/lang-json@0.0.6 (v0.0.7 available)
+#12 34.52 + @ast-grep/lang-kotlin@0.0.6 (v0.0.7 available)
+#12 34.52 + @ast-grep/lang-php@0.0.6 (v0.0.7 available)
+#12 34.52 + @ast-grep/lang-python@0.0.5 (v0.0.6 available)
+#12 34.52 + @ast-grep/lang-ruby@0.0.6 (v0.0.7 available)
+#12 34.52 + @ast-grep/lang-rust@0.0.6 (v0.0.7 available)
+#12 34.52 + @ast-grep/lang-scala@0.0.6 (v0.0.7 available)
+#12 34.52 + @ast-grep/lang-swift@0.0.7 (v0.0.8 available)
+#12 34.52 + @ast-grep/napi@0.40.5 (v0.51.0 available)
+#12 34.52 + @dqbd/tiktoken@1.0.22
+#12 34.52 + @google/genai@1.30.0 (v2.31.0 available)
+#12 34.52 + @hono/node-server@1.19.17
+#12 34.52 + @iarna/toml@2.2.5
+#12 34.52 + @lvce-editor/ripgrep@5.7.0 (v5.8.0 available)
+#12 34.52 + @modelcontextprotocol/sdk@1.29.0 (v1.32.2 available)
+#12 34.52 + @opentelemetry/api@1.9.0 (v1.10.0 available)
+#12 34.52 + @opentelemetry/api-logs@0.219.0 (v0.223.0 available)
+#12 34.52 + @opentelemetry/core@2.8.0 (v3.0.0 available)
+#12 34.52 + @opentelemetry/instrumentation-http@0.219.0 (v0.300.0 available)
+#12 34.52 + @opentelemetry/resources@2.8.0 (v3.0.0 available)
+#12 34.52 + @opentelemetry/sdk-logs@0.219.0 (v3.0.0 available)
+#12 34.52 + @opentelemetry/sdk-metrics@2.8.0 (v3.0.0 available)
+#12 34.52 + @opentelemetry/sdk-trace-base@2.8.0 (v2.12.0 available)
+#12 34.52 + @opentelemetry/sdk-trace-node@2.8.0 (v2.12.0 available)
+#12 34.52 + @opentelemetry/semantic-conventions@1.41.1 (v1.44.0 available)
+#12 34.52 + @testing-library/dom@10.4.1 (v10.4.2 available)
+#12 34.52 + @xterm/headless@5.5.0 (v6.0.0 available)
+#12 34.52 + ai@5.0.206 (v7.0.156 available)
+#12 34.52 + ajv@8.20.0
+#12 34.52 + ajv-formats@3.0.1
+#12 34.52 + ansi-regex@6.2.2 (v6.4.0 available)
+#12 34.52 + bun@1.3.14 (v1.4.4 available)
+#12 34.52 + chalk@5.6.2 (v6.0.1 available)
+#12 34.52 + chardet@2.2.0
+#12 34.52 + cheerio@1.2.0
+#12 34.52 + cli-spinners@2.9.2 (v3.4.0 available)
+#12 34.52 + clipboardy@4.0.0 (v5.3.2 available)
+#12 34.52 + command-exists@1.2.9
+#12 34.52 + comment-json@4.6.2 (v5.0.0 available)
+#12 34.52 + debug@4.4.3
+#12 34.52 + diff@8.0.4 (v9.0.0 available)
+#12 34.52 + dotenv@17.4.2 (v18.0.9 available)
+#12 34.52 + env-paths@4.0.0
+#12 34.52 + execa@9.6.1 (v10.2.1 available)
+#12 34.52 + fast-glob@3.3.3
+#12 34.52 + fast-levenshtein@2.0.6 (v3.0.0 available)
+#12 34.52 + fast-uri@3.1.6
+#12 34.52 + fdir@6.5.0
+#12 34.52 + fzf@0.5.2
+#12 34.52 + glob@12.0.0 (v14.0.3 available)
+#12 34.52 + google-auth-library@9.15.1 (v11.3.2 available)
+#12 34.52 + gradient-string@2.0.2 (v3.0.0 available)
+#12 34.52 + highlight.js@11.11.1 (v11.12.0 available)
+#12 34.52 + html-to-text@9.0.5 (v10.0.1 available)
+#12 34.52 + http-proxy-agent@5.0.0
+#12 34.52 + https-proxy-agent@7.0.6 (v9.1.0 available)
+#12 34.52 + ignore@7.0.5 (v7.0.14 available)
+#12 34.52 + ink@6.4.8
+#12 34.52 + ink-gradient@3.0.0 (v4.0.1 available)
+#12 34.52 + ink-select-input@6.2.0
+#12 34.52 + ink-spinner@5.0.0
+#12 34.52 + ink-testing-library@4.0.0
+#12 34.52 + js-yaml@4.3.1 (v5.5.0 available)
+#12 34.52 + lowlight@3.3.0
+#12 34.52 + marked@15.0.12 (v18.1.2 available)
+#12 34.52 + micromatch@4.0.8
+#12 34.52 + mime-types@3.0.2
+#12 34.52 + mnemonist@0.40.4 (v0.40.6 available)
+#12 34.52 + node-fetch@3.3.2
+#12 34.52 + open@10.2.0 (v11.0.4 available)
+#12 34.52 + openai@5.23.2 (v7.45.1 available)
+#12 34.52 + path-scurry@2.0.2
+#12 34.52 + picomatch@4.0.4 (v4.0.7 available)
+#12 34.52 + react@19.2.7 (v19.3.1 available)
+#12 34.52 + read-package-up@11.0.0 (v12.0.0 available)
+#12 34.52 + sharp@0.35.3 (v0.35.5 available)
+#12 34.52 + shell-quote@1.10.0 (v1.12.0 available)
+#12 34.52 + simple-git@3.36.0 (v4.0.2 available)
+#12 34.52 + string-width@8.2.1 (v8.3.0 available)
+#12 34.52 + strip-ansi@7.2.0
+#12 34.52 + strip-json-comments@3.1.1 (v5.0.3 available)
+#12 34.52 + tar@7.5.22
+#12 34.52 + tinygradient@1.1.5 (v2.0.1 available)
+#12 34.52 + tree-sitter-bash@0.25.1
+#12 34.52 + tree-sitter-pwsh@0.38.1
+#12 34.52 + turndown@7.2.4
+#12 34.52 + typescript-language-server@5.3.0
+#12 34.52 + undici@7.29.0 (v8.12.3 available)
+#12 34.52 + update-notifier@7.3.1
+#12 34.52 + uuid@11.1.1 (v14.0.3 available)
+#12 34.52 + vscode-jsonrpc@8.2.1 (v10.0.0 available)
+#12 34.52 + web-tree-sitter@0.25.10 (v0.27.1 available)
+#12 34.52 + wrap-ansi@9.0.2 (v10.0.2 available)
+#12 34.52 + yargs@17.7.3 (v18.2.0 available)
+#12 34.52 + yauzl@3.4.0
+#12 34.52 + zod@3.25.76 (v4.6.7 available)
+#12 34.52 + zod-to-json-schema@3.25.2
+#12 34.52 
+#12 34.52 1225 packages installed [34.08s]
+#12 34.57 $ bun scripts/generate-git-commit-info.ts && bun scripts/generate_prompt_manifest.ts
+#12 34.64 fatal: not a git repository (or any of the parent directories): .git
+#12 38.57 bun build complete: /opt/agent/source/packages/cli/bundle/llxprt.js=19340499 /opt/agent/source/packages/cli/bundle/memprofile-launcher.js=37076 /opt/agent/source/packages/cli/bundle/memprofile-preload.js=21617 /opt/agent/source/packages/cli/bundle/memprofile-request.js=17643 /opt/agent/source/packages/cli/bundle/memprofile-report.js=18988 /opt/agent/source/packages/cli/bundle/memprofile-analyze.js=22009 /opt/agent/source/packages/cli/bundle/tree-sitter.wasm /opt/agent/source/packages/cli/bundle/providers/aliases/gemini.config /opt/agent/source/packages/cli/bundle/providers/aliases/cerebras-code.config /opt/agent/source/packages/cli/bundle/providers/aliases/claudecode.config /opt/agent/source/packages/cli/bundle/providers/aliases/openai-responses.config /opt/agent/source/packages/cli/bundle/providers/aliases/qwen.config /opt/agent/source/packages/cli/bundle/providers/aliases/openrouter.config /opt/agent/source/packages/cli/bundle/providers/aliases/makora.config /opt/agent/source/packages/cli/bundle/providers/aliases/openai-vercel.config /opt/agent/source/packages/cli/bundle/providers/aliases/deepseek.config /opt/agent/source/packages/cli/bundle/providers/aliases/fireworks.config /opt/agent/source/packages/cli/bundle/providers/aliases/anthropic.config /opt/agent/source/packages/cli/bundle/providers/aliases/llama-cpp.config /opt/agent/source/packages/cli/bundle/providers/aliases/ollama-cloud.config /opt/agent/source/packages/cli/bundle/providers/aliases/zai.config /opt/agent/source/packages/cli/bundle/providers/aliases/chutes-ai.config /opt/agent/source/packages/cli/bundle/providers/aliases/qwenvercel.config /opt/agent/source/packages/cli/bundle/providers/aliases/synthetic.config /opt/agent/source/packages/cli/bundle/providers/aliases/litellm.config /opt/agent/source/packages/cli/bundle/providers/aliases/kimi.config /opt/agent/source/packages/cli/bundle/providers/aliases/mistral.config /opt/agent/source/packages/cli/bundle/providers/aliases/xai.config /opt/agent/source/packages/cli/bundle/providers/aliases/codex.config /opt/agent/source/packages/cli/bundle/providers/aliases/lm-studio.config /opt/agent/source/packages/cli/bundle/providers/aliases/openai.config /opt/agent/source/packages/cli/bundle/policies/yolo.toml /opt/agent/source/packages/cli/bundle/policies/write.toml /opt/agent/source/packages/cli/bundle/policies/discovered.toml /opt/agent/source/packages/cli/bundle/policies/read-only.toml /opt/agent/source/packages/cli/bundle/sandbox-macos-restrictive-open.sb /opt/agent/source/packages/cli/bundle/sandbox-macos-permissive-closed.sb /opt/agent/source/packages/cli/bundle/sandbox-macos-restrictive-closed.sb /opt/agent/source/packages/cli/bundle/sandbox-macos-permissive-proxied.sb /opt/agent/source/packages/cli/bundle/sandbox-macos-restrictive-proxied.sb /opt/agent/source/packages/cli/bundle/sandbox-macos-permissive-open.sb /opt/agent/source/packages/cli/bundle/assets/NOTICE.md /opt/agent/source/packages/cli/bundle/assets/minimax-m3/manifest.json /opt/agent/source/packages/cli/bundle/assets/minimax-m3/tokenizer.bpe /opt/agent/source/packages/cli/bundle/assets/minimax-m3/LICENSE /opt/agent/source/packages/cli/bundle/assets/glm-5.2/manifest.json /opt/agent/source/packages/cli/bundle/assets/glm-5.2/tokenizer.bpe /opt/agent/source/packages/cli/bundle/assets/glm-5.2/LICENSE /opt/agent/source/packages/cli/bundle/assets/kimi-k3/manifest.json /opt/agent/source/packages/cli/bundle/assets/kimi-k3/tokenizer.bpe /opt/agent/source/packages/cli/bundle/assets/kimi-k3/LICENSE /opt/agent/source/packages/cli/bundle/examples/exclude-tools/llxprt-extension.json /opt/agent/source/packages/cli/bundle/examples/skills/gemini-extension.json /opt/agent/source/packages/cli/bundle/examples/skills/skills/greeter/SKILL.md /opt/agent/source/packages/cli/bundle/examples/context/llxprt-extension.json /opt/agent/source/packages/cli/bundle/examples/context/LLXPRT.md /opt/agent/source/packages/cli/bundle/examples/mcp-server/package.json /opt/agent/source/packages/cli/bundle/examples/mcp-server/llxprt-extension.json /opt/agent/source/packages/cli/bundle/examples/mcp-server/example.js /opt/agent/source/packages/cli/bundle/examples/mcp-server/gemini-extension.json /opt/agent/source/packages/cli/bundle/examples/mcp-server/README.md /opt/agent/source/packages/cli/bundle/examples/hooks/gemini-extension.json /opt/agent/source/packages/cli/bundle/examples/hooks/scripts/on-start.js /opt/agent/source/packages/cli/bundle/examples/hooks/hooks/hooks.json /opt/agent/source/packages/cli/bundle/core.md /opt/agent/source/packages/cli/bundle/subagent-delegation.md /opt/agent/source/packages/cli/bundle/compression.md /opt/agent/source/packages/cli/bundle/async-subagent-guidance.md /opt/agent/source/packages/cli/bundle/providers/gemini/core.md /opt/agent/source/packages/cli/bundle/providers/gemini/models/gemini-exp-1206/core.md /opt/agent/source/packages/cli/bundle/providers/gemini/models/gemini-2.5-flash/core.md /opt/agent/source/packages/cli/bundle/providers/gemini/models/gemini-2.5-flash/gemini-2-5-flash/core.md /opt/agent/source/packages/cli/bundle/providers/gemini/models/gemini-3-pro-preview/core.md /opt/agent/source/packages/cli/bundle/providers/gemini/models/gemini-3-flash-preview/core.md /opt/agent/source/packages/cli/bundle/env/sandbox.md /opt/agent/source/packages/cli/bundle/env/macos-seatbelt.md /opt/agent/source/packages/cli/bundle/env/git-repository.md /opt/agent/source/packages/cli/bundle/env/ide-mode.md /opt/agent/source/packages/cli/bundle/env/outside-of-sandbox.md /opt/agent/source/packages/cli/bundle/tools/apply-patch.md /opt/agent/source/packages/cli/bundle/tools/read-file.md /opt/agent/source/packages/cli/bundle/tools/delete_line_range.md /opt/agent/source/packages/cli/bundle/tools/read-many-files.md /opt/agent/source/packages/cli/bundle/tools/shell.md /opt/agent/source/packages/cli/bundle/tools/code-search.md /opt/agent/source/packages/cli/bundle/tools/save-memory.md /opt/agent/source/packages/cli/bundle/tools/read-line-range.md /opt/agent/source/packages/cli/bundle/tools/todo-write.md /opt/agent/source/packages/cli/bundle/tools/edit.md /opt/agent/source/packages/cli/bundle/tools/read_line_range.md /opt/agent/source/packages/cli/bundle/tools/list-subagents.md /opt/agent/source/packages/cli/bundle/tools/todo-read.md /opt/agent/source/packages/cli/bundle/tools/task.md /opt/agent/source/packages/cli/bundle/tools/ls.md /opt/agent/source/packages/cli/bundle/tools/delete-line-range.md /opt/agent/source/packages/cli/bundle/tools/write-file.md /opt/agent/source/packages/cli/bundle/tools/direct-web-fetch.md /opt/agent/source/packages/cli/bundle/tools/glob.md /opt/agent/source/packages/cli/bundle/tools/todo-pause.md /opt/agent/source/packages/cli/bundle/tools/insert_at_line.md /opt/agent/source/packages/cli/bundle/tools/exa-web-search.md /opt/agent/source/packages/cli/bundle/tools/insert-at-line.md /opt/agent/source/packages/cli/bundle/tools/memory.md /opt/agent/source/packages/cli/bundle/tools/grep.md /opt/agent/source/packages/cli/bundle/default-prompts.json /opt/agent/source/packages/cli/bundle/git-commit.json
+#12 DONE 40.1s
+
+#13 [ 7/18] RUN python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2' && useradd --create-home --uid 10001 agent && mkdir -p /home/agent/workspace && chown agent:agent /home/agent /home/agent/workspace
+#13 2.506 Collecting opentelemetry-sdk<2,>=1.30
+#13 2.570   Downloading opentelemetry_sdk-1.45.1-py3-none-any.whl (140 kB)
+#13 2.594      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 140.1/140.1 kB 6.8 MB/s eta 0:00:00
+#13 2.651 Collecting jsonschema<5,>=4.23
+#13 2.661   Downloading jsonschema-4.26.0-py3-none-any.whl (90 kB)
+#13 2.667      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 90.6/90.6 kB 23.6 MB/s eta 0:00:00
+#13 2.696 Collecting python-dotenv<2,>=1
+#13 2.706   Downloading python_dotenv-1.2.4-py3-none-any.whl (23 kB)
+#13 2.757 Collecting opentelemetry-api==1.45.1
+#13 2.766   Downloading opentelemetry_api-1.45.1-py3-none-any.whl (60 kB)
+#13 2.770      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.3/60.3 kB 52.3 MB/s eta 0:00:00
+#13 2.818 Collecting opentelemetry-semantic-conventions==0.66b1
+#13 2.829   Downloading opentelemetry_semantic_conventions-0.66b1-py3-none-any.whl (206 kB)
+#13 2.844      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 206.3/206.3 kB 14.7 MB/s eta 0:00:00
+#13 2.875 Collecting typing-extensions>=4.5.0
+#13 2.887   Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+#13 2.890      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 192.6 MB/s eta 0:00:00
+#13 2.938 Collecting attrs>=22.2.0
+#13 2.947   Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+#13 2.950      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.5/67.5 kB 89.6 MB/s eta 0:00:00
+#13 2.973 Collecting jsonschema-specifications>=2023.03.6
+#13 2.981   Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+#13 3.030 Collecting referencing>=0.28.4
+#13 3.040   Downloading referencing-0.37.0-py3-none-any.whl (26 kB)
+#13 3.690 Collecting rpds-py>=0.25.0
+#13 3.701   Downloading rpds_py-2026.9.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (375 kB)
+#13 3.734      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 375.4/375.4 kB 11.7 MB/s eta 0:00:00
+#13 3.841 Installing collected packages: typing-extensions, rpds-py, python-dotenv, attrs, referencing, opentelemetry-api, opentelemetry-semantic-conventions, jsonschema-specifications, opentelemetry-sdk, jsonschema
+#13 4.760 Successfully installed attrs-26.1.0 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 opentelemetry-api-1.45.1 opentelemetry-sdk-1.45.1 opentelemetry-semantic-conventions-0.66b1 python-dotenv-1.2.4 referencing-0.37.0 rpds-py-2026.9.1 typing-extensions-4.16.0
+#13 5.193 useradd: warning: the home directory /home/agent already exists.
+#13 5.193 useradd: Not copying any file from skel directory into it.
+#13 DONE 5.3s
+
+#14 [ 8/18] COPY .abb-runtime/ /opt/abb-runtime/
+#14 DONE 0.4s
+
+#15 [ 9/18] COPY agent.toml provenance.json ./
+#15 DONE 0.2s
+
+#16 [10/18] COPY network/ ./network/
+#16 DONE 0.2s
+
+#17 [11/18] COPY bootstrap/ ./bootstrap/
+#17 DONE 0.2s
+
+#18 [12/18] COPY regression.ts ./regression.ts
+#18 DONE 0.2s
+
+#19 [13/18] COPY .abb-adapter/requirements.txt /opt/abb-adapter/requirements.txt
+#19 DONE 0.2s
+
+#20 [14/18] RUN python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip
+#20 DONE 0.7s
+
+#21 [15/18] RUN python -m pip --isolated install --no-cache-dir --index-url https://pypi.org/simple -r /opt/abb-adapter/requirements.txt
+#21 0.790 Collecting agent-client-protocol==0.12.1
+#21 0.852   Downloading agent_client_protocol-0.12.1-py3-none-any.whl (85 kB)
+#21 0.868      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 85.9/85.9 kB 5.5 MB/s eta 0:00:00
+#21 1.157 Collecting pydantic>=2.7
+#21 1.166   Downloading pydantic-2.14.1-py3-none-any.whl (488 kB)
+#21 1.214      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 488.1/488.1 kB 10.5 MB/s eta 0:00:00
+#21 1.248 Collecting annotated-types>=0.6.0
+#21 1.256   Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+#21 2.769 Collecting pydantic-core==2.50.1
+#21 2.778   Downloading pydantic_core-2.50.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
+#21 2.957      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 12.1 MB/s eta 0:00:00
+#21 2.965 Requirement already satisfied: typing-extensions>=4.16.0 in /opt/venv/lib/python3.11/site-packages (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1)) (4.16.0)
+#21 2.992 Collecting typing-inspection>=0.4.4
+#21 3.000   Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+#21 3.104 Installing collected packages: typing-inspection, pydantic-core, annotated-types, pydantic, agent-client-protocol
+#21 3.586 Successfully installed agent-client-protocol-0.12.1 annotated-types-0.8.0 pydantic-2.14.1 pydantic-core-2.50.1 typing-inspection-0.4.4
+#21 DONE 3.9s
+
+#22 [16/18] COPY .abb-runtime/agentbench/runtime/docker/requirements.txt /opt/abb-runtime-deps/requirements.txt
+#22 DONE 0.2s
+
+#23 [17/18] RUN python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip
+#23 DONE 0.7s
+
+#24 [18/18] RUN python -m pip --isolated install --no-cache-dir --index-url https://pypi.org/simple -r /opt/abb-runtime-deps/requirements.txt
+#24 0.763 Ignoring tomli: markers 'python_version < "3.11"' don't match your environment
+#24 0.887 Collecting filelock<4,>=3.32.7
+#24 0.954   Downloading filelock-3.32.7-py3-none-any.whl (100 kB)
+#24 0.979      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.2/100.2 kB 4.4 MB/s eta 0:00:00
+#24 1.061 Collecting PyYAML<7,>=6
+#24 1.070   Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (806 kB)
+#24 1.151      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 806.6/806.6 kB 10.1 MB/s eta 0:00:00
+#24 1.220 Installing collected packages: PyYAML, filelock
+#24 1.387 Successfully installed PyYAML-6.0.3 filelock-3.32.7
+#24 DONE 1.6s
+
+#25 exporting to image
+#25 exporting layers
+#25 exporting layers 64.8s done
+#25 exporting manifest sha256:136c07f5db4afb673ea124282a0ec8162640633e37d2beaa622063f55ee1af68 0.1s done
+#25 exporting config sha256:10d15864f392e1509acf78fddc1349fcd809836bfe6cf3766d0d8c21544fd756
+#25 exporting config sha256:10d15864f392e1509acf78fddc1349fcd809836bfe6cf3766d0d8c21544fd756 0.1s done
+#25 exporting attestation manifest sha256:5cd579331dbfedcd0e7b7502a0cbff28ad584dc5c1e0d46bf64a876e126561b4
+#25 exporting attestation manifest sha256:5cd579331dbfedcd0e7b7502a0cbff28ad584dc5c1e0d46bf64a876e126561b4 0.2s done
+#25 exporting manifest list sha256:3b89a138448464a0e0f282a191ff35c602b970a52b4223a6afa2afe8130b11b0
+#25 exporting manifest list sha256:3b89a138448464a0e0f282a191ff35c602b970a52b4223a6afa2afe8130b11b0 0.1s done
+#25 naming to docker.io/library/abb-gt-repair:l1 0.0s done
+#25 unpacking to docker.io/library/abb-gt-repair:l1
+#25 unpacking to docker.io/library/abb-gt-repair:l1 83.0s done
+#25 DONE 148.4s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/25lq9t0vlryew5rhbwtuahhtt

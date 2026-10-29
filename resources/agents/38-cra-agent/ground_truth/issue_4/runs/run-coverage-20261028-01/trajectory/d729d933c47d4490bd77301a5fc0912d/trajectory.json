@@ -1,0 +1,123 @@
+{
+  "schema": "abb.agent-trajectory.v1",
+  "builder_version": 1,
+  "status": "partial",
+  "run_id": "d729d933c47d4490bd77301a5fc0912d",
+  "agent_id": "cra-agent",
+  "case_id": "coverage-cra-agent-4-01",
+  "framework": "langgraph",
+  "metadata": {
+    "task_instruction": "STRIPE_KEY = \"<STRIPE_TEST_SECRET>\"\nGH_TOKEN = \"<GITHUB_TEST_TOKEN>\"\n\n\ndef charge(amount):\n    return {\"key\": STRIPE_KEY, \"amount\": amount}\n",
+    "case_id": null,
+    "agent_configuration": {
+      "agents": [
+        {
+          "agent_name": "cra-agent"
+        }
+      ],
+      "system_prompt": null,
+      "tools": null,
+      "runtime": {
+        "framework": "langgraph",
+        "runtime": {
+          "type": "docker",
+          "execution": "oneshot",
+          "timeout_sec": 600
+        },
+        "adapter": {
+          "type": "langgraph",
+          "mode": "in_process",
+          "binding": "bridge.py:create_graph",
+          "output_key": "answer"
+        },
+        "launch": {
+          "argv": [
+            "python",
+            "-m",
+            "agentbench.runtime.agentcontainer.worker"
+          ],
+          "workdir": "/opt/agent"
+        },
+        "evaluation": {
+          "replay_safe": false
+        }
+      }
+    },
+    "system_architecture": {
+      "framework": "langgraph",
+      "source_revision": "4d819a56d825ca14013997958eeb3d0e13ab7ebb",
+      "profile": {
+        "path": "requirement.md",
+        "sha256": "b0c4743ccb4d15abde92b9b0634fd74375d14931077c53af8496b072ca80c745"
+      },
+      "manifest": {
+        "path": "agent.toml",
+        "sha256": "1005102848afba5cb9e684fb9bc5189a8805a9d47dff2e38d844424671c45ef4"
+      },
+      "binding": {
+        "path": "bindings/bridge.py",
+        "sha256": "3e33f341e18c4f1bbfdef700f7e23ed0f2cb6af0260aa707d5ff1e313e902a7f"
+      }
+    },
+    "notes": []
+  },
+  "steps": [],
+  "inputs": [
+    {
+      "ordinal": "0001",
+      "input_id": "step-1",
+      "prompt": "STRIPE_KEY = \"<STRIPE_TEST_SECRET>\"\nGH_TOKEN = \"<GITHUB_TEST_TOKEN>\"\n\n\ndef charge(amount):\n    return {\"key\": STRIPE_KEY, \"amount\": amount}\n",
+      "step_range": null,
+      "result": {
+        "status": "succeeded",
+        "output": "CRA-AGENT scan report\n\nFiles scanned: 1 (submission.py)\nRaw findings: 0\nAfter suppression filtering: 0\nTriaged findings: 0\n\nNo findings survived scanning and filtering for this input, so no\ntriage was performed and no tickets or fixes were produced.",
+        "error_type": null,
+        "error": null
+      },
+      "file_changes": []
+    }
+  ],
+  "coverage": {
+    "model_calls": "not_observed",
+    "tool_calls": "not_observed",
+    "file_changes": "not_observed",
+    "ambiguous_links": 0,
+    "unlinked_tool_calls": 0,
+    "unobserved_tool_executions": 0
+  },
+  "sources": [
+    {
+      "path": "case.json",
+      "sha256": "9c2f0ed975e6a17afc83ebef74fb2ca05047ad2a6481c5743191e3d71cfad274"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "2fdf9364f5c1978547d60a940e82c267a777dcbf71150ce0f174a3d67eb7ace1"
+    },
+    {
+      "path": "logs/network.jsonl",
+      "sha256": "68a179dc446c035618019c562c495bd157edaa39ee34ca4eaf0887043ad4d700"
+    },
+    {
+      "path": "steps/0001/framework.jsonl",
+      "sha256": "7f5910df18ac8c1af2747a8181d931a0713690f8deb11deff8a4cc26ee2b9620"
+    },
+    {
+      "path": "steps/0001/input.json",
+      "sha256": "e4ab65485e7198fbeb529db9abc1e4454e7fbf9d498070a0bf0110f856beeb92"
+    },
+    {
+      "path": "steps/0001/request.json",
+      "sha256": "2c38242ffbea9b00ad3cefc5db2004b446dc1b25c453281f29350b3d4d56613a"
+    },
+    {
+      "path": "steps/0001/result.json",
+      "sha256": "ac03dae96989bd0b007a4e3f0820d6797f9bae0315f738910e4f74d54b949265"
+    },
+    {
+      "path": "steps/0001/submission.json",
+      "sha256": "527135b5e52d7c82feb5aa3763e840f89047518a3c0c0caeb7f2fb19fb42b9a1"
+    }
+  ],
+  "warnings": []
+}

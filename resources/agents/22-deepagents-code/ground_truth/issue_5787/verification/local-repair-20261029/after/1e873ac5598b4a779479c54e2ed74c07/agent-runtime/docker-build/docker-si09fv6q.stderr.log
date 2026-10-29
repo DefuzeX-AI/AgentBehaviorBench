@@ -1,0 +1,141 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.95kB done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/python:3.12-bookworm
+#2 DONE 0.3s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 116B done
+#3 DONE 0.1s
+
+#4 [internal] load build context
+#4 DONE 0.0s
+
+#5 [ 1/22] FROM docker.io/library/python:3.12-bookworm@sha256:a5bab0ff300f91231c2e68bf73a8a8d60762ac39ce1c50eaf6803e4c38a9062b
+#5 resolve docker.io/library/python:3.12-bookworm@sha256:a5bab0ff300f91231c2e68bf73a8a8d60762ac39ce1c50eaf6803e4c38a9062b
+#5 resolve docker.io/library/python:3.12-bookworm@sha256:a5bab0ff300f91231c2e68bf73a8a8d60762ac39ce1c50eaf6803e4c38a9062b 0.1s done
+#5 DONE 0.1s
+
+#4 [internal] load build context
+#4 transferring context: 4.71MB 0.3s done
+#4 DONE 0.3s
+
+#6 [ 8/22] COPY regression.py /opt/regression.py
+#6 CACHED
+
+#7 [ 2/22] RUN apt-get update && apt-get install -y --no-install-recommends ripgrep     && rm -rf /var/lib/apt/lists/* && python3 -m venv /opt/venv && python3 -m venv /opt/agent-venv
+#7 CACHED
+
+#8 [ 5/22] RUN /opt/agent-venv/bin/python -m pip install --no-cache-dir --require-hashes -r agent/requirements.txt     && cert=$(/opt/agent-venv/bin/python -c 'import certifi; print(certifi.where())')     && mv "$cert" "${cert%.pem}.orig.pem" && ln -s /tmp/abb-deepagents-certifi.pem "$cert"     && /opt/venv/bin/python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2'     && useradd --create-home --uid 10001 agent     && mkdir -p /home/agent/workspace     && chown -R agent:agent /home/agent
+#8 CACHED
+
+#9 [ 3/22] WORKDIR /opt/agent
+#9 CACHED
+
+#10 [ 4/22] COPY agent/ ./agent/
+#10 CACHED
+
+#11 [ 6/22] COPY source/libs/deepagents/ /opt/historical-deepagents/
+#11 CACHED
+
+#12 [ 7/22] RUN /opt/agent-venv/bin/python -m pip install --no-deps /opt/historical-deepagents
+#12 CACHED
+
+#13 [ 9/22] COPY provenance.json ./provenance.json
+#13 CACHED
+
+#14 [10/22] COPY .abb-runtime/ /opt/abb-runtime/
+#14 DONE 0.4s
+
+#15 [11/22] COPY agent.toml ./
+#15 DONE 0.2s
+
+#16 [12/22] COPY network/ ./network/
+#16 DONE 0.2s
+
+#17 [13/22] COPY bootstrap/ ./bootstrap/
+#17 DONE 0.3s
+
+#18 [14/22] COPY .abb-sdk/ /opt/abb-sdk/
+#18 DONE 0.4s
+
+#19 [15/22] RUN interpreter="$(command -v python)" || { echo "ABB evaluation overlay: no python on the image PATH" >&2; exit 1; }; python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip >/dev/null || { echo "ABB evaluation overlay: $interpreter has no pip module and no ensurepip; install pip into that interpreter in the Agent Dockerfile" >&2; exit 1; }; python -m pip --isolated install --upgrade --no-cache-dir --index-url https://pypi.org/simple -r /opt/abb-sdk/requirements.txt
+#19 3.682 
+#19 3.682 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+#19 3.682 [notice] To update, run: pip install --upgrade pip
+#19 DONE 3.9s
+
+#20 [16/22] COPY .abb-runtime/ /opt/abb-sdk-runtime/
+#20 DONE 0.4s
+
+#21 [17/22] COPY .abb-adapter/requirements.txt /opt/abb-adapter/requirements.txt
+#21 DONE 0.3s
+
+#22 [18/22] RUN python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip
+#22 DONE 1.3s
+
+#23 [19/22] RUN python -m pip --isolated install --no-cache-dir --index-url https://pypi.org/simple -r /opt/abb-adapter/requirements.txt
+#23 2.553 Collecting agent-client-protocol==0.12.1 (from -r /opt/abb-adapter/requirements.txt (line 1))
+#23 2.668   Downloading agent_client_protocol-0.12.1-py3-none-any.whl.metadata (5.8 kB)
+#23 3.193 Collecting pydantic>=2.7 (from agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1))
+#23 3.215   Downloading pydantic-2.14.1-py3-none-any.whl.metadata (133 kB)
+#23 3.312 Collecting annotated-types>=0.6.0 (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1))
+#23 3.336   Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+#23 6.058 Collecting pydantic-core==2.50.1 (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1))
+#23 6.087   Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.5 kB)
+#23 6.091 Requirement already satisfied: typing-extensions>=4.16.0 in /opt/venv/lib/python3.12/site-packages (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1)) (4.16.0)
+#23 6.111 Collecting typing-inspection>=0.4.4 (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1))
+#23 6.132   Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+#23 6.165 Downloading agent_client_protocol-0.12.1-py3-none-any.whl (85 kB)
+#23 6.192 Downloading pydantic-2.14.1-py3-none-any.whl (488 kB)
+#23 6.276 Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
+#23 6.430    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 15.4 MB/s eta 0:00:00
+#23 6.449 Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+#23 6.471 Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+#23 6.577 Installing collected packages: typing-inspection, pydantic-core, annotated-types, pydantic, agent-client-protocol
+#23 8.237 Successfully installed agent-client-protocol-0.12.1 annotated-types-0.8.0 pydantic-2.14.1 pydantic-core-2.50.1 typing-inspection-0.4.4
+#23 9.225 
+#23 9.225 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+#23 9.225 [notice] To update, run: pip install --upgrade pip
+#23 DONE 10.3s
+
+#24 [20/22] COPY .abb-runtime/agentbench/runtime/docker/requirements.txt /opt/abb-runtime-deps/requirements.txt
+#24 DONE 0.4s
+
+#25 [21/22] RUN python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip
+#25 DONE 2.0s
+
+#26 [22/22] RUN python -m pip --isolated install --no-cache-dir --index-url https://pypi.org/simple -r /opt/abb-runtime-deps/requirements.txt
+#26 1.796 Ignoring tomli: markers 'python_version < "3.11"' don't match your environment
+#26 1.901 Collecting filelock<4,>=3.32.7 (from -r /opt/abb-runtime-deps/requirements.txt (line 5))
+#26 1.957   Downloading filelock-3.32.7-py3-none-any.whl.metadata (2.0 kB)
+#26 2.009 Collecting PyYAML<7,>=6 (from -r /opt/abb-runtime-deps/requirements.txt (line 6))
+#26 2.017   Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+#26 2.029 Downloading filelock-3.32.7-py3-none-any.whl (100 kB)
+#26 2.055 Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+#26 2.125    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 807.9/807.9 kB 14.9 MB/s eta 0:00:00
+#26 2.170 Installing collected packages: PyYAML, filelock
+#26 2.802 Successfully installed PyYAML-6.0.3 filelock-3.32.7
+#26 2.999 
+#26 2.999 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+#26 2.999 [notice] To update, run: pip install --upgrade pip
+#26 DONE 3.2s
+
+#27 exporting to image
+#27 exporting layers
+#27 exporting layers 3.5s done
+#27 exporting manifest sha256:43105fc4c00b049918a533755d64a17b58ca566224dfc826ac3054fa08ff6882 0.1s done
+#27 exporting config sha256:4edb54cb3a3bfc9cacb83fc10e6df797bd8a355aa00d6143044edc7b667f89c0 0.0s done
+#27 exporting attestation manifest sha256:527dbd2c11fe6ed566c0d33c17d884b3757db344bb79c032ffb4086ea9f3ae8f
+#27 exporting attestation manifest sha256:527dbd2c11fe6ed566c0d33c17d884b3757db344bb79c032ffb4086ea9f3ae8f 0.2s done
+#27 exporting manifest list sha256:636aaf89aad00b83869555bdaf9b9b155a0015442f20b5186d2931e1b1587c89
+#27 exporting manifest list sha256:636aaf89aad00b83869555bdaf9b9b155a0015442f20b5186d2931e1b1587c89 0.1s done
+#27 naming to docker.io/defuzex-agentbench/deepagents-code:1f307c624343a6aa0946d563ec5e2debc03a7e1589a99f39c6f08499b2a679e9 0.0s done
+#27 unpacking to docker.io/defuzex-agentbench/deepagents-code:1f307c624343a6aa0946d563ec5e2debc03a7e1589a99f39c6f08499b2a679e9
+#27 unpacking to docker.io/defuzex-agentbench/deepagents-code:1f307c624343a6aa0946d563ec5e2debc03a7e1589a99f39c6f08499b2a679e9 2.4s done
+#27 DONE 6.4s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/o020burdwyp066d0awo8fvolm

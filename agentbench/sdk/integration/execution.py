@@ -25,6 +25,14 @@ from agentbench.sdk.common.output_permissions import prepare_output
 from agentbench.sdk.common.workspace import workspace_policy, prepare_workspace, workspace_digest
 
 
+def _host_copy_path(path):
+    """Use Windows extended paths for deeply nested SDK source copies."""
+    path = Path(path).resolve()
+    if os.name == 'nt' and not str(path).startswith('\\\\?\\'):
+        return Path('\\\\?\\' + str(path))
+    return path
+
+
 def _private_path(root, relative):
     """Resolve a plugin-owned file beneath controller-only storage."""
     path = PurePosixPath(relative)
@@ -113,6 +121,8 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                 on_artifacts_ready(directory)
             control.check()
 
+            from agentbench.trajectory.metadata import capture_target
+            files.save('request/target.json', capture_target(agent.path))
             with stage_agent(agent, control=control, deadline=preparation) as descriptor:
                 # Keep the tracked source/workspace separate from private SDK storage.
                 # Only the trusted controller mounts the ledger.
@@ -150,7 +160,8 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                             if expected_environment_sha256 != workspace_digest(contract):
                                 raise ValueError('Saved Case workspace differs; no Agent steps were executed')
                     else:
-                        shutil.copytree(Path(descriptor.path / 'agent'), Path(repository), ignore=_ignore,
+                        shutil.copytree(_host_copy_path(descriptor.path / 'agent'),
+                                        _host_copy_path(repository), ignore=_ignore,
                                         copy_function=checked_copy)
                     for relative in private_directories:
                         path = _private_path(ledger_root, relative)
@@ -284,33 +295,57 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     except Exception as exc:  # noqa: BLE001 - never alter the execution outcome
                         status['trajectory'] = {'status': 'failed', 'path': 'trajectory.json',
                                                 'error_type': type(exc).__name__, 'error': str(exc)}
-                status['artifacts'] = (collect_artifacts(directory, status, environ=environ)
-                                       if collect_artifacts is not None else {'directory': str(directory)})
-                if primary_error is not None:
-                    primary_error.artifacts = status['artifacts']
-                manifest = destination / 'manifest.json'
-                if Path(manifest).is_file() and not Path(manifest).is_symlink():
+                try:
+                    status['artifacts'] = (collect_artifacts(directory, status, environ=environ)
+                                           if collect_artifacts is not None else {'directory': str(directory)})
+                    if primary_error is not None:
+                        primary_error.artifacts = status['artifacts']
+                    manifest = destination / 'manifest.json'
+                    if Path(manifest).is_file() and not Path(manifest).is_symlink():
+                        try:
+                            status['sdk_run_id'] = json.loads(Path(manifest).read_text()).get('run_id')
+                        except (OSError, ValueError, AttributeError):
+                            pass  # Preserve the original container/validation outcome.
+                    if (status['cleanup_status'] == 'succeeded'
+                            and status['host_trace_validation'] == 'succeeded'):
+                        cleanup_transport(directory)
+                finally:
                     try:
-                        status['sdk_run_id'] = json.loads(Path(manifest).read_text()).get('run_id')
-                    except (OSError, ValueError, AttributeError):
-                        pass  # Preserve the original container/validation outcome.
-                files.save('run.json', status)
-                if (status['cleanup_status'] == 'succeeded'
-                        and status['host_trace_validation'] == 'succeeded'):
-                    cleanup_transport(directory)
-                if workspace_temp is not None:
-                    workspace_temp.cleanup()
+                        if status['cleanup_status'] in ('succeeded', 'not_started'):
+                            cleanup_source(directory)
+                            status['source_cleanup_status'] = 'succeeded'
+                        else:
+                            status['source_cleanup_status'] = 'retained'
+                    except (OSError, ValueError) as exc:
+                        status.update(status='failed', source_cleanup_status='failed',
+                                      source_cleanup_error_type=type(exc).__name__,
+                                      source_cleanup_error=str(exc))
+                        if primary_error is None:
+                            raise
+                    finally:
+                        files.save('run.json', status)
+                        if workspace_temp is not None:
+                            workspace_temp.cleanup()
         timing_root.status = status['status']
         return directory
 
 
 def cleanup_transport(directory):
     """Retire only temporary communication after both containers are stopped."""
+    _remove_run_directories(directory, ('channel', 'agent-request', 'agent-output'))
+
+
+def cleanup_source(directory):
+    """Retire the read-only runtime copy, preserving SDK recovery and evidence."""
+    _remove_run_directories(directory, ('sdk-source',))
+
+
+def _remove_run_directories(directory, names):
     root = Path(directory).resolve()
-    for name in ('channel', 'agent-request', 'agent-output'):
+    for name in names:
         path = root / name
         if path.is_symlink() or (hasattr(path, 'is_junction') and path.is_junction()) or not path.resolve().is_relative_to(root):
-            raise ValueError('Transport path leaves execution root')
+            raise ValueError('Temporary data path leaves execution root')
         if path.is_dir():
             target = str(path)
             if os.name == 'nt' and not target.startswith('\\\\?\\'):

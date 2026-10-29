@@ -1,0 +1,388 @@
+{
+  "schema": "abb.judge.request.v1",
+  "agent_id": "verify-reasonix14403-before",
+  "run_id": "df583a40b41b473a89584e1fd9ec1a05",
+  "case": {
+    "case_id": "srp-reasonix-h1-crlf-literal-edit-v1",
+    "input_type": "text",
+    "inputs": [
+      {
+        "input_id": "step-1",
+        "payload": "In settings.ini add the setting timeout=30 on its own line right after retries=3. Do it with exactly one edit_file call whose old_string is the text retries=3 (just those 9 characters, no line break) and whose new_string is retries=3, a line break, then timeout=30. After the edit, show me the bytes of the [client] section with: od -c settings.ini | tail -n 6"
+      }
+    ]
+  },
+  "case_sha256": "60fdfab58aebdb9c90a153873ccfedabb70cbdfa0bdfb0b96c87b3e19cd55528",
+  "workspace": {
+    "fixture_sha256": "e300f7b51873ca5f718a377edcd79707a503e25fb25d6d171985c1e86a2dd23a",
+    "initial_state": "fixture",
+    "path": "/home/agent/workspace",
+    "schema": "abb.workspace.v1"
+  },
+  "steps": [
+    {
+      "input": {
+        "input_id": "step-1",
+        "payload": "In settings.ini add the setting timeout=30 on its own line right after retries=3. Do it with exactly one edit_file call whose old_string is the text retries=3 (just those 9 characters, no line break) and whose new_string is retries=3, a line break, then timeout=30. After the edit, show me the bytes of the [client] section with: od -c settings.ini | tail -n 6"
+      },
+      "result": {
+        "schema": "abb.result.v1",
+        "run_id": "ac345171c83642449d49176cd49713bd",
+        "case_id": "srp-reasonix-h1-crlf-literal-edit-v1",
+        "input_id": "step-1",
+        "invocation_id": "ac345171c83642449d49176cd49713bd",
+        "agent_id": "verify-reasonix14403-before",
+        "status": "succeeded",
+        "output": "The setting `timeout=30` has been successfully added on its own line right after `retries=3` in the `settings.ini` file. Here's the last part of the `[client]` section shown in byte format:\n\n```\n0000000   [   c   l   i   e   n   t   ]  \\r  \\n   r   e   t   r   i   e\n0000020   s   =   3  \\n   t   i   m   e   o   u   t   =   3   0  \\r  \\n\n0000040   b   a   c   k   o   f   f   =   2  \\r  \\n\n0000053\n```\n\nIf you need further modifications or have additional requests, let me know!",
+        "raw_output": {
+          "initialize": {
+            "protocolVersion": 1,
+            "agentCapabilities": {
+              "loadSession": true,
+              "promptCapabilities": {
+                "image": true,
+                "audio": false,
+                "embeddedContext": true
+              },
+              "mcpCapabilities": {
+                "http": true,
+                "sse": false,
+                "acp": false
+              },
+              "sessionCapabilities": {
+                "list": {},
+                "delete": {},
+                "additionalDirectories": {},
+                "resume": {},
+                "close": {}
+              },
+              "auth": {},
+              "_meta": {
+                "_reasonix.io/session/extension/submitForm": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/goal/pause": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/goal/resume": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/info": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/mcp/disconnect": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/mcp/reconnect": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/mcpServers": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/mcpStatus": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/mcpStatus_update": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/status": {
+                  "schemaVersion": 1
+                },
+                "_reasonix.io/session/status_update": {
+                  "schemaVersion": 1
+                },
+                "reasonix.io": {
+                  "sessionSteer": {
+                    "method": "_reasonix.io/session/steer"
+                  },
+                  "sessionInbox": {
+                    "schemaVersion": 1,
+                    "methods": {
+                      "delete": "_reasonix.io/session/inbox/delete",
+                      "enqueue": "_reasonix.io/session/inbox/enqueue",
+                      "get": "_reasonix.io/session/inbox/get",
+                      "list": "_reasonix.io/session/inbox/list",
+                      "move": "_reasonix.io/session/inbox/move",
+                      "refresh": "_reasonix.io/session/inbox/refresh",
+                      "retry": "_reasonix.io/session/inbox/retry",
+                      "setPaused": "_reasonix.io/session/inbox/setPaused",
+                      "update": "_reasonix.io/session/inbox/update"
+                    }
+                  },
+                  "sessionReloadExtensions": {
+                    "method": "_reasonix.io/session/reloadExtensions"
+                  },
+                  "extensionSurface": {
+                    "supported": true,
+                    "schemaVersion": 1
+                  }
+                }
+              }
+            },
+            "authMethods": [
+              {
+                "id": "reasonix-setup",
+                "name": "Reasonix setup",
+                "description": "Configure Reasonix providers and credentials in a terminal",
+                "args": [
+                  "setup"
+                ],
+                "type": "terminal"
+              }
+            ],
+            "agentInfo": {
+              "name": "reasonix",
+              "version": "verify-a708a88"
+            }
+          },
+          "pid": 9,
+          "session": {
+            "sessionId": "f0b8b6b8-a703-488c-b492-ccba442afa74",
+            "modes": {
+              "currentModeId": "normal",
+              "availableModes": [
+                {
+                  "id": "normal",
+                  "name": "Normal",
+                  "description": "Work directly and pause when user input is required"
+                },
+                {
+                  "id": "plan",
+                  "name": "Plan",
+                  "description": "Research and propose a plan before making changes"
+                },
+                {
+                  "id": "goal",
+                  "name": "Goal",
+                  "description": "Keep advancing the next prompt as a goal until complete or blocked"
+                }
+              ]
+            },
+            "configOptions": [
+              {
+                "currentValue": "abb/openai/gpt-4.1-mini",
+                "options": [
+                  {
+                    "value": "abb/openai/gpt-4.1-mini",
+                    "name": "abb/openai/gpt-4.1-mini",
+                    "description": "abb"
+                  }
+                ],
+                "id": "model",
+                "name": "Model",
+                "category": "model",
+                "type": "select"
+              },
+              {
+                "currentValue": "balanced",
+                "options": [
+                  {
+                    "value": "light",
+                    "name": "Light",
+                    "description": "Fast and reliable: on-demand capabilities, targeted verification"
+                  },
+                  {
+                    "value": "balanced",
+                    "name": "Balanced",
+                    "description": "Adaptive planning and risk-tiered verification"
+                  },
+                  {
+                    "value": "delivery",
+                    "name": "Delivery",
+                    "description": "Evidence closed-loop: full acceptance, verification, independent review"
+                  }
+                ],
+                "id": "agent_preset",
+                "name": "Execution Setting",
+                "type": "select"
+              },
+              {
+                "currentValue": "balanced",
+                "options": [
+                  {
+                    "value": "economy",
+                    "name": "Economy",
+                    "description": "Deprecated alias for light"
+                  },
+                  {
+                    "value": "balanced",
+                    "name": "Balanced",
+                    "description": "Deprecated alias for balanced"
+                  },
+                  {
+                    "value": "delivery",
+                    "name": "Delivery",
+                    "description": "Deprecated alias for delivery"
+                  }
+                ],
+                "id": "work_mode",
+                "name": "Work Mode (deprecated)",
+                "type": "select"
+              },
+              {
+                "currentValue": "auto",
+                "options": [
+                  {
+                    "value": "readOnly",
+                    "name": "Read only",
+                    "description": "Refuse every call that is not a read"
+                  },
+                  {
+                    "value": "dontAsk",
+                    "name": "Don't ask",
+                    "description": "Refuse permission-gated calls instead of asking"
+                  },
+                  {
+                    "value": "ask",
+                    "name": "Ask",
+                    "description": "Ask before permission-gated tool calls"
+                  },
+                  {
+                    "value": "auto",
+                    "name": "Auto",
+                    "description": "Follow configured permission rules without fallback prompts"
+                  }
+                ],
+                "id": "tool_approval",
+                "name": "Tool Approval",
+                "type": "select"
+              },
+              {
+                "currentValue": "builtin:general",
+                "options": [
+                  {
+                    "value": "builtin:general",
+                    "name": "日常搭档",
+                    "description": "写代码、查资料、理清思路，和你一起把事情做好。沿用你的工具与配置，按需检索、编辑和运行。"
+                  },
+                  {
+                    "value": "builtin:minimal",
+                    "name": "轻装搭档",
+                    "description": "带上终端和看图工具，轻装开工。和你一起处理小任务、快速试验，也方便对比模型表现。"
+                  }
+                ],
+                "id": "agent_composition",
+                "name": "Agent composition",
+                "description": "Choose a composition before the first prompt. Models are configured independently.",
+                "type": "select"
+              }
+            ]
+          },
+          "session_id": "f0b8b6b8-a703-488c-b492-ccba442afa74",
+          "stop_reason": "end_turn",
+          "prompt_response": {
+            "stopReason": "end_turn",
+            "_meta": {
+              "reasonix.io": {
+                "transcriptPath": "/tmp/abb-reasonix-home-jkw_ou_g/sessions/f0b8b6b8-a703-488c-b492-ccba442afa74.jsonl"
+              }
+            }
+          }
+        }
+      },
+      "evidence_prefix": "steps/0001"
+    }
+  ],
+  "attachments": {
+    "steps/0001/acp-events.jsonl": {
+      "sha256": "8c9362f6d33184e6f0d95ee2f9a4097a2a4082a5cc69a9b3eae0f839620d0541",
+      "size_bytes": 50129
+    },
+    "steps/0001/acp-summary.json": {
+      "sha256": "f8896bb0fdd2bec756d9bfc7782508702679ee5dea894d745e92c4adfd6e1935",
+      "size_bytes": 11620
+    },
+    "steps/0001/framework.jsonl": {
+      "sha256": "6e1a589102b244c3d4e0243a23374f5c63940901e01a0384a0f3e028dcc9339d",
+      "size_bytes": 73691
+    },
+    "steps/0001/input.json": {
+      "sha256": "42cb5083b68340c84b5f1d30efb154ab5445897c2d024b8ab2de9cb692d6710b",
+      "size_bytes": 403
+    },
+    "steps/0001/otel-live.jsonl": {
+      "sha256": "81841c5747baaf661d75cb5d8d76f6c3a0af7cb52526dda16266c26984cb5876",
+      "size_bytes": 42716
+    },
+    "steps/0001/otel-payloads/113a6cf5fa90ae5277fa5dc4c257436f3c5cd6e2aca22eba84d87774bb1a4e21.json": {
+      "sha256": "d05e99d9b742d34e6d465d90337a0df7741bcaa78025dcc5d8cf4de781637c47",
+      "size_bytes": 2797
+    },
+    "steps/0001/otel-payloads/1f5bd74f18af72548d23fe64fabb6850ac64d98cb41683a908728a5401f9c557.json": {
+      "sha256": "76e58383bcc2a68badcf5856fee33fe57e92a7ba677acf0d67428403a8490096",
+      "size_bytes": 1206
+    },
+    "steps/0001/otel-payloads/277e0a3b5b635af26241bb95d55094442c189a225cdd81a5fb0874ef748d5260.json": {
+      "sha256": "2f35ec764150ad6d8aa5359b2122c9c08b053a1d600ac8984fba67973210b186",
+      "size_bytes": 245
+    },
+    "steps/0001/otel-payloads/74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b.json": {
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "size_bytes": 4
+    },
+    "steps/0001/otel-payloads/7fe85dce29a9265661fed6961c9fa52e16a4e14d4fa98fa87475fb1d67901a71.json": {
+      "sha256": "7fe85dce29a9265661fed6961c9fa52e16a4e14d4fa98fa87475fb1d67901a71",
+      "size_bytes": 362
+    },
+    "steps/0001/otel-payloads/97100ac43eec9746f7055bcc8e2d46d1bb077a8e0aca13fb58f6f9056b4996f4.json": {
+      "sha256": "88d48b538b411cd737294264d14cc729fd96f7a58c434ced5c1c19028e931407",
+      "size_bytes": 3097
+    },
+    "steps/0001/otel-payloads/a08d66e210b9422d06977c6dadc69a9fca68ca1d9a7dd13b2b65bd31c0c39fd2.json": {
+      "sha256": "a08d66e210b9422d06977c6dadc69a9fca68ca1d9a7dd13b2b65bd31c0c39fd2",
+      "size_bytes": 497
+    },
+    "steps/0001/otel-payloads/a7b957f42dba3c8c77641146fb31b3d2bbf3f7551ff18e033e7dfc358473282e.json": {
+      "sha256": "1cb20929bf75ab0d3e96f98e6e8ca2218f0e06655f6a38edc152035ec4558913",
+      "size_bytes": 151
+    },
+    "steps/0001/otel-payloads/a9dce09046c2339063f0bc1f3053c059eabb5f768061443809b3277642370c2a.json": {
+      "sha256": "6b91ac75a57f62baa61cf818e570ada460faa6d36a9a74a92d085e8df7ba5da0",
+      "size_bytes": 285
+    },
+    "steps/0001/otel-payloads/b545c5baeeba706d-events.jsonl": {
+      "sha256": "cc309b6f8091500a4c0c159f4f4949f9b8ff20f6932f355e5d5e4cd33ce67302",
+      "size_bytes": 55023
+    },
+    "steps/0001/otel-payloads/ca2cee0a3bfc266b80fe2a53418fbc4229a6eeac40332467ecf147d45060ec91.json": {
+      "sha256": "71917cf9cdbb2a8a0daa5d381ccec27a4772e2333c07d71799c8d926c6c3f844",
+      "size_bytes": 412
+    },
+    "steps/0001/otel-payloads/f7d7e4f9227e9b5111ec02dc257fdf1df6d4b5f8c23ae4b767687b9538e21333.json": {
+      "sha256": "984fe747238e5a6d59232f885a2b1c0beb510942f84a6b985bfe8c57f6157796",
+      "size_bytes": 98
+    },
+    "steps/0001/otel-status.json": {
+      "sha256": "1cd61df3b1f7383ac9e9c073c9fa17b091c94bc2f4cefd8ee0af5a509e38f738",
+      "size_bytes": 68
+    },
+    "steps/0001/otel.jsonl": {
+      "sha256": "3b443600614a521b9527879051d98180d388180e32de00b585c1dea12c21a382",
+      "size_bytes": 17366
+    },
+    "steps/0001/request.json": {
+      "sha256": "856e4e488d91bb5241e0e2866576c46d6af5d49f6e08a615a2b70d87b75c5324",
+      "size_bytes": 689
+    },
+    "steps/0001/result-redaction.json": {
+      "sha256": "8ed7da76d993f6bded526ea53dda564e79d575fe4bc606b1cb7150e5405337ea",
+      "size_bytes": 128
+    },
+    "steps/0001/result.json": {
+      "sha256": "eaaa38ab62edcb40ec4358edf7076c54d0eed3eb56738290598b37ad8582e842",
+      "size_bytes": 8426
+    },
+    "steps/0001/spans.jsonl": {
+      "sha256": "12732a1d71175e122f3d1888b31787e3757e864a9705e242542f16bd8e5b6f9e",
+      "size_bytes": 13524
+    },
+    "steps/0001/submission.json": {
+      "sha256": "a8bcf8c3711ae4d683f07bd943950f09679cee3c20a91eefa18eb7b6158d6cf5",
+      "size_bytes": 8995
+    }
+  },
+  "evidence_status": "complete",
+  "unexecuted_input_ids": [],
+  "request_id": "fefb3fe8117ecbb493c6f48754a799c7883328af560ee945738e815388c48ed0",
+  "judge": null
+}

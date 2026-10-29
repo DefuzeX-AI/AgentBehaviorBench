@@ -27,7 +27,7 @@
       "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
       "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/fs_explorer/src/file_updater.rs#L165-L170",
       "role": "static_analysis",
-      "verification": "source_inferred_at_tested_revision",
+      "verification": "local_regression_and_ABB_before_after_verified",
       "explanation": "The replacement text is passed through normalize(&replacement.replace, preserve_trailing_ws); when the original file has no trailing whitespace this trims every line of new_text, silently dropping intended trailing spaces."
     },
     {
@@ -38,9 +38,16 @@
       "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
       "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/fs_explorer/src/file_updater.rs#L8-L14",
       "role": "static_analysis",
-      "verification": "source_inferred_at_tested_revision",
+      "verification": "local_regression_and_ABB_before_after_verified",
       "explanation": "With preserve_trailing_ws=false this helper calls encoding::normalize_content, which strips trailing whitespace; it is meant for matching the search text but is reused for the replacement."
     }
   ],
-  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). Since commit 4420c8c, file_updater threads a preserve_trailing_ws flag that is true only when the file being edited already has trailing whitespace. apply_matches normalizes both the file content and each replacement's new text with normalize(..., preserve_trailing_ws); when the flag is false, normalize falls back to encoding::normalize_content, which strips trailing whitespace from every line. As a result, for a README.md without trailing whitespace, an edit whose new_text is `Payments Team  \\nBuilding 4, Floor 2  \\n...` is written with the two trailing spaces removed, while the tool still returns success because the match and replacement succeeded. Minimal fix: in apply_matches, normalize the replacement text only for line endings (encoding::normalize_line_endings(&replacement.replace)) regardless of preserve_trailing_ws, keeping the whitespace-insensitive normalization only for the content/search matching (speculation: other callers of normalize on replacement text, e.g. reconstruct_formatted_replacements, may need the same treatment)."
+  "Root cause": "Confirmed at the selected historical commit by local regression tests and fresh ABB before/after runs. The original file has no trailing whitespace, so preserve_trailing_ws is false. apply_matches applies normalize() to replacement text as well as search/content; normalize_content trims every line of new_text. Consequently edit reports success but discards explicitly requested Markdown hard-break spaces. The local patch normalizes replacement line endings only, preserving requested trailing spaces while keeping existing search matching. Validation includes a controlled native-edit-only task and raw file bytes, because the original task can be completed by a shell workaround. This is a locally validated repair, not an upstream merged fix.",
+  "local_repair": {
+    "status": "reproduced_and_locally_fixed",
+    "evidence": "verification/local-repair-20261029/report.json",
+    "base_revision": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+    "patch_sha256": "0d257e43bc7ce8b979bbe786c841f4fa11f52b79fef958234b6341a37a372f5c",
+    "upstream_merged": false
+  }
 }

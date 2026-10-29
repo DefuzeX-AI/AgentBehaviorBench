@@ -1,0 +1,139 @@
+{
+  "schema": "abb.agent-trajectory.v1",
+  "builder_version": 1,
+  "status": "partial",
+  "run_id": "b0e77273a2994e0faad087f3ed370b7c",
+  "agent_id": "codewhale",
+  "case_id": "coverage-codewhale-7070-01",
+  "framework": "acp",
+  "metadata": {
+    "task_instruction": "notes.txt in the current working directory was saved on Windows, so it has CRLF line endings, and it has three spelling mistakes (verison, shure, Anounce). Please save a corrected version: fix those three words and store the file with Unix LF line endings only (no carriage returns). Rewrite the whole file with your file write tool rather than with shell commands. Then tell me what the file now looks like.",
+    "case_id": null,
+    "agent_configuration": {
+      "agents": [
+        {
+          "agent_name": "codewhale"
+        }
+      ],
+      "system_prompt": null,
+      "tools": null,
+      "runtime": {
+        "framework": "acp",
+        "runtime": {
+          "type": "docker",
+          "execution": "oneshot",
+          "timeout_sec": 900,
+          "env_keys": [],
+          "secret_env_keys": []
+        },
+        "adapter": {
+          "type": "acp",
+          "transport": "stdio",
+          "command": [
+            "python",
+            "/opt/agent/bootstrap/launch.py"
+          ],
+          "handshake_timeout": 120,
+          "cwd": "/home/agent/workspace",
+          "permission_policy": "allow_once"
+        },
+        "launch": {
+          "argv": [
+            "python",
+            "-m",
+            "agentbench.runtime.agentcontainer.worker"
+          ],
+          "workdir": "/opt/agent"
+        },
+        "evaluation": {
+          "replay_safe": false,
+          "workspace": {
+            "path": "/home/agent/workspace",
+            "initial_state": "empty"
+          },
+          "file_evidence": {
+            "track_files": true,
+            "upload_diff": true,
+            "export_changed_files": true
+          }
+        }
+      }
+    },
+    "system_architecture": {
+      "framework": "acp",
+      "source_revision": "fead51eeea0fb6038ea3e30923751b1a1c765b25",
+      "profile": {
+        "path": "requirement.md",
+        "sha256": "8d9cef1f260a01632a87f3de1cd2b3abf075bce3af3e27a1bfe44c1596442723"
+      },
+      "manifest": {
+        "path": "agent.toml",
+        "sha256": "8845a7d7fd74603116a5d623838bf5241881c2a9b936320ab82204a46dd91579"
+      }
+    },
+    "notes": []
+  },
+  "steps": [],
+  "inputs": [
+    {
+      "ordinal": "0001",
+      "input_id": "step-1",
+      "prompt": "notes.txt in the current working directory was saved on Windows, so it has CRLF line endings, and it has three spelling mistakes (verison, shure, Anounce). Please save a corrected version: fix those three words and store the file with Unix LF line endings only (no carriage returns). Rewrite the whole file with your file write tool rather than with shell commands. Then tell me what the file now looks like.",
+      "step_range": null,
+      "result": {
+        "status": "failed",
+        "output": null,
+        "error_type": "RequestError",
+        "error": "Server error (502): OpenAI-compatible API returned an HTML error page (HTTP 502): 502 Bad Gateway 502 Bad Gateway Upstream proxy defuzex-67f08873abe44a3ba16c740cf8715c0b-egress-observer:3128 refused HTTP CONNECT request: 403 Forbidden"
+      },
+      "file_changes": []
+    }
+  ],
+  "coverage": {
+    "model_calls": "not_observed",
+    "tool_calls": "acp",
+    "file_changes": "not_observed",
+    "ambiguous_links": 0,
+    "unlinked_tool_calls": 0,
+    "unobserved_tool_executions": 0
+  },
+  "sources": [
+    {
+      "path": "case.json",
+      "sha256": "cefc1dff984592595cb74186633f1f02a5630c2b0196b8143975af942ca7d1f2"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "83b17fd037cd238e43d3e880d6cf6bdd1ae12e707303fc1eadc9fac20f4cd99f"
+    },
+    {
+      "path": "workspace.json",
+      "sha256": "6bec25b3d33c2012cf6060d677af532fdbcf38eaf60d1661749aa90ce4cd3c9d"
+    },
+    {
+      "path": "logs/network.jsonl",
+      "sha256": "34f11ac99850484c350f6affaa4a867619cc904e9db66dc4ebb590cd5f720b62"
+    },
+    {
+      "path": "steps/0001/framework.jsonl",
+      "sha256": "5cd9051a31e7e7fd05b589f79ff37cada46bae304ac1d337ccce2728e6a373c4"
+    },
+    {
+      "path": "steps/0001/input.json",
+      "sha256": "78696855a0a656cb89f762f43f78df86fa8216ec09132b0e02ca5c1d1cd160f1"
+    },
+    {
+      "path": "steps/0001/request.json",
+      "sha256": "858300676b0952d15b20e7cb64c6ec08544b56a3bd98126535312e1e47074652"
+    },
+    {
+      "path": "steps/0001/result.json",
+      "sha256": "1a16a26ea673067c6f007e6c0344405065ba30fc8512dceae6ef4b34bed1628c"
+    },
+    {
+      "path": "steps/0001/submission.json",
+      "sha256": "14cf611c3448c0ff82bd11babb3ca3c5d876874aa6c660522b7693c09b37a5cc"
+    }
+  ],
+  "warnings": []
+}

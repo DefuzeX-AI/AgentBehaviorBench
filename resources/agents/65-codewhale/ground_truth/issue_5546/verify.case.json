@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-codewhale-5546-v1",
+  "issue": {
+    "repository": "codewhale-hq/Codewhale",
+    "number": 5546,
+    "url": "https://github.com/codewhale-hq/Codewhale/issues/5546",
+    "state": "closed",
+    "title": "[redacted] output from tools impairs editing"
+  },
+  "version_choice": "historical:0.9.10",
+  "reported_version": "0.9.10 (source HEAD 2026-08-23, pre-0.9.11)",
+  "commit_version": "369868d23e593acd71da51db30058b512175e08d",
+  "fixed_in": "0.9.11",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create the file package.json in the workspace by running exactly: printf '{\\n  \"name\": \"demo\",\\n  \"dependencies\": {\\n    \"jsonwebtoken\": \"^9.0.2\",\\n    \"password-validator\": \"^5.3.0\"\\n  }\\n}\\n' > package.json",
+    "Read package.json, tell me the exact version ranges of jsonwebtoken and password-validator as written in the file, then change jsonwebtoken to ^9.0.3 with an edit."
+  ],
+  "expected": "Ordinary code such as `\"jsonwebtoken\": \"^9.0.2\"` reaches the model byte-exact in read/shell tool results; only credential-shaped values are masked (issue #5546; fixed in 0.9.11 by commit 2776c214 'redact_model_bound_secrets').",
+  "defect": "Model-bound tool results are run through the broad key-based scrubber, so values next to keys containing token/password (dependency versions) are replaced with `[redacted]`, which breaks exact-match edits and read-back.",
+  "fault location": [
+    {
+      "file": "crates/tui/src/client.rs",
+      "function": "prepare_model_bound_request",
+      "line_start": 1259,
+      "line_end": 1263,
+      "commit": "369868d23e593acd71da51db30058b512175e08d",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/369868d23e593acd71da51db30058b512175e08d/crates/tui/src/client.rs#L1259-L1263",
+      "role": "source_review",
+      "verification": "recorded_trace_and_pinned_source_review",
+      "explanation": "Applies the sanitizer to every model-bound tool-result content block before provider projection."
+    },
+    {
+      "file": "crates/tui/src/client.rs",
+      "function": "redact_model_bound_text",
+      "line_start": 628,
+      "line_end": 633,
+      "commit": "369868d23e593acd71da51db30058b512175e08d",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/369868d23e593acd71da51db30058b512175e08d/crates/tui/src/client.rs#L628-L633",
+      "role": "source_review",
+      "verification": "recorded_trace_pinned_source_and_upstream_fix",
+      "explanation": "Calls the broad persistence::redact_secrets policy after exact-value secret masking; this is the call site changed by the upstream fix."
+    },
+    {
+      "file": "crates/config/src/persistence.rs",
+      "function": "redact_keyed_assignment",
+      "line_start": 382,
+      "line_end": 419,
+      "commit": "369868d23e593acd71da51db30058b512175e08d",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/369868d23e593acd71da51db30058b512175e08d/crates/config/src/persistence.rs#L382-L419",
+      "role": "source_review",
+      "verification": "recorded_trace_and_pinned_source_review",
+      "explanation": "Matches sensitive key substrings without classifying the value, then replaces the remainder. The token/password hints are declared at lines 234-247."
+    }
+  ],
+  "Root cause": "At recorded revision 369868d23e593acd71da51db30058b512175e08d (native ACP version 0.9.10), prepare_model_bound_request rewrites every ContentBlock::ToolResult using redact_model_bound_text. After replacing configured secret values, that helper calls persistence::redact_secrets, a broad key-based log scrubber. redact_keyed_assignment tests whether the key contains a sensitive substring (including token/password) and replaces the whole nonempty value without checking credential shape. Thus jsonwebtoken and password-validator match even when their values are ordinary dependency versions; the same reconstruction also drops a trailing comma. Native ACP output for call_815783ad7600491f97ae1c55 contains ^9.0.2 and ^5.3.0, while the model-bound result with that exact ID contains [redacted]. Upstream fix 2776c214efd52528e0432ecdbbed22df4921d53c changes this helper to redact_model_bound_secrets and adds a byte-exact ordinary-code regression test. This review locates the model-bound visibility defect; the recorded final edit succeeds through a workaround. See analysis/root-cause-20261028/README.md and evidence.json for provenance and trajectory limitations."
+}

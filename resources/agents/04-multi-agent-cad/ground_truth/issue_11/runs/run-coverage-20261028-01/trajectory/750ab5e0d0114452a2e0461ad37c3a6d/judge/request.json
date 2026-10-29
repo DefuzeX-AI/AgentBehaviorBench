@@ -1,0 +1,208 @@
+{
+  "schema": "abb.judge.request.v1",
+  "agent_id": "multi-agent-cad",
+  "run_id": "5f30edec004044618949ead6d12aad79",
+  "case": {
+    "case_id": "coverage-multi-agent-cad-11-01",
+    "inputs": [
+      {
+        "input_id": "step-1",
+        "payload": {
+          "message": "L-bracket, base 50x30x5 mm, arm 30x30x5 mm, 5 mm inside fillet. Reference drawing: https://example.com/bracket.txt"
+        }
+      }
+    ]
+  },
+  "case_sha256": "fbb92f56b7f9276118d8077f8a4d5fccb0e8e52c5cec61a428a865f953528ac9",
+  "workspace": null,
+  "steps": [
+    {
+      "input": {
+        "input_id": "step-1",
+        "payload": {
+          "message": "L-bracket, base 50x30x5 mm, arm 30x30x5 mm, 5 mm inside fillet. Reference drawing: https://example.com/bracket.txt"
+        }
+      },
+      "result": {
+        "schema": "abb.result.v1",
+        "run_id": "58988a11165540c3bb23d8516bdc435c",
+        "case_id": "coverage-multi-agent-cad-11-01",
+        "input_id": "step-1",
+        "invocation_id": "58988a11165540c3bb23d8516bdc435c",
+        "agent_id": "multi-agent-cad",
+        "status": "succeeded",
+        "output": "Status: HALTED (ErrorType.FATAL)\nIterations: 0\nCAD brief: {\"part_name\":\"l-bracket-50x30x5-30x30x5-fillet5\",\"part_category\":\"L-bracket\",\"length_unit\":\"mm\",\"origin_convention\":\"centroid_on_base_plane\",\"primary_workplane\":\"XY\",\"max_extent_x_mm\":50.0,\"max_extent_y_mm\":30.0,\"max_extent_z_mm\":35.0,\"target_volume_mm3\":null,\"material\":null,\"material_density_g_cm3\":null,\"key_parameters\":{\"BASE_LENGTH_X\":50,\"BASE_WIDTH_Y\":30,\"BASE_THICKNESS_Z\":5,\"ARM_LENGTH_X\":30,\"ARM_WIDTH_Y\":30,\"ARM_THICKNESS_Z\":5,\"FILLET_RADIUS\":5},\"verification_targets\":[{\"id\":\"overall-x\",\"kind\":\"overall_dimension\",\"description\":\"Overall bounding box length in X direction\",\"nominal\":50.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"x\",\"critical\":true,\"notes\":\"Length of base along X axis\"},{\"id\":\"overall-y\",\"kind\":\"overall_dimension\",\"description\":\"Overall bounding box width in Y direction\",\"nominal\":30.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"y\",\"critical\":true,\"notes\":\"Width of base and arm along Y axis\"},{\"id\":\"overall-z\",\"kind\":\"overall_dimension\",\"description\":\"Overall bounding box height in Z direction\",\"nominal\":35.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"z\",\"critical\":true,\"notes\":\"Height is base thickness plus arm thickness (5 + 30)\"},{\"id\":\"single-body\",\"kind\":\"single_body\",\"description\":\"Part must be a single connected solid body\",\"nominal\":null,\"tolerance_upper\":0.0,\"tolerance_lower\":0.0,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":null,\"critical\":true,\"notes\":null},{\"id\":\"water-tightness\",\"kind\":\"water_tightness\",\"description\":\"Part must be a closed manifold mesh\",\"nominal\":null,\"tolerance_upper\":0.0,\"tolerance_lower\":0.0,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":null,\"critical\":true,\"notes\":null}],\"functional_requirements\":[\"Bracket must provide rigid 90-degree support between base and arm\",\"Load bearing primarily along vertical axis (Z)\",\"Fillet radius of 5 mm to reduce stress concentration at corner\"],\"manufacturing_method\":\"3d_print_fdm\",\"special_features\":[\"L-bracket MUST have a 5 mm inside fillet radius at the junction between base and arm\",\"Origin MUST be at centroid of base bottom face with Z=0 at base bottom\",\"Bracket MUST be oriented with base along X axis and arm along Z axis forming a 90-degree angle\",\"All features MUST be symmetric about the XZ plane (Y coordinates mirror about Y=0)\"],\"user_request_raw\":\"L-bracket, base 50x30x5 mm, arm 30x30x5 mm, 5 mm inside fillet. Reference drawing: https://example.com/bracket.txt\",\"spec_version\":1}\nQA report: {\"cad_brief_id\":\"(coder-failure)\",\"engine_a\":{\"engine_name\":\"cadpy_analysis\",\"results\":[],\"summary\":\"\",\"warnings\":[],\"errors\":[],\"raw_json\":null},\"engine_b\":{\"engine_name\":\"check_mesh\",\"results\":[],\"summary\":\"\",\"warnings\":[],\"errors\":[\"Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\\nTraceback:\\nTraceback (most recent call last):\\n  File \\\"/opt/agent/agent/multi_agent_cad/nodes.py\\\", line 552, in _node_python_coder_deterministic\\n    from cadpy.generation import EntrySpec, run_script_generator\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\\\", line 40, in <module>\\n    from cadpy.glb import (\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\\\", line 32, in <module>\\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\\\", line 32, in <module>\\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\"],\"raw_json\":null},\"all_passed\":false,\"passed_count\":0,\"failed_count\":0,\"noise_only_fail_count\":0,\"error_type\":\"dimension\",\"error_details\":[\"Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\\nTraceback:\\nTraceback (most recent call last):\\n  File \\\"/opt/agent/agent/multi_agent_cad/nodes.py\\\", line 552, in _node_python_coder_deterministic\\n    from cadpy.generation import EntrySpec, run_script_generator\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\\\", line 40, in <module>\\n    from cadpy.glb import (\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\\\", line 32, in <module>\\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\\\", line 32, in <module>\\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\"],\"improvement_suggestions\":[],\"connectivity_warning\":null,\"strength_score\":null,\"manufacturability_warnings\":[],\"topology_changed\":false,\"topology_delta\":{},\"iteration\":0}",
+        "raw_output": {
+          "answer": "Status: HALTED (ErrorType.FATAL)\nIterations: 0\nCAD brief: {\"part_name\":\"l-bracket-50x30x5-30x30x5-fillet5\",\"part_category\":\"L-bracket\",\"length_unit\":\"mm\",\"origin_convention\":\"centroid_on_base_plane\",\"primary_workplane\":\"XY\",\"max_extent_x_mm\":50.0,\"max_extent_y_mm\":30.0,\"max_extent_z_mm\":35.0,\"target_volume_mm3\":null,\"material\":null,\"material_density_g_cm3\":null,\"key_parameters\":{\"BASE_LENGTH_X\":50,\"BASE_WIDTH_Y\":30,\"BASE_THICKNESS_Z\":5,\"ARM_LENGTH_X\":30,\"ARM_WIDTH_Y\":30,\"ARM_THICKNESS_Z\":5,\"FILLET_RADIUS\":5},\"verification_targets\":[{\"id\":\"overall-x\",\"kind\":\"overall_dimension\",\"description\":\"Overall bounding box length in X direction\",\"nominal\":50.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"x\",\"critical\":true,\"notes\":\"Length of base along X axis\"},{\"id\":\"overall-y\",\"kind\":\"overall_dimension\",\"description\":\"Overall bounding box width in Y direction\",\"nominal\":30.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"y\",\"critical\":true,\"notes\":\"Width of base and arm along Y axis\"},{\"id\":\"overall-z\",\"kind\":\"overall_dimension\",\"description\":\"Overall bounding box height in Z direction\",\"nominal\":35.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"z\",\"critical\":true,\"notes\":\"Height is base thickness plus arm thickness (5 + 30)\"},{\"id\":\"single-body\",\"kind\":\"single_body\",\"description\":\"Part must be a single connected solid body\",\"nominal\":null,\"tolerance_upper\":0.0,\"tolerance_lower\":0.0,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":null,\"critical\":true,\"notes\":null},{\"id\":\"water-tightness\",\"kind\":\"water_tightness\",\"description\":\"Part must be a closed manifold mesh\",\"nominal\":null,\"tolerance_upper\":0.0,\"tolerance_lower\":0.0,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":null,\"critical\":true,\"notes\":null}],\"functional_requirements\":[\"Bracket must provide rigid 90-degree support between base and arm\",\"Load bearing primarily along vertical axis (Z)\",\"Fillet radius of 5 mm to reduce stress concentration at corner\"],\"manufacturing_method\":\"3d_print_fdm\",\"special_features\":[\"L-bracket MUST have a 5 mm inside fillet radius at the junction between base and arm\",\"Origin MUST be at centroid of base bottom face with Z=0 at base bottom\",\"Bracket MUST be oriented with base along X axis and arm along Z axis forming a 90-degree angle\",\"All features MUST be symmetric about the XZ plane (Y coordinates mirror about Y=0)\"],\"user_request_raw\":\"L-bracket, base 50x30x5 mm, arm 30x30x5 mm, 5 mm inside fillet. Reference drawing: https://example.com/bracket.txt\",\"spec_version\":1}\nQA report: {\"cad_brief_id\":\"(coder-failure)\",\"engine_a\":{\"engine_name\":\"cadpy_analysis\",\"results\":[],\"summary\":\"\",\"warnings\":[],\"errors\":[],\"raw_json\":null},\"engine_b\":{\"engine_name\":\"check_mesh\",\"results\":[],\"summary\":\"\",\"warnings\":[],\"errors\":[\"Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\\nTraceback:\\nTraceback (most recent call last):\\n  File \\\"/opt/agent/agent/multi_agent_cad/nodes.py\\\", line 552, in _node_python_coder_deterministic\\n    from cadpy.generation import EntrySpec, run_script_generator\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\\\", line 40, in <module>\\n    from cadpy.glb import (\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\\\", line 32, in <module>\\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\\\", line 32, in <module>\\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\"],\"raw_json\":null},\"all_passed\":false,\"passed_count\":0,\"failed_count\":0,\"noise_only_fail_count\":0,\"error_type\":\"dimension\",\"error_details\":[\"Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\\nTraceback:\\nTraceback (most recent call last):\\n  File \\\"/opt/agent/agent/multi_agent_cad/nodes.py\\\", line 552, in _node_python_coder_deterministic\\n    from cadpy.generation import EntrySpec, run_script_generator\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\\\", line 40, in <module>\\n    from cadpy.glb import (\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\\\", line 32, in <module>\\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\\\", line 32, in <module>\\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\"],\"improvement_suggestions\":[],\"connectivity_warning\":null,\"strength_score\":null,\"manufacturability_warnings\":[],\"topology_changed\":false,\"topology_delta\":{},\"iteration\":0}"
+        }
+      },
+      "evidence_prefix": "steps/0001"
+    }
+  ],
+  "attachments": {
+    "steps/0001/framework.jsonl": {
+      "sha256": "70b34361da96648e5032ce6910eb81aafbedd1d2a3021297696a972cb9cdc64b",
+      "size_bytes": 275247
+    },
+    "steps/0001/input.json": {
+      "sha256": "3031fddde9f5a577d71c4107b83102695cfe3fbd8df2a3d46bd08100127b60df",
+      "size_bytes": 178
+    },
+    "steps/0001/otel-live.jsonl": {
+      "sha256": "9badcfbf5d7eae5a460c10cb657e6f37a788f79a0b2f2dccba1d212fa6870d7c",
+      "size_bytes": 100133
+    },
+    "steps/0001/otel-payloads/04caab97e58617a7de7651244b0399b0d1d662886eb4855bb5972a8452501a83.json": {
+      "sha256": "5aeac36187de9d3f459b19528e43af3f4677bca0cee0b66e9ba7bc19ee92d0c4",
+      "size_bytes": 3330
+    },
+    "steps/0001/otel-payloads/06e0feb2c3ce657b58b9858f0e7797ea1a1b38ccbddb7700b0f5fecd80b49a64.json": {
+      "sha256": "bd03b60c602115670e8111dc085a1f3b047465b2ff558ffd6c4a6d5ac529c27a",
+      "size_bytes": 133
+    },
+    "steps/0001/otel-payloads/142dc358e0eb4ea8107c8f6a7a6a797bd2ed1b476993cc32e84e0b36f8094680.json": {
+      "sha256": "8886bb198dfd142796c39d3a371e90bf15d560253a415acd74ec4b6f4bf75433",
+      "size_bytes": 430
+    },
+    "steps/0001/otel-payloads/1702019d7d58eeda3dca152e36cc0290a3894e551b61b2993e8a4856c30d0f7b.json": {
+      "sha256": "b476e425508f473e72d821f1bedd2353316d56996b708527c2d3f714152bc984",
+      "size_bytes": 351
+    },
+    "steps/0001/otel-payloads/1943a1540d8130b617a94e4b6805c15ecf0cdbf9d6f94a2c2cb2f3e0b7c7812a.json": {
+      "sha256": "4f21baaa116f2e3def606f8b8ecf80995ed80e5225c3a75be5f120dc7294d22f",
+      "size_bytes": 3343
+    },
+    "steps/0001/otel-payloads/29b5a47cf14dd162850b94daad9994181942ceafcdbb54e807ec6ce02a18153f.json": {
+      "sha256": "f7c72ce94e935c00bb54451c76e0141436d02edd4d15e51b5c990e1173bce717",
+      "size_bytes": 20301
+    },
+    "steps/0001/otel-payloads/3bef6f555419eafe15a2623906a86f4a9858fefdd16533ea178bb60b13ae3137.json": {
+      "sha256": "4e8bcd2c2a85fcec2bf86e8477bbf73665098c19f8a3d75efbd071327c4ef5c8",
+      "size_bytes": 20546
+    },
+    "steps/0001/otel-payloads/4045b89bb06589b5043c1eedaa037d8848f4a5c043b568290c4f399b122dae85.json": {
+      "sha256": "da47b24c3d57f67ddb831382fa02fc9c7e49ab804ddbbae95fbc66ed6180d888",
+      "size_bytes": 386
+    },
+    "steps/0001/otel-payloads/447b1a0de13f76775ecce50980a540c357d1dcd146a0c7eba02b04175322be61.json": {
+      "sha256": "cf4c9f4f78d171c53722667a0b2a0e25dd1079bcc9c38f07c4eaf92e5ddc4109",
+      "size_bytes": 14091
+    },
+    "steps/0001/otel-payloads/499fe0a688c8ce39d67e3d35e3b234d284981e0bddce34fdefd14c3ab0636c26.json": {
+      "sha256": "43b9f50561b4a061f7774e4cada903bf80fbbe783bfc1ec6e45a215efdce0b98",
+      "size_bytes": 105
+    },
+    "steps/0001/otel-payloads/4c6f5452d4be87fe8009e6a732e26ec7cb4c961d6605f5d4b2e27e444f91b951.json": {
+      "sha256": "85a1ebc78705fea86665e464b17f28e908b21bf7989694c80f0c0c0742ecdc93",
+      "size_bytes": 5498
+    },
+    "steps/0001/otel-payloads/51f67978dc228f0fabdedfa1768ba4bfb9ca5b5d08b6896298caf146abde20ee.json": {
+      "sha256": "c8bd922b9ca67ca583702a4dfc73b1d1a0c0ced328a85cb24d87b9abb011283c",
+      "size_bytes": 3317
+    },
+    "steps/0001/otel-payloads/5eb54bb680e64ff472fb4aed44c1200eb80cbbc3af1c5399eac059b38c533616.json": {
+      "sha256": "5eb54bb680e64ff472fb4aed44c1200eb80cbbc3af1c5399eac059b38c533616",
+      "size_bytes": 7
+    },
+    "steps/0001/otel-payloads/674a84d3e38ea9f03b36e6400f2481072d86c0cb8ffd21d43a4410226fe10070.json": {
+      "sha256": "652d4a55727a7b0f17599a1b628a218a6b38b7a9f2914821bc7f405dbeee1f56",
+      "size_bytes": 366
+    },
+    "steps/0001/otel-payloads/6e922bddce2e2e14eb0113934efdd705e742d3fa4814ff330584a25294c80a21.json": {
+      "sha256": "69ac2b15673902d7b12607861bf001873ffca9d42d410649d406542337084402",
+      "size_bytes": 366
+    },
+    "steps/0001/otel-payloads/7027a9807ff54b0dbcea96ff2bb73130cdb7286f7bae63e810abf4f690d3ebde.json": {
+      "sha256": "ac208fa04cc05f3a149882b8b7af106a0dc88edecadef03209bc8da921c70c6f",
+      "size_bytes": 4684
+    },
+    "steps/0001/otel-payloads/7ca8bd4253310f714c5cecdc0b515fb5d14928b8957bc27e8b40878c3f44a7e2.json": {
+      "sha256": "b21e14b58463d51064eb71a3ce9f25c346729bdf48b7a860a1b4c3f48791322e",
+      "size_bytes": 18143
+    },
+    "steps/0001/otel-payloads/888dc4df260bb94b82ea74bf4a0d5db757b4d4e390a65821174d26361830fc1e.json": {
+      "sha256": "ed111f569cd1098502a03dcf68e23a720deb16ce26086fc31945053194e34d65",
+      "size_bytes": 20572
+    },
+    "steps/0001/otel-payloads/906f78628435c70eebf559ca8ec1c236e284f142e2d7feb2a07adf7e63fee085.json": {
+      "sha256": "8851b47725823868319308a3cf7a7a0bd3922b6e3d581d5a2d2ebe4d39d148de",
+      "size_bytes": 303
+    },
+    "steps/0001/otel-payloads/932dac36915df10d3405ea46e31baa416ef509212abb5c815a3a8cdddf368def.json": {
+      "sha256": "d98542ba2f7ab77dc2c1c2f03446548d4a19d9c49f104aa8ae0d5d7ec158d833",
+      "size_bytes": 20559
+    },
+    "steps/0001/otel-payloads/9ed3840df6ffe4b271d88acd43a591ca9a63256e535b7c54f0ae612efcbe6f38.json": {
+      "sha256": "8956871e5ed869219606a5b9a9631f6c7f0341163a781dc6830dd7aaebfb1f04",
+      "size_bytes": 374
+    },
+    "steps/0001/otel-payloads/a8f214e0b06e468650e226c76a94f175472f2a253068a0667e41da23e9c75584.json": {
+      "sha256": "bc1dc637c6dc5ff2f2f3ed8a3932ea79f78542bfbeb08665a3ac27231edea94b",
+      "size_bytes": 285
+    },
+    "steps/0001/otel-payloads/ac92fa3629449afe718a49a6ef84cce902925faf4709a24991f75ef399323085.json": {
+      "sha256": "ac92fa3629449afe718a49a6ef84cce902925faf4709a24991f75ef399323085",
+      "size_bytes": 23
+    },
+    "steps/0001/otel-payloads/b2b86d3a9454b220874f9b8e641b94db8c2224a22afef5dce5b08ed695f2b17c.json": {
+      "sha256": "4250ae7ba331ebe78b6fe28acdad871e5c60e2471f83cb3edb69e628b99f63a4",
+      "size_bytes": 4446
+    },
+    "steps/0001/otel-payloads/b95206079befb29a35c698c93f01694e3d39e20179945882eab6d28b3389e565.json": {
+      "sha256": "4d514faa3a02b5fb383b63cd2f6b3b8f3312f9293e259c9938dca63b15a3a6ec",
+      "size_bytes": 1451
+    },
+    "steps/0001/otel-payloads/ce3f676da69b9d75a6142c913195d5e6924c5dc7e56dd090314a098c6c3cf6a0.json": {
+      "sha256": "ce3f676da69b9d75a6142c913195d5e6924c5dc7e56dd090314a098c6c3cf6a0",
+      "size_bytes": 5850
+    },
+    "steps/0001/otel-payloads/df229e387e543686375b528f3932e8c98daddc2fa26242ef664bf65609784b32.json": {
+      "sha256": "df229e387e543686375b528f3932e8c98daddc2fa26242ef664bf65609784b32",
+      "size_bytes": 11
+    },
+    "steps/0001/otel-payloads/e540470965466b23631da48b82d024b6121ca2ae1816ac963ad36b51c45a6bd7.json": {
+      "sha256": "982fa627a9042079740e8875bd43692b78f124dc6080138718246f67f762ca37",
+      "size_bytes": 390
+    },
+    "steps/0001/otel-payloads/f201ab1f83441614b071d4eb7bd3e04b1ee565d45254d0482ee13c521eddaca7.json": {
+      "sha256": "2d0e88d6d5924dd83dd73d3accc40d5ef6add924e865514c42bed8cae03783d4",
+      "size_bytes": 349
+    },
+    "steps/0001/otel-status.json": {
+      "sha256": "1cd61df3b1f7383ac9e9c073c9fa17b091c94bc2f4cefd8ee0af5a509e38f738",
+      "size_bytes": 68
+    },
+    "steps/0001/otel.jsonl": {
+      "sha256": "f3ae35cb5944a2b3002bf7ed267c3561cd15e4dc8c9b4d53b769ef52c11e30b5",
+      "size_bytes": 38010
+    },
+    "steps/0001/request.json": {
+      "sha256": "1a55615eaeef0a325853c171c267ac394fd69037d49cb1987cff1021c75533d5",
+      "size_bytes": 452
+    },
+    "steps/0001/result-redaction.json": {
+      "sha256": "8ed7da76d993f6bded526ea53dda564e79d575fe4bc606b1cb7150e5405337ea",
+      "size_bytes": 128
+    },
+    "steps/0001/result.json": {
+      "sha256": "ce20e207017fe1e9d539ddc55fec60ae6a98c1b0f19db82965e11b8180ac5569",
+      "size_bytes": 12015
+    },
+    "steps/0001/spans.jsonl": {
+      "sha256": "673cdc6c13d258a8f6cf18ea90cab039b6422619c178a3817876b5f4d9252160",
+      "size_bytes": 18417
+    },
+    "steps/0001/submission.json": {
+      "sha256": "4e2bddc78e8cbe8b4769a4f8591ff3bfb300d0090394c854eab1ca7457b7b8a8",
+      "size_bytes": 12100
+    },
+    "trajectory.json": {
+      "sha256": "0f01983c04963d7232986c1804c71c250a09d5d731989f9b6a8d2afe66e68728",
+      "size_bytes": 85177
+    }
+  },
+  "evidence_status": "complete",
+  "unexecuted_input_ids": [],
+  "request_id": "b755aa3be64568796a19bd5e9f18e146003f8c8c97d9a01cb4ce0acfaf0fb2a6",
+  "judge": null
+}
