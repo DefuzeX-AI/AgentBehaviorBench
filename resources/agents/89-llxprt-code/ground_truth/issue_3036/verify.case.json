@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-llxprt-code-3036-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3036,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3036",
+    "state": "closed",
+    "title": "delete_line_range strips the trailing newline when end_line exceeds EOF; insert_at_line's documented append does not exist"
+  },
+  "version_choice": "historical:v0.10.0",
+  "reported_version": "v0.10.0",
+  "commit_version": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+  "fixed_in": "v0.11.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create two files a.txt and b.txt, each containing exactly `aaa\\nbbb\\nccc\\n` (three lines, each ending with a newline), for example with printf.",
+    "Call delete_line_range on a.txt with start_line 3 and end_line 3, and on b.txt with start_line 3 and end_line 999, then compare both files byte by byte with xxd."
+  ],
+  "expected": "Both files end up as `aaa\\nbbb\\n`, keeping the trailing newline regardless of how the end of the range is spelled.",
+  "defect": "With end_line 999 the trailing newline is also removed (`aaa\\nbbb` vs `aaa\\nbbb\\n`; hexdump `6161 610a 6262 62`).",
+  "fault location": [
+    {
+      "file": "packages/tools/src/tools/delete_line_range.ts",
+      "function": "DeleteLineRangeToolInvocation.execute",
+      "line_start": 173,
+      "line_end": 195,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/delete_line_range.ts#L173-L195",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "split('\\n') leaves a phantom '' element for the final newline, totalLines counts it, and count = end_line - start_line + 1 is never clamped, so an over-long range splices the phantom element away; PR #3053 models lines without the phantom element (lineEditing helpers) and clamps the range."
+    },
+    {
+      "file": "packages/tools/src/tools/insert_at_line.ts",
+      "function": "InsertAtLineToolInvocation.execute",
+      "line_start": 177,
+      "line_end": 190,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/insert_at_line.ts#L177-L190",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The same phantom element inflates totalLines in the 'exceeds file length' error, and appending past EOF is rejected although the description promises it; PR #3053 fixes the line model and the documented append behaviour."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3053. In v0.10.0, delete_line_range splits the file with content.split('\\n'); for a newline-terminated file this yields a trailing empty string that represents the final newline. totalLines includes it, and the splice count is end_line - start_line + 1 without clamping to the real number of lines. With end_line equal to the last line the phantom element survives and join('\\n') restores the final newline, but with end_line beyond EOF the splice also removes the phantom element and the file loses its trailing newline. insert_at_line uses the same line model, so its errors report one line too many, and it rejects line numbers past EOF although its description says the content will be appended. Commit 5c2dc30 (PR #3053, 'Fix range-editor tools' phantom trailing-newline line model') adds shared line-editing helpers that keep the trailing newline separate, clamps ranges, and aligns insert_at_line with its documented append. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0."
+}

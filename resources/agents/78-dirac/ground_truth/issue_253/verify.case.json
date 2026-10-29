@@ -1,0 +1,45 @@
+{
+  "case_id": "ir-dirac-253-v1",
+  "issue": {
+    "repository": "dirac-run/dirac",
+    "number": 253,
+    "url": "https://github.com/dirac-run/dirac/issues/253",
+    "state": "closed",
+    "title": "ACP: answering session/request_permission quickly freezes the turn (askResponse cleared after the card is presented)"
+  },
+  "version_choice": "historical:v0.5.17-cli",
+  "reported_version": "0.5.17",
+  "commit_version": "95edfe366c7ed8114d5693e96c91f9faa903c61c",
+  "fixed_in": "v0.5.18-cli",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run exactly this one shell command and nothing else: sudo -n true ; echo exit=$?"
+  ],
+  "expected": "After the client answers session/request_permission with allow_once, the command runs and the turn continues and returns (session/prompt completes).",
+  "defect": "When the permission request is answered immediately, the answer is recorded and then wiped, so no further session/update arrives and session/prompt never returns (the log stops after `[TaskMessageBridge] Permission response received`).",
+  "fault location": [
+    {
+      "file": "src/core/task/TaskMessenger.ts",
+      "function": "TaskMessenger (card handle).waitForInteraction",
+      "line_start": 237,
+      "line_end": 266,
+      "commit": "95edfe366c7ed8114d5693e96c91f9faa903c61c",
+      "url": "https://github.com/dirac-run/dirac/blob/95edfe366c7ed8114d5693e96c91f9faa903c61c/src/core/task/TaskMessenger.ts#L237-L266",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The card is presented to the client (L240-241, which makes the ACP bridge send session/request_permission) before askResponse and the other response fields are unconditionally cleared (L262-266); c0f15df keeps a response already tagged with this card id (askResponseCardId === id) and publishes cardInteractionReady only after setup."
+    },
+    {
+      "file": "src/core/task/TaskUserInput.ts",
+      "function": "submitCardResponse",
+      "line_start": 51,
+      "line_end": 73,
+      "commit": "95edfe366c7ed8114d5693e96c91f9faa903c61c",
+      "url": "https://github.com/dirac-run/dirac/blob/95edfe366c7ed8114d5693e96c91f9faa903c61c/src/core/task/TaskUserInput.ts#L51-L73",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The submitted answer is stored without recording which card it answers, so waitForInteraction cannot tell a fresh answer from a stale one; c0f15df sets taskState.askResponseCardId and adds clearAskResponse()."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/dirac-run/dirac/commit/c0f15dfea2df6eda3366620c6928ae332ccbd1df. In TaskMessenger's card waitForInteraction, the card is pushed to waitingCardIds and presented (flushPendingWrites + postPresentationToWebview); over ACP this is what makes TaskMessageBridge send session/request_permission. Only afterwards does the method clear askResponse, askResponseText and the other response fields and then wait for askResponse !== undefined. A client that answers immediately (as ABB and the issue's script do) gets its allow_once recorded by submitCardResponse between presentation and the clear; the clear wipes it, and the pWaitFor waits forever, so no further session/update is sent and session/prompt never returns. Commit c0f15df (\"fix(acp): defer card input until its task queue turn\") records askResponseCardId in submitCardResponse, clears response fields in waitForInteraction only when they do not belong to this card (via a new clearAskResponse helper), emits a cardInteractionReady event after setup, and makes the ACP bridge ignore cards that are not yet the active interaction. The fix first ships in v0.5.18 / v0.5.18-cli; the pinned revision f1847e9 (v0.5.23) already contains it, so the case is tested at v0.5.17-cli (95edfe3), the version in the issue."
+}

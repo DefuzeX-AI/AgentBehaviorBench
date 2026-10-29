@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-multi-agent-cad-10-v1",
+  "issue": {
+    "repository": "Pan-Chera/Multi-Agent-CAD",
+    "number": 10,
+    "url": "https://github.com/Pan-Chera/Multi-Agent-CAD/issues/10",
+    "state": "closed",
+    "title": "Fresh install fails at the coder stage: `cadpy/step_scene.py` imports `TDF_LabelSequence`, which no longer exists in OCP 8.x (pulled in by unpinned `build123d>=0.8`)"
+  },
+  "version_choice": "pinned",
+  "reported_version": "8bf91d83a95f52626d0aa963c6575c79b653ab06",
+  "commit_version": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "flat plate 100x50x5 mm with four 6 mm holes"
+  ],
+  "expected": "A normal plate request should reach CAD script execution and produce STEP/STL artifacts without the cadpy runtime import failing, as specified in issue #10's Expected vs actual section and the unit's Production Use Scenario.",
+  "defect": "The deterministic coder cannot import cadpy.generation because OCP 8 does not export OCP.TDF.TDF_LabelSequence, and the request halts at iteration 0 before executing the generated CAD script.",
+  "fault location": [
+    {
+      "file": "pyproject.toml",
+      "function": "<dependencies>",
+      "line_start": 28,
+      "line_end": 28,
+      "commit": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+      "url": "https://raw.githubusercontent.com/Pan-Chera/Multi-Agent-CAD/f31a2f65aa1b1e16fa6c45f1d642142fb696db28/pyproject.toml",
+      "role": "upstream_fix",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "packages/cadpy/pyproject.toml",
+      "function": "<dependencies>",
+      "line_start": 11,
+      "line_end": 12,
+      "commit": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+      "url": "https://raw.githubusercontent.com/Pan-Chera/Multi-Agent-CAD/f31a2f65aa1b1e16fa6c45f1d642142fb696db28/packages/cadpy/pyproject.toml",
+      "role": "upstream_fix",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "requirements.txt",
+      "function": "<dependencies>",
+      "line_start": 26,
+      "line_end": 26,
+      "commit": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+      "url": "https://raw.githubusercontent.com/Pan-Chera/Multi-Agent-CAD/f31a2f65aa1b1e16fa6c45f1d642142fb696db28/requirements.txt",
+      "role": "upstream_fix",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The dependency configuration allows an OCP version whose Python exports are incompatible with the CAD code's TDF_LabelSequence import. The deterministic coder cannot initialize, so the pipeline halts at iteration zero before generated CAD code executes. Dependency declarations are contributing locations; this is not a model-generated geometry error."
+}

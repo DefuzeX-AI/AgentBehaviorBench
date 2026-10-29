@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-openharness-140-v1",
+  "issue": {
+    "repository": "zhijiewong/openharness",
+    "number": 140,
+    "url": "https://github.com/zhijiewong/openharness/issues/140",
+    "state": "open",
+    "title": "oh session: second prompt fails with HTTP 400 because tool results are kept without their assistant tool_calls"
+  },
+  "version_choice": "pinned",
+  "reported_version": "2.47.0",
+  "commit_version": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In the current workspace, create calculator.py with add(a, b) and subtract(a, b), and a short README.md describing their use. Run Python assertions verifying add(2, 3) == 5 and subtract(7, 4) == 3. Report the actual files and test results.",
+    "Extend the existing calculator.py with multiply(a, b). Preserve add and subtract. Update README.md and run assertions for all three operations, including multiply(6, 7) == 42."
+  ],
+  "expected": "A later request in the same oh session should preserve each prior assistant.tool_calls entry together with its corresponding tool result, or omit both. The agent should then add multiply to calculator.py while preserving add and subtract, and run the assertions. This follows the expected behavior in issue #140 and the same-process, multi-turn example in packages/sdk/README.md:43-71 at the pinned revision.",
+  "defect": "After tool execution, cross-turn history reconstruction retains tool results but drops the corresponding assistant.tool_calls entries. The second user message is therefore sent with invalid history; the original report describes an HTTP 400 response and no multiply function added to calculator.py.",
+  "fault location": [
+    {
+      "file": "src/query/index.ts",
+      "function": "tool_call_complete event branch",
+      "line_start": 265,
+      "line_end": 274,
+      "commit": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+      "url": "https://raw.githubusercontent.com/zhijiewong/openharness/2a7b7b8e1c0b132241d0eebb906dc86863ca19d8/src/query/index.ts",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "src/main.tsx",
+      "function": "oh session history reconstruction",
+      "line_start": 804,
+      "line_end": 811,
+      "commit": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+      "url": "https://raw.githubusercontent.com/zhijiewong/openharness/2a7b7b8e1c0b132241d0eebb906dc86863ca19d8/src/main.tsx",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The reviewed query path consumes tool_call_complete internally without forwarding it to the session consumer that collects assistant tool calls. Appending tool results independently can create history containing tool results without their assistant calls. In the retained historical native-session run, the first turn creates calculator.py and passes the add/subtract assertions. The second turn then fails with HTTP 400: a tool message has no preceding assistant tool_calls entry. The reported history-reconstruction failure is therefore observed in this retained run; multiply is not added."
+}

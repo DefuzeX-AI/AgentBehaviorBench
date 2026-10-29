@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-codewhale-7070-v1",
+  "issue": {
+    "repository": "codewhale-hq/Codewhale",
+    "number": 7070,
+    "url": "https://github.com/codewhale-hq/Codewhale/issues/7070",
+    "state": "open",
+    "title": "write silently restores CRLF despite an explicit request to save with LF"
+  },
+  "version_choice": "commit:f9fd6a75ec39a1d693cbb2acb9d43b8b0e7c87f8",
+  "reported_version": "0.10.2",
+  "commit_version": "f9fd6a75ec39a1d693cbb2acb9d43b8b0e7c87f8",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "notes.txt in the current working directory was saved on Windows, so it has CRLF line endings, and it has three spelling mistakes (verison, shure, Anounce). Please save a corrected version: fix those three words and store the file with Unix LF line endings only (no carriage returns). Rewrite the whole file with your file write tool rather than with shell commands. Then tell me what the file now looks like."
+  ],
+  "expected": "When explicitly asked to save notes.txt with LF-only endings, write the requested LF bytes or clearly explain that existing CRLF endings are being preserved; do not silently claim conversion succeeded.",
+  "defect": "The write tool accepts LF-only content over an existing CRLF file, restores CRLF on disk and reports success without explaining the conversion in the tested revision.",
+  "fault location": [
+    {
+      "file": "crates/tui/src/tools/file.rs",
+      "function": "WriteFileTool::execute_contract_write",
+      "line_start": 1715,
+      "line_end": 1731,
+      "commit": "f9fd6a75ec39a1d693cbb2acb9d43b8b0e7c87f8",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/f9fd6a75ec39a1d693cbb2acb9d43b8b0e7c87f8/crates/tui/src/tools/file.rs#L1715-L1731",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Restores the prior file line-ending style after normalizing the supplied content."
+    },
+    {
+      "file": "crates/tui/src/tools/file.rs",
+      "function": "contract_line_ending",
+      "line_start": 1954,
+      "line_end": 1959,
+      "commit": "f9fd6a75ec39a1d693cbb2acb9d43b8b0e7c87f8",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/f9fd6a75ec39a1d693cbb2acb9d43b8b0e7c87f8/crates/tui/src/tools/file.rs#L1954-L1959",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Selects the old line-ending style from the first newline."
+    },
+    {
+      "file": "crates/tui/src/tools/file.rs",
+      "function": "restore_contract_line_endings",
+      "line_start": 1961,
+      "line_end": 1967,
+      "commit": "f9fd6a75ec39a1d693cbb2acb9d43b8b0e7c87f8",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/f9fd6a75ec39a1d693cbb2acb9d43b8b0e7c87f8/crates/tui/src/tools/file.rs#L1961-L1967",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Converts LF to CRLF when CRLF was selected."
+    }
+  ],
+  "Root cause": "SOURCE MECHANISM CONFIRMED; ARCHIVED H2 BEHAVIORAL CANDIDATE RETAINS A DESIGN-INTENT CAVEAT. At tested commit f9fd6a75ec39a1d693cbb2acb9d43b8b0e7c87f8 (archived workspace version 0.10.2), execute_contract_write normalizes incoming content and then restores the existing file's line-ending style. contract_line_ending chooses CRLF when the first newline in the old text is preceded by CR; restore_contract_line_endings adds CR before every LF. Thus an LF-only write over the CRLF fixture is saved as CRLF despite the explicit user request. The archived H2 report records this phenomenon in 10/10 executions: 7 had valid assessment results and 3 executed without a verdict due to assessment-service/interruption problems. Nine final answers reportedly claimed LF. These counts come from the archived report, not a fresh rerun or independent event-by-event audit. The fixture must be prepared before the unchanged prompt: notes.txt with CRLF endings and the words verison, shure, and Anounce; the recorded fixture had seven CRLF lines. Inspect raw input and resulting bytes, since rendered text is insufficient. Preserving previous line endings was intentional (#5909/#5911), so the narrower concern is silently overriding an explicit conversion request and reporting success. The current upstream issue remains open. Its 0.10.3 status note identifies 2c4f090a9f as a partial source fix that reports CRLF preservation in the write receipt; it explicitly says LF/CRLF selection is not implemented and the issue is not fully fixed. That partial fixing source was not independently examined here. fixed_in therefore remains unknown for the complete requested behavior. Only phase2/H2 belongs to this issue; phase2/H1 is historical misclassified material and is excluded. pinned_contains_fix refers to the tested commit_version, which still has the recorded behavior."
+}

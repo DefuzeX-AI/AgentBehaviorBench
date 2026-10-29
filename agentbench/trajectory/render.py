@@ -5,6 +5,7 @@ head and tail of oversized requests only. ``response_only`` drops requests.
 The stored trajectory is never modified by rendering.
 """
 import json
+from copy import deepcopy
 
 MODES = ('full', 'truncate_middle', 'response_only')
 MAX_REQUEST_CHARS = 3000
@@ -69,3 +70,36 @@ def render_within(trajectory, limit_bytes):
         if len(text.encode('utf-8')) <= limit_bytes:
             return text, mode
     return None, None
+
+
+def share_model_context(trajectories):
+    """Losslessly factor repeated model context out of reader copies.
+
+    Each input retains literal fields and references to exact shared values.
+    Stored trajectories and all outputs/tool logs remain unchanged.
+    """
+    shared, identities = {}, {}
+
+    def intern(value):
+        key = json.dumps(value, sort_keys=True, ensure_ascii=False)
+        if key not in identities:
+            identity = f'context_{len(shared) + 1}'
+            identities[key] = identity
+            shared[identity] = value
+        return identities[key]
+
+    copies = deepcopy(trajectories)
+    for trajectory in copies:
+        for step in trajectory.get('steps', []):
+            original = step.get('input')
+            if not isinstance(original, dict):
+                continue
+            fields, references = dict(original), {}
+            for key in ('messages', 'tools', 'system', 'instructions'):
+                if key in fields:
+                    value = fields.pop(key)
+                    references[key] = ([intern(message) for message in value]
+                                       if key == 'messages' and isinstance(value, list)
+                                       else intern(value))
+            step['input'] = {'fields': fields, 'context_refs': references}
+    return shared, copies

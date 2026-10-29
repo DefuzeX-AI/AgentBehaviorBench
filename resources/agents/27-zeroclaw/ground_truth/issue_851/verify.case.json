@@ -1,0 +1,45 @@
+{
+  "case_id": "ir-zeroclaw-851-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 851,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/851",
+    "state": "closed",
+    "title": "[Bug]: zeroclaw agent -m ignores autonomy level=full — shell commands blocked in non-interactive (Docker/CI) mode"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.1.0",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "v0.1.2",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run exactly this shell command: python3 -c \"x = 1; print(x)\""
+  ],
+  "expected": "The shell tool runs the command (the semicolon is inside double quotes, so it is one python3 invocation) and prints 1.",
+  "defect": "The security policy splits the command on the quoted `;`, the second fragment `print(x)\"` is not an allowed command, and the shell call is rejected as not allowed by security policy.",
+  "fault location": [
+    {
+      "file": "src/security/policy.rs",
+      "function": "SecurityPolicy::is_command_allowed",
+      "line_start": 390,
+      "line_end": 423,
+      "commit": "b43e9eb3255df4a71fa91c175a7b6d61c33baa4a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/b43e9eb3255df4a71fa91c175a7b6d61c33baa4a/src/security/policy.rs#L390-L423",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Splits the command on every `;`, `|`, `&&`, `||` and newline with plain string replace, ignoring quotes, then requires each fragment's first word to be allowlisted, so a quoted SQL/Python `;` produces a non-allowlisted fragment; PR #902 (commit 6746625) replaces this with the quote-aware split_unquoted_segments."
+    },
+    {
+      "file": "src/security/policy.rs",
+      "function": "SecurityPolicy::command_risk_level",
+      "line_start": 189,
+      "line_end": 196,
+      "commit": "b43e9eb3255df4a71fa91c175a7b6d61c33baa4a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/b43e9eb3255df4a71fa91c175a7b6d61c33baa4a/src/security/policy.rs#L189-L196",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Risk classification uses the same quote-blind separator replacement (including `&`); PR #902 switches it to split_unquoted_segments as well."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/902 (landed as commit https://github.com/zeroclaw-labs/zeroclaw/commit/67466254f0d1e7a5b616cd8e7896f990425bfecc, \"fix(security): parse shell separators only when unquoted\"). At the reported revision (v0.1.0, commit b43e9eb) SecurityPolicy::is_command_allowed normalises the command by replacing every `;`, `|`, newline, `&&` and `||` with a NUL byte and validates each resulting fragment against allowed_commands, without tracking quotes. A command such as `sqlite3 /tmp/test.db \"CREATE TABLE t(id INT); INSERT ...\"` (or `python3 -c \"x = 1; print(x)\"`) is therefore cut inside the quoted argument, the second fragment starts with `INSERT`/`print(x)\"`, which is not allowlisted, and the shell tool fails with a security-policy rejection before execution; the model may then retry or fabricate output, as the issue reports. PR #902 adds a QuoteState-tracking split_unquoted_segments and contains_unquoted_single_ampersand and uses them in both is_command_allowed and command_risk_level. The fix first ships in v0.1.2 and the pinned v0.8.5 still uses split_unquoted_segments (crates/zeroclaw-config/src/policy.rs L1002, used at L2578), so the pinned revision contains the fix. The issue's second complaint (level=full still prompting / reading EOF from stdin in `zeroclaw agent -m`) is not addressed by this diff and is out of scope for the supervised ACP unit."
+}

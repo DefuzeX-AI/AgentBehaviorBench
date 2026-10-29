@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 ROOT=Path(__file__).resolve().parents[1]
-bootstrap=ROOT/'resources/agents/139-openaeon/bootstrap'
+bootstrap=ROOT/'resources/agents/116-openaeon/bootstrap'
 launch=Path(os.environ.get('TEST_LAUNCH',str(bootstrap/'launch.py')))
 warm=Path(os.environ.get('TEST_WARM',str(bootstrap/'warm_cache.py')))
 spec=importlib.util.spec_from_file_location('warm_candidate',warm)

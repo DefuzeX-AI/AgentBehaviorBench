@@ -1,0 +1,45 @@
+{
+  "case_id": "ir-labscript-ai-42-v1",
+  "issue": {
+    "repository": "KRATSZ/LabScript-AI",
+    "number": 42,
+    "url": "https://github.com/KRATSZ/LabScript-AI/issues/42",
+    "state": "open",
+    "title": "Legacy backend/ (backup/server): PyLabRobot simulator never runs because setup_simulation_environment() instantiates deprecated ChatterBoxBackend, and correction rounds splice LLM prose into the protocol"
+  },
+  "version_choice": "pinned",
+  "reported_version": "abff77285eacc98f245a27059d7d2c34969dcc2c",
+  "commit_version": "abff77285eacc98f245a27059d7d2c34969dcc2c",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Generate a PyLabRobot protocol for a 1:2 serial dilution of a sample across 8 wells of a 96-well plate on the configured Hamilton Vantage deck. Use a 1000 µL tip for all transfers. Include a mixing step after each dilution."
+  ],
+  "expected": "The generated protocol is executed in the PyLabRobot simulator and validated (or corrected based on errors in the protocol itself).",
+  "defect": "Every simulation fails during simulator setup with `NotImplementedError: ChatterBoxBackend is deprecated. Use LiquidHandlerChatterboxBackend instead.`, and correction rounds splice the LLM's prose and code fences into the protocol so the next simulation fails with a SyntaxError; the final outcome is None.",
+  "fault location": [
+    {
+      "file": "backend/pylabrobot_utils.py",
+      "function": "setup_simulation_environment",
+      "line_start": 413,
+      "line_end": 414,
+      "commit": "abff77285eacc98f245a27059d7d2c34969dcc2c",
+      "url": "https://github.com/KRATSZ/LabScript-AI/blob/abff77285eacc98f245a27059d7d2c34969dcc2c/backend/pylabrobot_utils.py#L413-L414",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The simulator always instantiates ChatterBoxBackend (imported at L26), whose constructor raises NotImplementedError in the pylabrobot 0.2.x that the unpinned dependency resolves to, so no protocol ever runs."
+    },
+    {
+      "file": "backend/pylabrobot_agent.py",
+      "function": "correction node (protocol cleanup)",
+      "line_start": 349,
+      "line_end": 353,
+      "commit": "abff77285eacc98f245a27059d7d2c34969dcc2c",
+      "url": "https://github.com/KRATSZ/LabScript-AI/blob/abff77285eacc98f245a27059d7d2c34969dcc2c/backend/pylabrobot_agent.py#L349-L353",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "Fences are stripped only if the reply starts with ```python and ends with ```; a reply with leading prose is inserted verbatim into the template (same logic in the generate node at L268-272), causing SyntaxError."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). The legacy backend's simulate step calls setup_simulation_environment, which builds the liquid handler with `ChatterBoxBackend()`. pyproject.toml lists `pylabrobot` without a version, so an install resolves pylabrobot 0.2.x, where ChatterBoxBackend.__init__ raises NotImplementedError and points to LiquidHandlerChatterboxBackend; the error is raised in setup before the generated protocol(lh) runs, so every attempt fails regardless of the generated code. The correction LLM is shown an error in code it cannot change, answers with an explanation plus a fenced block, and the cleanup in the generate/correction nodes only removes fences when the whole reply starts with ```python and ends with ```, so prose and fences are inserted at the `# [AGENT_CODE_STUB]` by fill_template_with_logic and the next simulation fails with SyntaxError. Minimal fix: use `LiquidHandlerChatterboxBackend` in setup_simulation_environment (and the golden template) or pin pylabrobot to a version that still has ChatterBoxBackend; extract the first ```python fenced block (regex) instead of prefix/suffix stripping. Separately (minor), should_continue_edge mutates state in an edge function, which LangGraph does not persist, so final_outcome stays None. The current main is a rewrite (labscriptai/) that already uses LiquidHandlerChatterboxBackend, but it does not modify backend/, so it is not counted as a fix."
+}

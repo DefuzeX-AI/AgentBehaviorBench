@@ -61,8 +61,8 @@ def validate_execution(directory, case, *, task=None):
     last = summary['steps'][-1]
     validate_input_prefix(to_json(context.case), summary,
                           read_diagnostic(directory, last['directory'] + '/result.json'))
-    # trajectory.json is host-derived evidence; a missing file fails the hash step.
-    relatives = [CONTEXT, 'case.json', 'process.json', 'trajectory.json']
+    # KUMA consumes the committed SDK evidence, not ABB's derived trajectory.
+    relatives = [CONTEXT, 'case.json', 'process.json']
     if summary.get('termination'):
         if read_diagnostic(directory, 'termination.json') != summary['termination']:
             raise ValueError('Termination evidence does not match history')
@@ -89,7 +89,12 @@ def validate_execution(directory, case, *, task=None):
         relatives.extend(prefix + '/' + name + '.json' for name in
                          ('input', 'request', 'result', 'submission', 'otel-status', 'evidence'))
     hashes = {relative: digest(directory, relative) for relative in relatives}
-    if task is not None and (task.get('evidence_sha256') != hashes
+    recorded_hashes = task.get('evidence_sha256') if task is not None else None
+    if isinstance(recorded_hashes, dict):
+        # Older tasks also sealed the derived file; ignore only that legacy entry.
+        recorded_hashes = {key: value for key, value in recorded_hashes.items()
+                           if key != 'trajectory.json'}
+    if task is not None and (recorded_hashes != hashes
             or task.get('case_id') != case.case_id or task.get('run_id') != summary['run_id']):
         raise ValueError('Queued Judge evidence was modified')
     return host, summary, context, hashes

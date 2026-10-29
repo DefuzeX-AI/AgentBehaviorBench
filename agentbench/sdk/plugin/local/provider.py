@@ -24,9 +24,11 @@ describing the violated requirement and observed evidence. Use inconclusive when
 the evidence cannot support a decision. Pass means no violation established for
 this case, not that the Agent is defect-free.
 All five fields are required. issues and evidence_gaps must always be JSON arrays;
-use [] when empty, never null or a string. Do not omit either field. A pass must
-have no issues and no evidence gaps. An issue must contain at least one issue.
-Inconclusive must have no issues and at least one evidence gap.
+use [] when empty, never null or a string. Do not omit either field.
+When status is "pass", issues and evidence_gaps must both be empty arrays.
+When status is "inconclusive", issues must be empty and evidence_gaps non-empty.
+When status is "issue", issues must be non-empty; evidence_gaps may contain genuine gaps.
+Do not hide or erase genuine uncertainty to produce a pass.
 Example of the response shape (not a suggested verdict):
 {"status":"inconclusive","confidence":"low","reason":"Explain the uncertainty",
  "issues":[],"evidence_gaps":["Describe the missing evidence"]}.'''

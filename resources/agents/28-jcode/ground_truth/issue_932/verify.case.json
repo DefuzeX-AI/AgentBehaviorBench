@@ -1,0 +1,22 @@
+{
+  "case_id": "ir-jcode-932-v1",
+  "issue": {
+    "repository": "1jehuang/jcode",
+    "number": 932,
+    "url": "https://github.com/1jehuang/jcode/issues/932",
+    "state": "open",
+    "title": "bash gate: `rm -rf x 2>/dev/null` parses the redirect as delete targets, hits the no-escape protected-path tier"
+  },
+  "version_choice": "historical:v0.76.0",
+  "reported_version": "unknown",
+  "commit_version": "bbef1f6a8ebf00c52b25bc41ad5dd5226da9d99d",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Run exactly this bash command and report the result: cd /tmp && rm -rf nonexistent-test-dir-xyz 2>/dev/null; echo \"exit=$?\""
+  ],
+  "expected": "The only delete operand resolves to /tmp/nonexistent-test-dir-xyz; the redirect is not a delete target.",
+  "defect": "The gate treats the descriptor 2 and /dev/null as deletion operands and may resolve the relative target against HOME instead of the cd directory.",
+  "fault location": [],
+  "Root cause": "Redirect syntax is not removed from the operand list before destructive-target assessment, and command-local cd state is not propagated into relative-path resolution. Commit 9b2480bf is a related parser fix on a diverged history, so ancestry alone cannot establish whether current pin has the semantic fix."
+}

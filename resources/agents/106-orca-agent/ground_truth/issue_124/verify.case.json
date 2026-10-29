@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-orca-agent-124-v1",
+  "issue": {
+    "repository": "echoVic/orca-agent",
+    "number": 124,
+    "url": "https://github.com/echoVic/orca-agent/issues/124",
+    "state": "closed",
+    "title": "[Bug]: `--mode=acp` sends the final answer twice (streamed deltas, then the whole message again as one chunk)"
+  },
+  "version_choice": "historical:v0.5.8",
+  "reported_version": "0.5.3; also 0.5.8",
+  "commit_version": "bef73ea292f61885a2be66a4976e7e9345160e4e",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create hello.txt with these three lines: Weekend plan; Sat: market, then sort the bookshelf.; Sun: a 5 km run, then a quiet dinner.",
+    "Read hello.txt in the current directory, then summarize it in 3-4 sentences and give it a short title."
+  ],
+  "expected": "The concatenated ACP message stream contains the final answer once.",
+  "defect": "After streaming the answer deltas, plain ACP emits the complete answer again as one final message chunk.",
+  "fault location": [
+    {
+      "file": "crates/orca-runtime/src/acp/agent.rs",
+      "function": "emit_surface_event ResponseCompleted arm",
+      "line_start": 2718,
+      "line_end": 2723,
+      "commit": "bef73ea292f61885a2be66a4976e7e9345160e4e",
+      "url": "https://github.com/echoVic/orca-agent/blob/bef73ea292f61885a2be66a4976e7e9345160e4e/crates/orca-runtime/src/acp/agent.rs#L2718-L2723",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "emit_surface_event forwards assistant deltas and later the complete response text without tracking how much has already been sent. The shared-session observer already tracks offsets; #125 applies equivalent once-only behavior to plain ACP."
+    }
+  ],
+  "Root cause": "emit_surface_event forwards assistant deltas and later the complete response text without tracking how much has already been sent. The shared-session observer already tracks offsets; #125 applies equivalent once-only behavior to plain ACP."
+}

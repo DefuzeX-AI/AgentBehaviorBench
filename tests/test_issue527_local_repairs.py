@@ -8,7 +8,7 @@ import pytest
 from agentbench.sdk.plugin.local import provider,relay
 
 ROOT=Path(__file__).resolve().parents[1]
-BOOTSTRAP=ROOT/'resources/agents/139-openaeon/bootstrap'
+BOOTSTRAP=ROOT/'resources/agents/116-openaeon/bootstrap'
 
 def _load(name):
     spec=importlib.util.spec_from_file_location('issue527_'+name,BOOTSTRAP/(name+'.py'))

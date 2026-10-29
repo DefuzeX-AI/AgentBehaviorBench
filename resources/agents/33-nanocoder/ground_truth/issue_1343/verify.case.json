@@ -1,0 +1,36 @@
+{
+  "case_id": "ir-nanocoder-1343-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1343,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1343",
+    "state": "closed",
+    "title": "[Bug] find_files fails to match any files when pattern begins with ./"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "1.31.0 (approx: first release after fix)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Set up a small repository fixture in the current directory (the workspace is empty). Run these exact commands: `mkdir -p source/utils`; `echo '{\"name\": \"fixture\", \"version\": \"1.0.0\"}' > package.json`; `echo 'export const cli = 1;' > source/cli.tsx`; `echo 'export const x = 1;' > source/utils/file-search.ts`; `git init -q && git add -A`. Then run `find . -type f -not -path './.git/*'` and show me the output.",
+    "Now use the find_files tool with pattern: \"./package.json\" and tell me exactly what it returns.",
+    "Next use the find_files tool with pattern: \"./source/**/*.ts\" and tell me exactly what it returns."
+  ],
+  "expected": "find_files should remove or ignore a leading './' before matching. The pattern './package.json' should find package.json, and './source/**/*.ts' should find source/utils/file-search.ts. This matches the issue's expected behavior and the normalization added by fix PR #1393 before the pattern reaches matchesGlob.",
+  "defect": "For a pattern beginning with './', find_files returns 'No files or directories found matching pattern \"./package.json\"'. normalizePathForMatch changes backslashes to forward slashes but keeps the leading './'. tokenizeExpandedPattern then treats '.' and '/' as literal tokens, so the pattern cannot match normalized relative paths such as 'package.json' or 'source/utils/file-search.ts'.",
+  "fault location": [
+    {
+      "file": "source/utils/file-search.ts",
+      "function": "buildGlobRegexes",
+      "line_start": 95,
+      "line_end": 101,
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/utils/file-search.ts",
+      "role": "source_review",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "Glob construction anchors the normalized pattern, but normalization retains a leading ./ while candidate relative paths omit it. Both ./package.json and ./source/**/*.ts consequently fail to match existing fixture files. The retained setup and subsequent empty find_files results support the mismatch."
+}

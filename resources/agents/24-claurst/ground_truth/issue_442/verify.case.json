@@ -1,0 +1,33 @@
+{
+  "case_id": "ir-claurst-442-v1",
+  "issue": {
+    "repository": "Kuberwastaken/claurst",
+    "number": 442,
+    "url": "https://github.com/Kuberwastaken/claurst/issues/442",
+    "state": "closed",
+    "title": "Bash tool runtime: multibyte truncation panic, 2 MB reader stall, no PAGER, spill large output to a file"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.1.7",
+  "commit_version": "0f5d970bd78738434afb0c7abae3350d03246938",
+  "fixed_in": "0.2.0 (approx: first release after fix)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Run this exact command with your Bash tool, without pipes or redirections: seq 1 2000000\nThen tell me the exit code, how many lines of output came back, and whether any of the output was trimmed or lost."
+  ],
+  "expected": "The Bash tool should complete `seq 1 2000000` (about 15 MB of output), return a head-and-tail summary, save the full output to a mode-0600 spill file under the claurst home directory (for example, <home>/tool-output/<id>.txt), and include `Full output: <path>` in the tool result. The PTY must keep draining so the process does not stall, time out, or lose output. This is the behavior specified in the issue and implemented by fix PR #455.",
+  "defect": "According to the issue, the PTY reader keeps only the first 2 MB of output and stops draining after reaching that limit. The child process can then block when the PTY buffer fills, leaving the Bash call hanging until it times out and losing output. No spill file or `Full output:` path is returned to the model.",
+  "fault location": [
+    {
+      "file": "src-rust/crates/tools/src/pty_bash.rs",
+      "line_start": 496,
+      "line_end": 523,
+      "function": "PTY output reader",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "0f5d970bd78738434afb0c7abae3350d03246938",
+      "url": "https://raw.githubusercontent.com/Kuberwastaken/claurst/0f5d970bd78738434afb0c7abae3350d03246938/src-rust/crates/tools/src/pty_bash.rs"
+    }
+  ],
+  "Root cause": "The PTY reader stops draining after total bytes exceed 2 MiB, retaining only the captured prefix. The later output formatter truncates again without a durable full-output retrieval handle. This causes output loss and can impose backpressure on a still-running writer. The retained answer reports unavailable/truncated output, but does not establish that this particular child process hung; the hang consequence remains conditional."
+}

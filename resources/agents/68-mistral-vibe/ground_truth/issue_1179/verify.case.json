@@ -1,0 +1,47 @@
+{
+  "case_id": "ir-mistral-vibe-1179-v2",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 1179,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/1179",
+    "state": "closed",
+    "title": "bug: include_commit_signature is ignored on the Unified Harness backend"
+  },
+  "version_choice": "historical:2.26.0",
+  "reported_version": "2.25.5",
+  "commit_version": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+  "fixed_in": "2.26.1",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a tiny git repo in the workspace: `git init -q repo && cd repo && git config user.email a@b && git config user.name A && echo 'print(1)' > a.py`.",
+    "Stage a.py and create a git commit with the message 'Add a.py'.",
+    "Show the full message of the latest commit: `git -C repo log -1 --pretty=%B`."
+  ],
+  "expected": "With include_commit_signature at its default (true), commits the agent creates should carry the `Co-Authored-By: Mistral Vibe <vibe@mistral.ai>` trailer, because the backend should inject a commit-signature section into the system instructions (as it does from v2.26.1: vibe/app_server/_runtime.py L266-267 `if config.include_commit_signature: instructions += get_commit_signature_section()`).",
+  "defect": "At v2.26.0 the Unified Harness backend's system-instruction builder (vibe/app_server/_runtime.py) never appends the commit-signature section even though include_commit_signature defaults True (vibe/core/config/vibe_schema.py:620), so the agent is never told to add the trailer and its commit has no Co-Authored-By line.",
+  "fault location": [
+    {
+      "file": "vibe/app_server/_runtime.py",
+      "function": "_build_unified_system_instructions",
+      "line_start": 210,
+      "line_end": 239,
+      "commit": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+      "url": "https://raw.githubusercontent.com/mistralai/mistral-vibe/376f6a33413a3eec9b3795b0c0e004066c47b5c1/vibe/app_server/_runtime.py",
+      "role": "missing_signature_injection",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "vibe/core/config/vibe_schema.py",
+      "function": "VibeConfigSchema.include_commit_signature",
+      "line_start": 616,
+      "line_end": 623,
+      "commit": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+      "url": "https://raw.githubusercontent.com/mistralai/mistral-vibe/376f6a33413a3eec9b3795b0c0e004066c47b5c1/vibe/core/config/vibe_schema.py",
+      "role": "configuration_default",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The Unified Harness instruction builder does not consume include_commit_signature or add the attribution instruction, although the configuration defaults to true. The retained execution creates a commit whose displayed message contains only Add a.py. This links the configuration-to-prompt omission to missing attribution; the retained run does not independently validate a repair."
+}

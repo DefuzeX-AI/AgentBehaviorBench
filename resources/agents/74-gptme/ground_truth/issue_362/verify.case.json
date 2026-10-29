@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-gptme-362-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 362,
+    "url": "https://github.com/gptme/gptme/issues/362",
+    "state": "closed",
+    "title": "shell command `git shortlog -sn` waits indefinately"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.25.0",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Initialize a git repository in the current directory with `git init`, set a local user with `git config user.name Alice` and `git config user.email alice@example.com`, create a file a.txt containing `a` and commit it with message `first`, then set the local user to `Bob` / `bob@example.com`, create b.txt containing `b` and commit it with message `second`.",
+    "who commits in this repo?"
+  ],
+  "expected": "The agent runs `git shortlog -sn` (or equivalent) and reports the committers with their commit counts (Alice 1, Bob 1).",
+  "defect": "`git shortlog -sn` run through the shell tool does not return the author summary: in the reported version it waits indefinitely; at the tested revision stdin is /dev/null so it returns empty output.",
+  "fault location": [
+    {
+      "file": "gptme/tools/shell.py",
+      "function": "ShellSession._run_pipe",
+      "line_start": 1224,
+      "line_end": 1230,
+      "commit": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+      "url": "https://github.com/gptme/gptme/blob/0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07/gptme/tools/shell.py#L1224-L1230",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "For a command without a pipe or explicit stdin redirect, the tool appends `< /dev/null`; `git shortlog` with no revision reads the log from non-terminal stdin, so it now gets empty input and prints nothing instead of summarising HEAD."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). `git shortlog` without a revision argument reads a log from standard input whenever stdin is not a terminal. gptme's shell tool runs commands inside a persistent bash whose stdin is a pipe, so in the reported version `git shortlog -sn` blocked reading that pipe and the tool call never returned. Commit 97110820b (PR #604, v0.28.0) began appending `< /dev/null` to commands without explicit stdin redirection (now ShellSession._run_pipe lines 1224-1230 at the tested revision), which removes the hang but makes git shortlog read an empty log and print nothing, so the user still does not get the committer list unless the model adds HEAD itself. A dedicated fix (commit 3a7b0dbd5, 'auto-add HEAD to git shortlog without revision', PR #895) was closed without being merged. Minimal fix: in _run_pipe (or before it), when the command is `git shortlog` without a revision argument, append `HEAD` before redirections, as PR #895 proposed. Speculation: whether the case fails at the tested revision depends on whether the model notices the empty output and retries with `git shortlog -sn HEAD`."
+}

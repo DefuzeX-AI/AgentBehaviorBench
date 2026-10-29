@@ -1,0 +1,45 @@
+{
+  "case_id": "ir-zeroclaw-11612-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 11612,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/11612",
+    "state": "closed",
+    "title": "[Bug]: Re-running an already-approved shell command in the same turn aborts the agent loop (\"repeated prompt-required tool call 'shell' with identical arguments before approval\") and ends the ACP session"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.8.5",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "v0.8.6",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create apply.py that prints \"ok\", run it with python3 apply.py, then run the same command again to confirm the result is unchanged."
+  ],
+  "expected": "The second, identical `python3 apply.py` call is sent to the client for approval and runs, and the agent confirms the output is unchanged.",
+  "defect": "The second call is never offered for approval; the turn fails with `Agent loop aborted: repeated prompt-required tool call 'shell' with identical arguments before approval.` (JSON-RPC -32603) and the ACP session ends.",
+  "fault location": [
+    {
+      "file": "crates/zeroclaw-runtime/src/agent/turn/call_prep.rs",
+      "function": "prepare_tool_calls",
+      "line_start": 184,
+      "line_end": 221,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-runtime/src/agent/turn/call_prep.rs#L184-L221",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Records every prompt-required shell signature in the turn-scoped set before approval and bails when it is already present, without ever removing it after the call is approved and executed; PR #11653 (commit d02b748) removes the signature once the call is approved."
+    },
+    {
+      "file": "crates/zeroclaw-runtime/src/agent/turn/mod.rs",
+      "function": "run_tool_call_loop",
+      "line_start": 535,
+      "line_end": 535,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-runtime/src/agent/turn/mod.rs#L535-L535",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The guard set is created once per user turn and shared by all tool iterations, so an approved call from an earlier iteration still blocks an identical later one."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/11653 (commit https://github.com/zeroclaw-labs/zeroclaw/commit/d02b748c30ee259cee445503f48d4b3b576f0d61, \"fix(agent): let an approved shell call be rerun later in the same turn\"). At the pinned v0.8.5 the turn loop creates prompt_approval_tool_signatures once per user turn (turn/mod.rs L535). In prepare_tool_calls, every shell call that requires a prompt inserts its (tool, args) signature into that set before approval; if the insert finds the signature already present, the function logs and `anyhow::bail!`s with \"Agent loop aborted: repeated prompt-required tool call 'shell' with identical arguments before approval.\" The guard (added by #7901 against unapproved approval loops) never removes a signature after the operator approves and the command runs, so a legitimate rerun of `python3 apply.py` later in the same turn aborts the turn without a second permission request; in `zeroclaw acp` the error surfaces as JSON-RPC -32603 and the session ends. The fix keeps the pending signature and removes it from the turn-scoped set once the call is approved (denied or unanswered calls keep it), plus regression tests. It first ships in v0.8.6; the pinned revision does not contain it."
+}

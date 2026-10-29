@@ -1,0 +1,56 @@
+{
+ "case_id": "ir-zeroclaw-10912-v1",
+ "issue": {
+  "repository": "zeroclaw-labs/zeroclaw",
+  "number": 10912,
+  "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/10912",
+  "state": "closed",
+  "title": "[Bug]: Streaming text guard suppresses whole replies when prose quotes a tool-result-shaped object; three retries then a generic format error"
+ },
+ "version_choice": "pinned",
+ "reported_version": "v0.8.5",
+ "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+ "fixed_in": "v0.8.6",
+ "pinned_contains_fix": false,
+ "steps": [
+  "Explain in prose the JSON shape of a native tool-result message, showing the object inline in a code span with the tool_call_id and content keys."
+ ],
+ "expected": "The explanatory reply, including the inline object, is delivered to the client.",
+ "defect": "The streaming text guard classifies the inline object as an internal tool-result envelope, suppresses the whole reply three times, and the client only sees the generic \"internal tool-call format error\".",
+ "fault location": [
+  {
+   "file": "crates/zeroclaw-runtime/src/agent/turn/stream_guard.rs",
+   "function": "StreamTextGuard::should_suppress_protocol_candidate",
+   "line_start": 182,
+   "line_end": 209,
+   "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+   "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-runtime/src/agent/turn/stream_guard.rs#L182-L209",
+   "role": "upstream_fix",
+   "verification": "fix_diff_mapped_to_tested_revision",
+   "explanation": "Suppresses any candidate classified as ToolProtocolEnvelopeKind::ToolResult whenever tools are active, with the narrow looks_like_tool_protocol_example as the only exemption; PR #10935 (commit c25324e) exempts inert result-shaped fragments quoted in prose."
+  },
+  {
+   "file": "crates/zeroclaw-runtime/src/agent/turn/stream_guard.rs",
+   "function": "StreamTextGuard::evaluate_pending / suppress_protocol",
+   "line_start": 92,
+   "line_end": 131,
+   "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+   "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-runtime/src/agent/turn/stream_guard.rs#L92-L131",
+   "role": "upstream_fix",
+   "verification": "fix_diff_mapped_to_tested_revision",
+   "explanation": "A positive suppression clears the pending text and sets suppress_forwarding, so the rest of the reply (and the prose already buffered) is withheld; PR #10935 tracks released prose and records a suppression diagnostic instead of dropping the reply."
+  },
+  {
+   "file": "crates/zeroclaw-tool-call-parser/src/lib.rs",
+   "function": "classify_tool_protocol_envelope (object rule)",
+   "line_start": 319,
+   "line_end": 325,
+   "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+   "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-tool-call-parser/src/lib.rs#L319-L325",
+   "role": "upstream_fix",
+   "verification": "fix_diff_mapped_to_tested_revision",
+   "explanation": "Any object with a non-empty tool_call_id string and a content/result/output key is classified as a ToolResult envelope, regardless of context."
+  }
+ ],
+ "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/10935 (commit https://github.com/zeroclaw-labs/zeroclaw/commit/c25324e96c81389044716e6abff7d02ff3c5dec8, \"fix(runtime): keep prose that quotes a tool-result object out of the streaming protocol guard\"). At the pinned v0.8.5, StreamTextGuard buffers any suspicious brace-delimited candidate and calls should_suppress_protocol_candidate. classify_tool_protocol_envelope returns ToolResult for any object with a non-empty `tool_call_id` and a `content`/`result`/`output` key, and with tools active that classification is suppressible; the only exemption, looks_like_tool_protocol_example, requires a leading JSON fence or tag marker plus an 'example' keyword, which an inline code span in prose does not meet. suppress_protocol then clears the pending text and sets suppress_forwarding, so the entire reply is withheld; the turn loop records a tool_call_parse_issue, retries (max_retries = 2) and finally shows the generic internal tool-call format error. The fix adds checks for inert, non-call-shaped result fragments (is_inert_result_fragment, has_call_shaped_top_level_key), lets already-released prose through, records a suppression diagnostic and adds a retry stop notice for ACP. It first ships in v0.8.6; the pinned revision does not contain it."
+}

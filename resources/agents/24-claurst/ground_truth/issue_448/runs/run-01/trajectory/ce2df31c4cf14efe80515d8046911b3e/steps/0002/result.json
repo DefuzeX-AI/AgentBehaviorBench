@@ -1,0 +1,45 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "7cad387cbe564df5b076cd15c7c1a3cd",
+  "case_id": "ir-claurst-448-v1",
+  "input_id": "step-2",
+  "invocation_id": "7cad387cbe564df5b076cd15c7c1a3cd",
+  "agent_id": "claurst",
+  "status": "succeeded",
+  "output": "The patch tool reported success, but the result is unexpected — let me verify the raw file bytes:The patch tool reported success, but **verification shows the file was actually unchanged** — the removal line was not applied. Here are the full contents of `notes.txt` as they stand right now (confirmed with both the Read tool and a raw byte dump):\n\n```\nalpha\n-- old comment\nomega\n```\n\n**What went wrong:** The line being deleted (`-- old comment`) begins with dashes. Prefixing it with the unified diff removal marker `-` produces `--- old comment`, which is indistinguishable from a `--- <path>` file-header line. The patch parser treated it as a header instead of a deletion, so the hunk silently applied with no effect — the tool's \"+0 -0 lines\" report reflects that nothing actually changed.\n\nIf you'd like, I can remove the `-- old comment` line using a direct file edit instead (which doesn't suffer from the dash-ambiguity), or re-emit the diff in a form the parser handles. Just say the word — I didn't want to change the file beyond what you explicitly asked for.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": false,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {},
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "claurst",
+        "title": "Claurst",
+        "version": "0.1.7"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "acp-81ab4f23-2fbf-40c6-8ddf-705eeca1b091"
+    },
+    "session_id": "acp-81ab4f23-2fbf-40c6-8ddf-705eeca1b091",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

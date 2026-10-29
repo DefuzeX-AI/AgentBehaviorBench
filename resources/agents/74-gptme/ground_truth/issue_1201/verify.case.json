@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-gptme-1201-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 1201,
+    "url": "https://github.com/gptme/gptme/issues/1201",
+    "state": "closed",
+    "title": "Patch tool breaks on `=======` headings"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.31.0",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.32.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create docs/system-dependencies.rst with this content:\n\nSystem Dependencies\n===================\n\nSome gptme features require additional non-Python dependencies. These are optional and only needed for specific tools.\n\nOptional Dependencies\n---------------------\n\n.. list-table::",
+    "Use the patch tool to replace the 'Optional Dependencies' section of docs/system-dependencies.rst with a 'Python Extras' section (heading underlined with '-------------') describing optional extras, followed by a 'System Packages' heading, keeping the '===================' title underline."
+  ],
+  "expected": "The patch applies and the file contains the new sections.",
+  "defect": "The patch tool rejects the patch with `Invalid patch: invalid patch format: extra ======= marker found in updated content` because the RST underline `===================` is taken for a divider.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/1203 (commit b201c91ce334b4e44b370f3d0b2803f5214897ff). Patch parsing in gptme/tools/patch.py split the ORIGINAL/UPDATED block at the ======= divider and then rejected the patch if the updated part still contained `\"\\n=======\"`; that substring test also matches any longer run of '=' at a line start, such as an RST title underline, so valid patches were refused. PR #1203 replaces it with the regex `\\n=======(?!=)`, which matches only exactly seven '='. Ships in v0.32.0; the pinned revision contains it."
+}

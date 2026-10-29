@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-zeroclaw-2367-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 2367,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/2367",
+    "state": "closed",
+    "title": "[Bug]: System prompt 'Current Date & Time' is stale across turns"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.1.7",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "v0.1.8",
+  "pinned_contains_fix": false,
+  "steps": [
+    "what time is it",
+    "what time is it"
+  ],
+  "expected": "Each answer reflects the actual current time at that turn.",
+  "defect": "The second answer repeats the time from session start because the system prompt's '## Current Date & Time' value is generated once and reused for later turns.",
+  "fault location": [
+    {
+      "file": "src/agent/prompt.rs",
+      "function": "DateTimeSection::build",
+      "line_start": 194,
+      "line_end": 207,
+      "commit": "c3cf915b94ce179f0a77e7be94c4588c25cc5b0f",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/c3cf915b94ce179f0a77e7be94c4588c25cc5b0f/src/agent/prompt.rs#L194-L207",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Renders the wall-clock time into the system prompt once; PR #2447 (commit 13790ac) adds refresh_prompt_datetime to rewrite this section on each turn."
+    },
+    {
+      "file": "src/agent/agent.rs",
+      "function": "Agent::turn",
+      "line_start": 467,
+      "line_end": 474,
+      "commit": "c3cf915b94ce179f0a77e7be94c4588c25cc5b0f",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/c3cf915b94ce179f0a77e7be94c4588c25cc5b0f/src/agent/agent.rs#L467-L474",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Builds the system prompt only when history is empty and never updates it on later turns; PR #2447 adds an else-branch that refreshes the datetime of the existing system message (the same refresh is added in loop_.rs run, channels and gateway ws)."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/2447 (commit https://github.com/zeroclaw-labs/zeroclaw/commit/13790ac2b911beda91e4c773323ea24105e951c2, \"fix(agent): refresh system prompt datetime across long-lived turns\"). In v0.1.7 the system prompt includes a DateTimeSection that formats Local::now() as \"## Current Date & Time\" when the prompt is built, and Agent::turn (and the interactive loop in loop_.rs) builds that system prompt only once, when history is empty. Later turns reuse the cached system message, so the model treats the start-of-session timestamp as authoritative and answers \"what time is it\" with a stale time. PR #2447 adds prompt::refresh_prompt_datetime, which rewrites the timestamp payload of the existing section, and calls it before each turn in Agent::turn, loop_::run, channel and websocket prompt builders. 13790ac first ships in v0.1.8, but it sits on a branch that is not an ancestor of the pinned revision; the pinned v0.8.5 solves the problem differently: DateTimeSection now renders the date and UTC offset without wall-clock time (crates/zeroclaw-runtime/src/agent/prompt.rs L465-471, test at L1049) and Agent prefixes every user message with a fresh `[CURRENT DATE & TIME: ...]` line (agent.rs L1046-1067). The defect is therefore not expected to reproduce at the pinned revision."
+}

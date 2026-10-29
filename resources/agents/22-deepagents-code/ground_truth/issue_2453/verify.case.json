@@ -1,0 +1,36 @@
+{
+  "case_id": "ir-deepagents-code-2453-v1",
+  "issue": {
+    "repository": "langchain-ai/deepagents",
+    "number": 2453,
+    "url": "https://github.com/langchain-ai/deepagents/issues/2453",
+    "state": "closed",
+    "title": "`read_file` pagination skips lines after wrapping due to double limit application"
+  },
+  "version_choice": "historical:deepagents-code==0.0.1",
+  "reported_version": "deepagents 0.5.0a3",
+  "commit_version": "584ba7029649c75505f8a866d3607d97dbe784a0",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create /home/agent/workspace/wrapped.txt containing four LF-separated lines: line1; then exactly 15000 lowercase x characters; then important instruction; then line4. Use the normal file tools or shell to create these exact contents.",
+    "read /home/agent/workspace/wrapped.txt with offset=0 limit=3",
+    "read /home/agent/workspace/wrapped.txt with offset=3 limit=3"
+  ],
+  "expected": "The two read pages include every requested source line, including important instruction.",
+  "defect": "Formatting a long line wraps it into display rows and applies the page limit again, dropping an already-fetched source line.",
+  "fault location": [
+    {
+      "file": "libs/deepagents/deepagents/middleware/filesystem.py",
+      "function": "FilesystemMiddleware._handle_read_result",
+      "line_start": 924,
+      "line_end": 927,
+      "commit": "584ba7029649c75505f8a866d3607d97dbe784a0",
+      "url": "https://github.com/langchain-ai/deepagents/blob/584ba7029649c75505f8a866d3607d97dbe784a0/libs/deepagents/deepagents/middleware/filesystem.py#L924-L927",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The backend slices source lines first; the filesystem middleware then reapplies limit to the wrapped rendered rows. The next offset advances past source content that was never emitted. #3641 removes the second limiting step."
+    }
+  ],
+  "Root cause": "The backend slices source lines first; the filesystem middleware then reapplies limit to the wrapped rendered rows. The next offset advances past source content that was never emitted. #3641 removes the second limiting step."
+}

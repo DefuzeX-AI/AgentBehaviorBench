@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-nanocoder-1237-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1237,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1237",
+    "state": "closed",
+    "title": "[Bug] list_directory leaks all hidden files/dotfiles by default due to !dirPath.startsWith('.')"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "1.31.0 (approx: first release after fix)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Set up a small fixture in the workspace by running this exact shell command:\nmkdir -p .git\nn=zzhiddenmarker\nprintf 'MARKER=hidden-ok\\n' > \".$n\"\nmkdir -p \".$n-dir\"\nprintf 'x\\n' > \".$n-dir/entry.txt\"\nprintf 'ref: refs/heads/main\\n' > .git/HEAD\n\nWhen it finishes, just reply 'fixture ready' — don't describe the files.",
+    "Run the list_directory tool with default arguments (`{}`) on the current directory and show me the raw output."
+  ],
+  "expected": "With `showHiddenFiles: false` (the default), a `list_directory` call whose path defaults to '.' must exclude every entry whose name starts with '.', so the returned listing must not contain the fixture dotfile/dotdir (`.zzhiddenmarker`, `.zzhiddenmarker-dir`) — per the issue's Expected Behavior and the tool's own 'skip hidden files unless showHiddenFiles is true' contract.",
+  "defect": "`walkDirectory()`'s skip condition `!showHiddenFiles && item.name.startsWith('.') && !dirPath.startsWith('.')` is bypassed for the default path '.' (because '.'.startsWith('.') is true), so list_directory dumps all hidden files and directories (.env, .git, .zzhiddenmarker, …) into the output; fixed in 1.31.0 by PR #1253.",
+  "fault location": [
+    {
+      "file": "source/tools/list-directory.tsx",
+      "function": "executeListDirectory.walkDirectory",
+      "line_start": 70,
+      "line_end": 75,
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/tools/list-directory.tsx",
+      "role": "source_review",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The hidden-file skip condition additionally requires !dirPath.startsWith(\".\"). For the default directory \".\", that condition is false, disabling the hidden-entry filter. The retained default listing exposes .zzhiddenmarker and .zzhiddenmarker-dir. The absence of .git from that output does not negate the other hidden-entry leak."
+}

@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-opencrabs-2227-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 2227,
+    "url": "https://github.com/opencrabs/opencrabs/issues/2227",
+    "state": "closed",
+    "title": "fix(tool): edit_file line operations drop the final newline and convert CRLF files to LF"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.5.13",
+  "commit_version": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Run this exact command in the workspace: python3 -c \"open('settings.ini','wb').write(b'[app]\\r\\nname = demo\\r\\nmode = debug\\r\\nport = 8080\\r\\nworkers = 4\\r\\n')\"",
+    "Remove the `mode = debug` line from `settings.ini` using `edit_file`'s `delete_lines` (start_line=2, end_line=2)."
+  ],
+  "expected": "Only the requested line (mode = debug) is removed; all other bytes, including CRLF line endings and the final newline, remain unchanged, as the issue states replace (exact text) already does.",
+  "defect": "delete_lines rebuilds the file with content.lines() and join(\"\\n\"), silently converting CRLF to LF and dropping the final newline while the tool result only lists the changed line.",
+  "fault location": [
+    {
+      "file": "src/brain/tools/edit.rs",
+      "function": "EditTool::execute ReplaceLines",
+      "line_start": 268,
+      "line_end": 289,
+      "commit": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+      "url": "https://raw.githubusercontent.com/opencrabs/opencrabs/0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402/src/brain/tools/edit.rs",
+      "role": "source_review",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "Line-based edit operations split with content.lines() and reconstruct using LF joins. This discards CRLF delimiters and the original final-newline state across the whole file, even when only one line is removed. The case supplies an explicit CRLF byte fixture and uses delete_lines, making byte preservation the relevant oracle."
+}

@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-reasonix-14403-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 14403,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/14403",
+    "state": "closed",
+    "title": "[Bug]: Literal edit matches insert bare LF into CRLF files"
+  },
+  "version_choice": "commit:a708a88a75302d2ff4391cea6a041c0072ffc618",
+  "reported_version": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+  "commit_version": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+  "reference_agent_aliases": ["verify-reasonix14403-before"],
+  "fixed_in": "merged PR #14404; merge commit e29812d38f8aebb24151f983c5e1dbade0181edd; first release: unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In settings.ini add the setting timeout=30 on its own line right after retries=3. Do it with exactly one edit_file call whose old_string is the text retries=3 (just those 9 characters, no line break) and whose new_string is retries=3, a line break, then timeout=30. After the edit, show me the bytes of the [client] section with: od -c settings.ini | tail -n 6"
+  ],
+  "expected": "Literal edit_file/multi_edit replacements preserve the target line CRLF ending.",
+  "defect": "A literal match with a multiline LF replacement inserts bare LF into a CRLF file.",
+  "fault location": [
+    {
+      "file": "internal/tools/builtin/encoding_helpers.go",
+      "function": "matchLineEndings",
+      "line_start": 42,
+      "line_end": 50,
+      "commit": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/a708a88a75302d2ff4391cea6a041c0072ffc618/internal/tools/builtin/encoding_helpers.go#L42-L50",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "A literal match bypasses line-ending conversion."
+    },
+    {
+      "file": "internal/tools/builtin/encoding_helpers.go",
+      "function": "applyOldStringEdit",
+      "line_start": 92,
+      "line_end": 105,
+      "commit": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/a708a88a75302d2ff4391cea6a041c0072ffc618/internal/tools/builtin/encoding_helpers.go#L92-L105",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "The replace_all literal branch inserts the replacement unchanged."
+    },
+    {
+      "file": "internal/tools/builtin/encoding_helpers.go",
+      "function": "applyOldStringEdit",
+      "line_start": 144,
+      "line_end": 154,
+      "commit": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/a708a88a75302d2ff4391cea6a041c0072ffc618/internal/tools/builtin/encoding_helpers.go#L144-L154",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "The single-edit literal branch inserts the replacement unchanged."
+    }
+  ],
+  "Root cause": "At the selected commit, matchLineEndings returns new_string unchanged when old_string matches literally. The single-edit and replace_all literal branches of applyOldStringEdit then write that replacement without adapting its line endings to the CRLF file. In the retained baseline, an edit of retries=3 in a CRLF settings.ini inserts a bare LF; the subsequent od -c output shows retries=3 followed by LF while the surrounding lines retain CRLF. The historical test used a pre-created CRLF fixture containing [client], retries=3, and backoff=2. Fix PR #14404 was merged, but its first release is unknown. The historical test unit was named verify-reasonix14403-before; reference_agent_aliases maps that original identifier to the registered Agent without changing the saved trajectory."
+}

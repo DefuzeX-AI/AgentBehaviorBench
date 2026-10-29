@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-llxprt-code-3038-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3038,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3038",
+    "state": "closed",
+    "title": "Code analysis/search tooling: structural_analysis callees+definitions+dependencies fail silently, and codesearch is non-functional"
+  },
+  "version_choice": "historical:v0.10.0",
+  "reported_version": "v0.10.0",
+  "commit_version": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+  "fixed_in": "v0.11.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create src/funcs.ts containing:\nexport function leafOne(): number {\n  return 1;\n}\n\nexport function leafTwo(): number {\n  return 2;\n}\n\nexport function middle() {\n  return leafOne() + leafTwo();\n}\n\nexport function withReturnType(x: number): number { return x + 1; }\nexport function withoutReturnType(x: number) { return x + 2; }",
+    "Run structural_analysis on src/funcs.ts in definitions mode for withReturnType and for withoutReturnType, in callees mode for middle, and in callers mode for leafOne, and report each result."
+  ],
+  "expected": "definitions finds both functions and callees of middle returns leafOne and leafTwo, consistent with callers of leafOne returning middle.",
+  "defect": "definitions('withReturnType') returns [] while definitions('withoutReturnType') finds it, and callees('middle') returns [] although callers('leafOne') reports middle; the empty results look like true negatives.",
+  "fault location": [
+    {
+      "file": "packages/tools/src/tools/structural-analysis/callees.ts",
+      "function": "collectCalleeRefs",
+      "line_start": 67,
+      "line_end": 75,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/structural-analysis/callees.ts#L67-L75",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Looks the symbol up only as a method_definition with a property_identifier, so standalone function declarations never match; PR #3054 also matches function declarations and variable-bound function expressions."
+    },
+    {
+      "file": "packages/tools/src/tools/structural-analysis/definitions.ts",
+      "function": "searchDefinitionPatterns",
+      "line_start": 22,
+      "line_end": 27,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/structural-analysis/definitions.ts#L22-L27",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The ast-grep patterns `function NAME($$$PARAMS) { $$$BODY }` cannot match a function with a return type annotation, and failures are swallowed; PR #3054 replaces the patterns with kind-based rules that accept annotations."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3054. In v0.10.0, structural_analysis's callees mode finds the function body to inspect with an ast-grep rule of kind method_definition containing a property_identifier equal to the symbol; standalone functions are function_declaration nodes, so the rule never matches and the mode returns an empty list instead of an error. definitions mode uses literal ast-grep patterns such as `function NAME($$$PARAMS) { $$$BODY }`, which do not match when a return type annotation sits between the parameter list and the body, and pattern errors are caught and ignored, so annotated functions silently produce no definitions. Commit 33c602d (PR #3054, 'stop structural_analysis and codesearch failing silently') rewrites callees, definitions and dependencies to use kind-based queries that cover function declarations, annotated signatures and variable-bound functions, and makes codesearch fail loudly. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0."
+}

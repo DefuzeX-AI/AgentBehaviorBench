@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-gptme-3667-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 3667,
+    "url": "https://github.com/gptme/gptme/issues/3667",
+    "state": "closed",
+    "title": "shell tool: background command handling is fragile (ampersand mangled; no wait/poll primitive)"
+  },
+  "version_choice": "historical:v0.33.0",
+  "reported_version": "v0.33.0",
+  "commit_version": "eb5b671bd997804794d6b3b02ebc72ba525dc790",
+  "fixed_in": "v0.34.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Use the shell tool to run `cd /tmp && nohup python3 -c \"import time; time.sleep(5)\" > /tmp/log 2>&1 & echo \"pid $!\"`."
+  ],
+  "expected": "The command starts the Python process in the background and prints `pid <number>` without errors.",
+  "defect": "The background command is mangled: the tool reports `bash: line 35: bg: no job control` (or `Shell syntax error: unexpected token ...` for the VAR=$(...) variant) instead of starting the job.",
+  "fault location": [
+    {
+      "file": "gptme/tools/shell.py",
+      "function": "ShellSession._run_pipe",
+      "line_start": 491,
+      "line_end": 493,
+      "commit": "eb5b671bd997804794d6b3b02ebc72ba525dc790",
+      "url": "https://github.com/gptme/gptme/blob/eb5b671bd997804794d6b3b02ebc72ba525dc790/gptme/tools/shell.py#L491-L493",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "For a command without a pipe the tool blindly appends ` < /dev/null` after the whole line, so a `cmd & echo ...` list leaves the backgrounded process attached to the persistent shell's stdin pipe; PR #3673 adds _redirect_background_stdin, which inserts `< /dev/null` before every unquoted `&` operator."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/3673 (commit 01b6ad50a5b195b1b21b1f15a9960e285282e258). gptme runs every command inside one persistent bash process fed through a stdin pipe, and ShellSession._run_pipe (v0.33.0 lines 491-493) appends ` < /dev/null` to the end of any pipe-free command. For `... nohup python3 script.py > log 2>&1 & echo \"pid $!\"` the redirect only applies to the trailing `echo`; the backgrounded job keeps the shell's stdin pipe and can consume the tool's subsequent input, which corrupts the command/marker stream (the commit message says the background process 'can consume subsequent tool commands'). PR #3673 adds _redirect_background_stdin(), which uses bashlex to insert `< /dev/null` before every unquoted `&`, and adds `wait <id>` / `output <id> --new` primitives. Speculation: the exact `bg: no job control` text is plausibly produced when consumed/split input reaches bash; the `Shell syntax error: unexpected token ')'` variant comes from bashlex in split_commands (v0.33.0 lines 1975-1998) and is not changed by #3673. The fix ships in v0.34.0; the pinned revision contains it, so the case is tested at v0.33.0."
+}

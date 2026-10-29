@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-zeroclaw-5564-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 5564,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/5564",
+    "state": "closed",
+    "title": "[Bug]: Custom provider tool follow-up fails when successful tool output is empty"
+  },
+  "version_choice": "historical:v0.6.9",
+  "reported_version": "master @ 09a5f7a4",
+  "commit_version": "1a61ea731cc2fa8f765654578fe7f9b51ab589c5",
+  "fixed_in": "v0.7.3",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run the shell command python3 -c \"pass\" and then tell me whether it succeeded."
+  ],
+  "expected": "The empty successful tool output is sent back to the model as a non-empty tool result (e.g. \"(no output)\") and the agent reports that the command succeeded.",
+  "defect": "The follow-up model request carries a tool-role message with empty content, which strict providers reject with `400 ... tool role content cannot be empty`, so the turn fails although the tool succeeded.",
+  "fault location": [
+    {
+      "file": "src/agent/tool_execution.rs",
+      "function": "execute_one_tool",
+      "line_start": 92,
+      "line_end": 98,
+      "commit": "1a61ea731cc2fa8f765654578fe7f9b51ab589c5",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/1a61ea731cc2fa8f765654578fe7f9b51ab589c5/src/agent/tool_execution.rs#L92-L98",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "On success the tool's output is forwarded verbatim (scrub_credentials(&r.output)), so an empty stdout becomes an empty tool-role message; PR #5565 (commit fbb5ae9) substitutes \"(no output)\" when the output is empty."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/5565 (commit https://github.com/zeroclaw-labs/zeroclaw/commit/fbb5ae9a30c42c6443354b25160c392756044d81, \"fix(agent): normalize empty successful tool output\"). In v0.6.9 execute_one_tool returns ToolExecutionOutcome { output: scrub_credentials(&r.output), success: true } for every successful tool call. A command that succeeds with empty stdout (e.g. `open https://...`, `python3 -c \"pass\"`) therefore produces an empty string, which the agent loop serialises as a tool-role message with empty content in the next provider request; providers such as DeepSeek V3.2 on GCP reject it with 400 \"tool role content cannot be empty\", stopping the workflow. The fix normalises an empty successful output to \"(no output)\" before scrubbing and adds a regression test. It first ships in v0.7.3 and is an ancestor of the pinned v0.8.5, so the case tests v0.6.9. Whether ABB's model endpoint actually returns 400 is provider-dependent; the empty tool-role content is visible in the recorded request either way."
+}

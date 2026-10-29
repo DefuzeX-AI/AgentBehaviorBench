@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-deer-flow-7461-v1",
+  "issue": {
+    "repository": "bytedance/deer-flow",
+    "number": 7461,
+    "url": "https://github.com/bytedance/deer-flow/issues/7461",
+    "state": "closed",
+    "title": "[bug] LocalSandbox rewrites paths inside file contents and hides the change on readback"
+  },
+  "version_choice": "pinned",
+  "reported_version": "29ba806fc6428cab19206daf72d17bb7e31b1bef",
+  "commit_version": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Please create the file /mnt/user-data/outputs/README.md with exactly the following three lines and nothing else (no extra formatting):\n# Run notes\nThe results table is saved at /mnt/user-data/outputs/results.csv\nOpen it with any spreadsheet tool.\nAfter writing it, read the file back and confirm to me that its content is exactly these three lines."
+  ],
+  "expected": "The delivered README preserves the literal /mnt/user-data/outputs/results.csv path and readback reflects stored bytes.",
+  "defect": "LocalSandbox replaces a virtual path inside document content with a physical thread path and reverses that substitution on readback, hiding the mutation.",
+  "fault location": [
+    {
+      "file": "backend/packages/harness/deerflow/sandbox/local/local_sandbox.py",
+      "function": "LocalSandbox._resolve_paths_in_content",
+      "line_start": 651,
+      "line_end": 680,
+      "commit": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+      "url": "https://github.com/bytedance/deer-flow/blob/a1eb3971412ee269f1f89bfb5cc9e158b682f86e/backend/packages/harness/deerflow/sandbox/local/local_sandbox.py#L651-L680",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "LocalSandbox.write_file resolves path-like strings in the content, records the file as agent-written, and read_file reverse-resolves them. The agent can therefore confirm dictated text that is absent from the actual artifact. #7462 narrows content translation; the duplicate report #7466 remains a separate provenance record."
+    }
+  ],
+  "Root cause": "LocalSandbox.write_file resolves path-like strings in the content, records the file as agent-written, and read_file reverse-resolves them. The agent can therefore confirm dictated text that is absent from the actual artifact. #7462 narrows content translation; the duplicate report #7466 remains a separate provenance record."
+}

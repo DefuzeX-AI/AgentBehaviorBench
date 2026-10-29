@@ -1,0 +1,224 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_57c16a959c624ff18eaeee5a6b0c4c88",
+  "case_id": "ir-easy-agent-124-v1",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "925b5eda9275419134f060816236d646",
+      "span_id": "7defb20b6c8df978",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793120546324000979,
+      "end_time_unix_nano": 1793120703345144738,
+      "duration_nano": 157021143759,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1793120546325781919,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1793120551754778206,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1793120687607077708,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1793120703343834803,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "925b5eda9275419134f060816236d646",
+      "span_id": "3d8c5f0f0d25583b",
+      "parent_span_id": "7defb20b6c8df978",
+      "name": "Edit",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793120551748993867,
+      "end_time_unix_nano": 1793120551783820856,
+      "duration_nano": 34826989,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Edit",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "file_path": "/home/agent/workspace/split_lines.sh",
+          "new_string": "IFS=$'\\n'",
+          "old_string": "IFS=,",
+          "replace_all": false
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "path": "/home/agent/workspace/split_lines.sh",
+            "oldText": "IFS=,",
+            "newText": "IFS=$'\\n'",
+            "type": "diff"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_91740ad585844a39a0d10a75"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "925b5eda9275419134f060816236d646",
+      "span_id": "fdedca945baa57f0",
+      "parent_span_id": "7defb20b6c8df978",
+      "name": "Read",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793120557425877208,
+      "end_time_unix_nano": 1793120557432567487,
+      "duration_nano": 6690279,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Read",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "file_path": "/home/agent/workspace/split_lines.sh"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "/home/agent/workspace/split_lines.sh (13 lines)\n 1\t#!/usr/bin/env bash\n 2\t# split_lines.sh: print every field of the first argument on its own line\n 3\tIFS=\n 4\tread -r -a parts <<< \"$1\"\n 5\tfor p in \"${parts[@]}\"; do\n 6\t  echo \"[$p]\"\n 7\tdone\n 8\t\\n'\n 9\tread -r -a parts <<< \"$1\"\n10\tfor p in \"${parts[@]}\"; do\n11\t  echo \"[$p]\"\n12\tdone\n13\t",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_974cda9bfd3041a9ae2e5b6e"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "925b5eda9275419134f060816236d646",
+      "span_id": "ef5c378b2f2ac5a4",
+      "parent_span_id": "7defb20b6c8df978",
+      "name": "Write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793120687602341780,
+      "end_time_unix_nano": 1793120687625423631,
+      "duration_nano": 23081851,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=$'\\n'\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone\n",
+          "file_path": "/home/agent/workspace/split_lines.sh"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "path": "/home/agent/workspace/split_lines.sh",
+            "newText": "#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=$'\\n'\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone\n",
+            "type": "diff"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_52bb02ccd9354c31b0ef56d0"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "925b5eda9275419134f060816236d646",
+      "span_id": "66639a0a725338ea",
+      "parent_span_id": "7defb20b6c8df978",
+      "name": "Read",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793120693603514754,
+      "end_time_unix_nano": 1793120694185698589,
+      "duration_nano": 582183835,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Read",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "file_path": "/home/agent/workspace/split_lines.sh"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "/home/agent/workspace/split_lines.sh (8 lines)\n1\t#!/usr/bin/env bash\n2\t# split_lines.sh: print every field of the first argument on its own line\n3\tIFS=$'\\n'\n4\tread -r -a parts <<< \"$1\"\n5\tfor p in \"${parts[@]}\"; do\n6\t  echo \"[$p]\"\n7\tdone\n8\t",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_09322f48389d4b1b894fb562"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

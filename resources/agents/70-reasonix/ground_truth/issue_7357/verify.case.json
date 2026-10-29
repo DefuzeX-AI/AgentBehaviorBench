@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-reasonix-7357-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 7357,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/7357",
+    "state": "closed",
+    "title": "[Bug]: custom OpenAI provider is written DeepSeek's balance_url and price table on config rewrite"
+  },
+  "version_choice": "historical:1.19.4",
+  "reported_version": "1.19.4 (linux-amd64 release tarball)",
+  "commit_version": "b36a7e3d54a6cb88bbef8467fb5ba937f1337f34",
+  "fixed_in": "1.19.7 (PR #7386)",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Show me the Reasonix configuration file this session is using: run `cat \"${REASONIX_HOME:-$HOME/.reasonix}/config.toml\"` and paste the [[providers]] section exactly as printed."
+  ],
+  "expected": "A user-defined kind=\"openai\" provider receives no other vendor's billing settings when Reasonix rewrites config.toml (issue: 'never another vendor's pricing or billing endpoint').",
+  "defect": "On startup Reasonix rewrites the config_version=1 config and writes DeepSeek's balance_url (https://api.deepseek.com/user/balance) and USD price table onto the custom provider.",
+  "fault location": [
+    {
+      "file": "internal/config/load.go",
+      "function": "loadForEditStrict",
+      "line_start": 678,
+      "line_end": 694,
+      "commit": "b36a7e3d54a6cb88bbef8467fb5ba937f1337f34",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/b36a7e3d54a6cb88bbef8467fb5ba937f1337f34/internal/config/load.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "internal/config/load.go",
+      "function": "mergeFile",
+      "line_start": 741,
+      "line_end": 770,
+      "commit": "b36a7e3d54a6cb88bbef8467fb5ba937f1337f34",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/b36a7e3d54a6cb88bbef8467fb5ba937f1337f34/internal/config/load.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "internal/config/pricing.go",
+      "function": "ApplyUserConfigUpgradesOnStartup",
+      "line_start": 300,
+      "line_end": 333,
+      "commit": "b36a7e3d54a6cb88bbef8467fb5ba937f1337f34",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/b36a7e3d54a6cb88bbef8467fb5ba937f1337f34/internal/config/pricing.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "Edit loading initializes configuration with Default(), then decodes user TOML onto the existing provider slice. Omitted billing fields survive from the default DeepSeek provider in a custom provider entry. The startup migration persists this contaminated configuration. The trigger requires the old-schema provider fixture; the cat prompt alone is insufficient. Local source and historical before/after records support the decoding mechanism."
+}

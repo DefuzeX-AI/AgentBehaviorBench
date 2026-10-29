@@ -1,0 +1,36 @@
+{
+  "case_id": "ir-opencrabs-2212-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 2212,
+    "url": "https://github.com/opencrabs/opencrabs/issues/2212",
+    "state": "closed",
+    "title": "fix(tools): edit_file fuzzy fallback converts unrelated CRLF line endings to LF"
+  },
+  "version_choice": "historical:0.5.12",
+  "reported_version": "0.5.12",
+  "commit_version": "2cf3e6ead8d97ac560216ffff59e9561252e9d3d",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Run exactly this shell command in the current directory to create a Windows-style (CRLF) config file, then confirm it ran: printf 'name=demo\\r\\nhost=localhost\\r\\nport=8080\\r\\ndebug=false\\r\\nlog=info\\r\\n' > app.ini",
+    "In app.ini, replace the two consecutive lines\nhost=localhost\nport=8080\nwith these two lines\nhost=0.0.0.0\nport=9090\nDo it as one targeted edit of that two-line block with your file edit tool; do not rewrite the whole file and do not touch any other line.",
+    "Run exactly this shell command and show me its full output: od -c app.ini"
+  ],
+  "expected": "A targeted multiline edit should preserve untouched CRLF line endings.",
+  "defect": "The edit_file fuzzy fallback converts unrelated CRLF line endings to LF.",
+  "fault location": [
+    {
+      "file": "src/brain/tools/fuzzy.rs",
+      "function": "multiline replacement reconstruction",
+      "line_start": 89,
+      "line_end": 119,
+      "commit": "2cf3e6ead8d97ac560216ffff59e9561252e9d3d",
+      "url": "https://github.com/opencrabs/opencrabs/blob/2cf3e6ead8d97ac560216ffff59e9561252e9d3d/src/brain/tools/fuzzy.rs#L89-L119",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Full-file lines() followed by join(\"\\n\") loses CRLF outside the edited block."
+    }
+  ],
+  "Root cause": "Source confirmed: the multiline fallback splits the entire content with lines(), reconstructs the complete file and joins using LF. This removes CR from untouched lines. Archived analysis reports five hits among ten attempts, with one infrastructure failure and other runs using alternate paths; this did not pass the archived seven-of-ten threshold. Later model repairs can restore CRLF, so inspect the immediate edit result rather than only the final file. No fresh runtime reproduction was performed during this organization. Exact first fixing commit has not been established. Root steps describe the selected original case; other run-local cases can differ. Retained observations are not automatically independent same-prompt trials."
+}

@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-gptme-43-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 43,
+    "url": "https://github.com/gptme/gptme/issues/43",
+    "state": "closed",
+    "title": "`'?$'`, which is not a valid integer literal, hence the `ValueError`., kills the app"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.10.5",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.11.1",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Find the installed gptme package's tools/shell.py file (for example with `python -c \"import gptme.tools.shell as s; print(s.__file__)\"`).",
+    "Run the shell command `head -n 1000 <that path>` to show its contents."
+  ],
+  "expected": "The file's first 1000 lines are shown as normal shell output and the session continues.",
+  "defect": "Printing shell.py's own source (which contains the `echo ReturnCode:$?` marker text) makes the return-code parser raise `ValueError: invalid literal for int() ... '$?'`, which kills the app.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/commit/becab4d69a85f2c769f610f6200de44c7fabdcaf. The 2023 shell tool detected the end of a command by scanning stdout for a line containing `ReturnCode:<n> <delimiter>` and converting the token after `ReturnCode:` with int(). When the command's own output is gptme's shell.py source, the literal text `echo ReturnCode:$? ...` matches first, int('$?') raises ValueError, and because execute_msg did not catch tool exceptions the exception propagated through the chat loop and terminated gptme. Commit becab4d ('fix: catch exceptions from tools and propagate as messages', linked from the issue page) wraps execute_codeblock in try/except and yields a system message instead of crashing; the return-code parsing was later rewritten to match only `ReturnCode:(\\d+)` together with the delimiter (PR #335) and the current code strips a per-session marker. The crash fix first ships in v0.11.1; the pinned revision contains both changes."
+}

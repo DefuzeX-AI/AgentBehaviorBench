@@ -1,0 +1,36 @@
+{
+  "case_id": "ir-opencrabs-2210-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 2210,
+    "url": "https://github.com/opencrabs/opencrabs/issues/2210",
+    "state": "closed",
+    "title": "fix(tools): edit_file leaves stale version tracking and makes the next write_file fail"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.5.13",
+  "commit_version": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Step 1: In the current working directory, create a file named inventory.txt containing exactly these four lines:\napples=3\nbananas=5\ncherries=7\ndates=9\nThen confirm it was created.",
+    "Step 2: In inventory.txt, change only the bananas line so that it reads bananas=6. Make a targeted edit of that one line; do not rewrite the whole file.",
+    "Step 3: Now replace the entire contents of inventory.txt with exactly these two lines:\nkiwis=1\nlemons=2\nYou already have the complete new content from me, so do not read the file again first: make one write_file call with overwrite_read_confirm set to true (I confirm the blind replace). Then tell me whether that write succeeded on the first attempt, and if it was refused, quote the exact reason you were given."
+  ],
+  "expected": "The single step-3 write_file call with overwrite_read_confirm=true overwrites inventory.txt with 'kiwis=1\\nlemons=2' without any refusal, because write_file 'overwrites if it does [exist]' and overwrite_read_confirm 'Confirms you intend a blind replace', and the successful edit_file should have recorded the post-edit content in file_versions (module doc: record 'after a read and after a successful write, so the writer's own output is not mistaken for someone else's change on the next write').",
+  "defect": "The step-3 write_file is refused with 'Refusing to overwrite .../inventory.txt: it changed on disk after you read it. Another agent is working in this directory.' because edit_file wrote the file without calling file_versions::record, leaving a stale expected version; the file keeps the old content unless the agent re-reads it, and the false 'another agent' explanation is relayed to the user.",
+  "fault location": [
+    {
+      "file": "src/brain/tools/edit.rs",
+      "function": "successful edit bookkeeping",
+      "line_start": 363,
+      "line_end": 373,
+      "commit": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+      "url": "https://raw.githubusercontent.com/opencrabs/opencrabs/0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402/src/brain/tools/edit.rs",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The successful edit path atomically writes new file content but only tracks the path in the session; it does not refresh the file-version observation used by the next write guard. A subsequent confirmed overwrite is compared with stale pre-edit state and falsely rejected as another agent changing the file. The retained third turn quotes this exact refusal."
+}

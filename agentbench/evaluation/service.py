@@ -45,9 +45,23 @@ class EvaluationService:
         self.root = Path(root).resolve()
         self.environ = dict(os.environ if environ is None else environ)
 
-    def agent(self, agent_id):
-        from agentbench.harness.registry import tomllib
+    def prepare(self, agent_id, revision, *, output=print):
+        from agentbench.evaluation.targets import prepare_target
         registration = load_registry(self.root / 'resources/registry.toml').find(agent_id)
+        return prepare_target(registration, revision,
+            cache_dir=self.root / 'cache/prepared-agents', output_fn=output)
+
+    def _registration(self, agent_id, target=None):
+        if target is None:
+            return load_registry(self.root / 'resources/registry.toml').find(agent_id)
+        if target.registration.agent_id != agent_id:
+            raise ValueError('Prepared target belongs to another Agent')
+        target.validate()
+        return target.registration
+
+    def agent(self, agent_id, *, target=None):
+        from agentbench.harness.registry import tomllib
+        registration = self._registration(agent_id, target)
         manifest = tomllib.loads((registration.path / 'agent.toml').read_text(encoding='utf-8'))
         return {'schema': 'abb.agent.info.v1', 'agent_id': agent_id,
                 'display_name': manifest.get('display_name', agent_id),
@@ -57,16 +71,17 @@ class EvaluationService:
                 'context': load_agent_context(registration.path / 'requirement.md', agent_id=agent_id)}
 
     def execute(self, agent_id, cases, *, results_dir=None, judge=None, model=None,
-                timeout=2400, max_steps=None, concurrency=None, on_event=None):
+                timeout=2400, max_steps=None, concurrency=None, on_event=None, retry_policy=None,
+                target=None):
         from agentbench.sdk import resolve_sdk
         from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
         from agentbench.harness.session.references import history_guard, register_suite_reference
         from agentbench.sdk.plugin.native.backend import validate_case
         if not isinstance(cases, list) or not cases:
             raise ValueError('Cases must be a non-empty list')
-        context = self.agent(agent_id)['context']
+        context = self.agent(agent_id, target=target)['context']
         cases = [validate_case({**case, 'abb_agent_context': context}) for case in cases]
-        registration = load_registry(self.root / 'resources/registry.toml').find(agent_id)
+        registration = self._registration(agent_id, target)
         registration = replace(registration, case_count=len(cases))
         options = {'cases': cases, 'timeout': timeout}
         if max_steps is not None:
@@ -75,7 +90,7 @@ class EvaluationService:
             options['judge'] = judge
         runner = build_trace_suite_runner(max_bytes=DEFAULT_TRACE_MAX_BYTES, model=model,
             sdk_selection=resolve_sdk('native'), sdk_options=options,
-            concurrency=concurrency, environ=self.environ)
+            concurrency=concurrency, environ=self.environ, retry_policy=retry_policy)
         suite_id = runner.new_suite_id()
         parent = Path(results_dir) if results_dir is not None else self.root / 'results'
         with history_guard(self.root):

@@ -1,0 +1,143 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_57c16a959c624ff18eaeee5a6b0c4c88",
+  "case_id": "ir-easy-agent-124-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "1913c95778356cf5fe6cfd6cb4850c51",
+      "span_id": "ce3b8789a73bbcd0",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793120522345106231,
+      "end_time_unix_nano": 1793120546265707132,
+      "duration_nano": 23920600901,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1793120523363968548,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1793120523407956279,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1793120523408750141,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1793120530818312364,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1793120546264105934,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "1913c95778356cf5fe6cfd6cb4850c51",
+      "span_id": "a003a79fbca509af",
+      "parent_span_id": "ce3b8789a73bbcd0",
+      "name": "Write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793120530777713444,
+      "end_time_unix_nano": 1793120530843518678,
+      "duration_nano": 65805234,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone\n",
+          "file_path": "/home/agent/workspace/split_lines.sh"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "path": "/home/agent/workspace/split_lines.sh",
+            "newText": "#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone\n",
+            "type": "diff"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_b119150b03514fbdad7517a9"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "1913c95778356cf5fe6cfd6cb4850c51",
+      "span_id": "7bcc1c680eb92a32",
+      "parent_span_id": "ce3b8789a73bbcd0",
+      "name": "Read",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793120537993033773,
+      "end_time_unix_nano": 1793120537999904930,
+      "duration_nano": 6871157,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Read",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "file_path": "/home/agent/workspace/split_lines.sh"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "/home/agent/workspace/split_lines.sh (8 lines)\n1\t#!/usr/bin/env bash\n2\t# split_lines.sh: print every field of the first argument on its own line\n3\tIFS=,\n4\tread -r -a parts <<< \"$1\"\n5\tfor p in \"${parts[@]}\"; do\n6\t  echo \"[$p]\"\n7\tdone\n8\t",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_cb880602a5274f6cbe0de689"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

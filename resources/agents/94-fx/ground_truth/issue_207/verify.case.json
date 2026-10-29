@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-fx-207-v1",
+  "issue": {
+    "repository": "vercel-labs/fx",
+    "number": 207,
+    "url": "https://github.com/vercel-labs/fx/issues/207",
+    "state": "closed",
+    "title": "ACP streams terminal-rendered text instead of raw Markdown"
+  },
+  "version_choice": "historical:v0.0.4",
+  "reported_version": "v0.0.3; also v0.0.4",
+  "commit_version": "d8db856b4c041f69aae436a98b1aa92649bac09c",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Return raw Markdown containing a level-one heading named Markdown Showcase, a bullet list with First item, a two-column Name/Count table with api and 7, bold and italic text, and a fenced Python code block."
+  ],
+  "expected": "ACP agent_message_chunk text preserves the model Markdown source.",
+  "defect": "ACP emits terminal-rendered text, removing heading/emphasis markers and converting tables and lists to terminal glyphs.",
+  "fault location": [
+    {
+      "file": "src/acp/prompt.zig",
+      "function": "ACP agent emission callback",
+      "line_start": 1848,
+      "line_end": 1854,
+      "commit": "d8db856b4c041f69aae436a98b1aa92649bac09c",
+      "url": "https://github.com/vercel-labs/fx/blob/d8db856b4c041f69aae436a98b1aa92649bac09c/src/acp/prompt.zig#L1848-L1854",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The ACP callback ignores assistant_source events and forwards assistant_rendered events. PR #227 switches ACP to the raw source stream."
+    }
+  ],
+  "Root cause": "The ACP callback ignores assistant_source events and forwards assistant_rendered events. PR #227 switches ACP to the raw source stream."
+}

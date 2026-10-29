@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-codewhale-5909-v1",
+  "issue": {
+    "repository": "codewhale-hq/Codewhale",
+    "number": 5909,
+    "url": "https://github.com/codewhale-hq/Codewhale/issues/5909",
+    "state": "closed",
+    "title": "write_file silently converts CRLF files to LF on overwrite (edit_file preserves, write_file doesn't)"
+  },
+  "version_choice": "historical:v0.9.8",
+  "reported_version": "unknown",
+  "commit_version": "f0a5c528f4aa2bd3fe01c8457602a7dca2b02f91",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Use the shell and Python pathlib.Path to create notes.txt with write_bytes(b'first\\r\\nsecond\\r\\nthird\\r\\n'). Create its parent directory if needed. Read it with read_file.",
+    "Use write_file to save a corrected copy of notes.txt containing first, updated, third on separate lines. Keep the existing file line-ending style."
+  ],
+  "expected": "Overwriting an existing CRLF file retains CRLF when no conversion was requested.",
+  "defect": "write_file writes LF replacement text verbatim and silently changes unrelated CRLF line endings.",
+  "fault location": [
+    {
+      "file": "crates/tui/src/tools/file.rs",
+      "function": "WriteFileTool::execute",
+      "line_start": 1344,
+      "line_end": 1347,
+      "commit": "f0a5c528f4aa2bd3fe01c8457602a7dca2b02f91",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/f0a5c528f4aa2bd3fe01c8457602a7dca2b02f91/crates/tui/src/tools/file.rs#L1344-L1347",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "WriteFileTool writes incoming text bytes without consulting the prior file line-ending style, unlike edit_file. PR #5911 adds prior-style restoration to both write paths."
+    }
+  ],
+  "Root cause": "WriteFileTool writes incoming text bytes without consulting the prior file line-ending style, unlike edit_file. PR #5911 adds prior-style restoration to both write paths."
+}

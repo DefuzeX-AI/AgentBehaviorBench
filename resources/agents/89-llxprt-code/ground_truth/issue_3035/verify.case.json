@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-llxprt-code-3035-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3035,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3035",
+    "state": "closed",
+    "title": "ast_edit AX: AST validation does not block broken writes, and the schema contradicts the tool's two-step contract"
+  },
+  "version_choice": "historical:v0.10.0",
+  "reported_version": "v0.10.0",
+  "commit_version": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+  "fixed_in": "v0.11.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create src/service.ts containing:\nexport interface Order { id: string; shipped: boolean }\n\nexport class OrderService {\n  ship(id: string): Order {\n    return { id, shipped: true };\n  }\n}",
+    "Use ast_edit on src/service.ts with old_string `  ship(id: string): Order {` and new_string `  ship(id: string): Order {{{` and force: true, then check the file with tsc."
+  ],
+  "expected": "ast_edit refuses to write an edit that its AST validation shows introduces a syntax error, leaving src/service.ts unchanged.",
+  "defect": "ast_edit writes the broken code and reports \"Successfully applied edit to: .../src/service.ts\" together with \"AST validation: FAILED\"; tsc then reports `error TS1005: ',' expected`.",
+  "fault location": [
+    {
+      "file": "packages/tools/src/tools/ast-edit/ast-edit-invocation.ts",
+      "function": "ASTEditToolInvocation.executeApply",
+      "line_start": 373,
+      "line_end": 384,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/ast-edit/ast-edit-invocation.ts#L373-L384",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Only editData.error blocks the write; a failed editData.astValidation is ignored and the edit proceeds to writeEditResult; PR #3058 makes validation authoritative and rejects edits that introduce new syntax errors."
+    },
+    {
+      "file": "packages/tools/src/tools/ast-edit/ast-edit-invocation.ts",
+      "function": "ASTEditToolInvocation.writeEditResult",
+      "line_start": 387,
+      "line_end": 424,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/ast-edit/ast-edit-invocation.ts#L387-L424",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Writes the new content and builds a message that starts with 'Successfully applied edit' even when AST validation is FAILED; PR #3058 no longer writes in that case."
+    },
+    {
+      "file": "packages/tools/src/tools/ast-edit.ts",
+      "function": "ASTEditTool.constructor",
+      "line_start": 142,
+      "line_end": 146,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/ast-edit.ts#L142-L146",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The agent-facing schema describes force as 'Internal execution control. Managed automatically.', contradicting the two-step preview/apply contract; PR #3058 rewrites the description."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3058. In v0.10.0, ast_edit computes an AST validation of the edited content in calculateEdit, but executeApply only returns early on editData.error; the validation result is merely printed. writeEditResult therefore writes a syntactically broken file to disk and reports 'Successfully applied edit ... AST validation: FAILED'. In addition the schema tells the model that force is 'Internal execution control. Managed automatically.', so callers either believe a preview was applied or always pass force: true and skip the preview. Commit 0efa7c6 (PR #3058, 'make ast_edit validation authoritative') blocks writes whose validation shows newly introduced errors (new validation-categorizer logic, changes in edit-calculator.ts and ast-edit-invocation.ts) and describes the two-step contract in the force parameter. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0."
+}

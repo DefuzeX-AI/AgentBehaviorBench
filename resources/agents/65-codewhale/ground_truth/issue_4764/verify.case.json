@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-codewhale-4764-v1",
+  "issue": {
+    "repository": "codewhale-hq/Codewhale",
+    "number": 4764,
+    "url": "https://github.com/codewhale-hq/Codewhale/issues/4764",
+    "state": "closed",
+    "title": "`edit_file` tool failed to edit CRLF files on Windows"
+  },
+  "version_choice": "historical:v0.9.0",
+  "reported_version": "0.9.0",
+  "commit_version": "d167c07c96282411956ea7f35ddb8227afa1402f",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Use the shell and Python pathlib.Path to create crlf_repro/test.py with write_bytes(b'def greet(name):\\r\\n    print(f\"hello, {name}\")\\r\\n\\r\\ndef add(a, b):\\r\\n    return a + b\\r\\n'). Create its parent directory if needed. Read it with read_file.",
+    "Edit `crlf_repro/test.py`: replace the function `add` with a new implementation that returns a * b"
+  ],
+  "expected": "edit_file matches LF search text against a CRLF source and preserves the file line endings.",
+  "defect": "A multiline edit fails with Search string not found although read_file displayed the same source text.",
+  "fault location": [
+    {
+      "file": "crates/tui/src/tools/file.rs",
+      "function": "EditFileTool::execute",
+      "line_start": 838,
+      "line_end": 842,
+      "commit": "d167c07c96282411956ea7f35ddb8227afa1402f",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/d167c07c96282411956ea7f35ddb8227afa1402f/crates/tui/src/tools/file.rs#L838-L842",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The original edit path matches the CRLF file against LF search text without normalizing line endings in its exact or fuzzy matchers. PR #4942 normalizes matching and restores the original line ending."
+    }
+  ],
+  "Root cause": "The original edit path matches the CRLF file against LF search text without normalizing line endings in its exact or fuzzy matchers. PR #4942 normalizes matching and restores the original line ending."
+}

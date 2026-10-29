@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-deepagents-code-5785-v1",
+  "issue": {
+    "repository": "langchain-ai/deepagents",
+    "number": 5785,
+    "url": "https://github.com/langchain-ai/deepagents/issues/5785",
+    "state": "closed",
+    "title": "`read_file` renders the empty-file reminder as line 1 of the file on `FilesystemBackend`"
+  },
+  "version_choice": "pinned",
+  "reported_version": "deepagents 0.7.8",
+  "commit_version": "a764619aa8c850bc75e2e916cf53a587637d8c81",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create an empty file named empty.txt using the shell, then read it using read_file. Report the exact tool result and whether any numbered source line was returned."
+  ],
+  "expected": "An empty file yields an unnumbered empty-file reminder, not a fictitious line of file content.",
+  "defect": "read_file presents System reminder: File exists but has empty contents with a line-number gutter.",
+  "fault location": [
+    {
+      "file": "libs/deepagents/deepagents/backends/filesystem.py",
+      "function": "FilesystemBackend.read",
+      "line_start": 469,
+      "line_end": 477,
+      "commit": "a764619aa8c850bc75e2e916cf53a587637d8c81",
+      "url": "https://github.com/langchain-ai/deepagents/blob/a764619aa8c850bc75e2e916cf53a587637d8c81/libs/deepagents/deepagents/backends/filesystem.py#L469-L477",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "FilesystemBackend returns the empty-file sentinel as nonempty content, so middleware may number it as source text. The issue was closed as not planned because of submission provenance, not because a fixing commit was identified."
+    }
+  ],
+  "Root cause": "FilesystemBackend returns the empty-file sentinel as nonempty content, so middleware may number it as source text. The issue was closed as not planned because of submission provenance, not because a fixing commit was identified."
+}

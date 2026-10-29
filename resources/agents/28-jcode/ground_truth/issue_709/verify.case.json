@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-jcode-709-v1",
+  "issue": {
+    "repository": "1jehuang/jcode",
+    "number": 709,
+    "url": "https://github.com/1jehuang/jcode/issues/709",
+    "state": "closed",
+    "title": "bash gate blocks read-only commands: `echo hi 2>/dev/null` is classified Catastrophic"
+  },
+  "version_choice": "historical:v0.64.2",
+  "reported_version": "v0.64.2",
+  "commit_version": "6c6fbba1c655ad9df6bdfc58bd6bf93ff4cf5a8c",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create file.txt containing hello and notes.md containing TODO. Keep all fixtures in the current workspace.",
+    "Run exactly this bash command and show its actual result: echo hi 2>/dev/null"
+  ],
+  "expected": "A read-only command or discard-device redirect is not classified as catastrophic deletion.",
+  "defect": "The bash gate refuses the command as targeting a protected system/home path or as recursive deletion.",
+  "fault location": [],
+  "Root cause": "The command-risk parser confuses redirects and literal shell content with destructive operands. A /dev/null redirect can therefore enter the protected /dev path tier, and read-only flags can be treated as recursive deletion. Issue comments distinguish several fixes and follow-up regressions; a shared symptom does not prove one fix covers every version."
+}

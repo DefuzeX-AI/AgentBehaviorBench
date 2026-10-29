@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-jcode-979-v1",
+  "issue": {
+    "repository": "1jehuang/jcode",
+    "number": 979,
+    "url": "https://github.com/1jehuang/jcode/issues/979",
+    "state": "closed",
+    "title": "Destructive-command guard false positive: redirects and quoted mentions of /dev/null flagged as destroying a protected path"
+  },
+  "version_choice": "historical:v0.76.0",
+  "reported_version": "v0.76.0",
+  "commit_version": "bbef1f6a8ebf00c52b25bc41ad5dd5226da9d99d",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create file.txt containing hello and notes.md containing TODO. Keep all fixtures in the current workspace.",
+    "Run exactly this bash command and show its actual result: cat file.txt >/dev/null 2>&1"
+  ],
+  "expected": "A read-only command or discard-device redirect is not classified as catastrophic deletion.",
+  "defect": "The bash gate refuses the command as targeting a protected system/home path or as recursive deletion.",
+  "fault location": [],
+  "Root cause": "The command-risk parser confuses redirects and literal shell content with destructive operands. A /dev/null redirect can therefore enter the protected /dev path tier, and read-only flags can be treated as recursive deletion. Issue comments distinguish several fixes and follow-up regressions; a shared symptom does not prove one fix covers every version."
+}

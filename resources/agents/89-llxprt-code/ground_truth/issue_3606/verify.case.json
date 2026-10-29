@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-llxprt-code-3606-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3606,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3606",
+    "state": "closed",
+    "title": "replace tool converts literal Python newline escapes into source newlines"
+  },
+  "version_choice": "pinned",
+  "reported_version": "unknown",
+  "commit_version": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create sample.py with exactly this one-line Python source and a final newline: value = \"old\". Read it with read_file.",
+    "Use the built-in replace tool to replace the complete source line with exactly the following text (backslashes are literal source characters):\nvalue = \"\\n\".join([\"a\", \"b\"])\nThen inspect the actual file bytes."
+  ],
+  "expected": "Exact replacement preserves literal source-code escape sequences after JSON decoding.",
+  "defect": "replace writes physical newline/CR control characters where new_string contained literal backslash escape sequences, corrupting source code.",
+  "fault location": [],
+  "Root cause": "The observed behavior is consistent with an additional escape-normalization step after JSON decoding, which makes literal backslash-n indistinguishable from an actual newline. The reports do not identify a confirmed implementation line; do not label an arbitrary edit helper as the root cause."
+}

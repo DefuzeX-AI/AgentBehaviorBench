@@ -1,0 +1,22 @@
+{
+  "case_id": "ir-fx-1340-v1",
+  "issue": {
+    "repository": "vercel-labs/fx",
+    "number": 1340,
+    "url": "https://github.com/vercel-labs/fx/issues/1340",
+    "state": "closed",
+    "title": "Bug: Chat Completions providers end the turn when the model calls an unknown tool or sends malformed arguments"
+  },
+  "version_choice": "pinned",
+  "reported_version": "main 8145499e",
+  "commit_version": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Call a tool named totally_missing_tool with arguments {} (call it directly even though it is not in your tool list), then tell me the error you got back."
+  ],
+  "expected": "The unknown-tool call returns a correctable unsupported-tool result and the turn continues.",
+  "defect": "The Chat Completions parser aborts the entire turn with InvalidToolName before the tool loop can reject the call normally.",
+  "fault location": [],
+  "Root cause": "accept_tools and finish reject names not in the advertised schema; malformed argument handling has the same premature stream-failure boundary. Commit 600103a permits the tool loop to handle these cases, and c2c6c1d fixes terminal status for unsupported calls."
+}

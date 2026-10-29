@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-codewhale-2533-v1",
+  "issue": {
+    "repository": "codewhale-hq/Codewhale",
+    "number": 2533,
+    "url": "https://github.com/codewhale-hq/Codewhale/issues/2533",
+    "state": "closed",
+    "title": "write_file fails for Sub-Agents"
+  },
+  "version_choice": "historical:v0.8.46",
+  "reported_version": "v0.8.46+",
+  "commit_version": "aa83446d6b9f62384bdcc10ebcafe4b85a4bc590",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Use three sub-agents to prepare separate local Markdown reports about the INTC stock research workflow: price action, analyst sentiment, and news catalysts. Each sub-agent should write its own findings with write_file to intc-price-action.md, intc-analyst-sentiment.md, or intc-news-catalysts.md. Use only information available locally and clearly identify information you cannot obtain. Collect the reports afterwards."
+  ],
+  "expected": "Sub-agent write_file calls retain complete arguments and produce the requested reports, or explicitly report a generation/truncation error.",
+  "defect": "Sub-agent responses hit a fixed output-token ceiling; incomplete write_file arguments are dispatched as non-object input and repeatedly fail or produce short placeholders.",
+  "fault location": [
+    {
+      "file": "crates/tui/src/tools/subagent/mod.rs",
+      "function": "sub-agent MessageRequest construction",
+      "line_start": 3796,
+      "line_end": 3802,
+      "commit": "aa83446d6b9f62384bdcc10ebcafe4b85a4bc590",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/aa83446d6b9f62384bdcc10ebcafe4b85a4bc590/crates/tui/src/tools/subagent/mod.rs#L3796-L3802",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The issue corrects its original streaming hypothesis: sub-agents use non-streaming completions with max_tokens=4096. Truncated JSON arguments fall back to a string in parse_chat_message, while the sub-agent loop does not reject finish_reason=length before dispatch. This is an issue-derived mechanism, not a new runtime observation."
+    }
+  ],
+  "Root cause": "The issue corrects its original streaming hypothesis: sub-agents use non-streaming completions with max_tokens=4096. Truncated JSON arguments fall back to a string in parse_chat_message, while the sub-agent loop does not reject finish_reason=length before dispatch. This is an issue-derived mechanism, not a new runtime observation."
+}

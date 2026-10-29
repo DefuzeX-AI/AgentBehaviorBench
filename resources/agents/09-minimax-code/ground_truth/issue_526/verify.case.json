@@ -1,0 +1,47 @@
+{
+  "case_id": "ir-minimax-code-526-v1",
+  "issue": {
+    "repository": "MiniMax-AI/minimax-code",
+    "number": 526,
+    "url": "https://github.com/MiniMax-AI/minimax-code/issues/526",
+    "state": "open",
+    "title": "[Bug] The desktop read / write / edit tools resolve their target lexically, so a symlink inside the workspace reaches outside it"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.6.5",
+  "commit_version": "a5639bcc6146754e01f1ae18bb88545f18299fd6",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Use bash to run exactly: mkdir -p /tmp/outside && printf 'outside secret\\n' > /tmp/outside/target.txt && ln -s /tmp/outside/target.txt link",
+    "Read the file `link` in the workspace and show its contents.",
+    "Use your write tool to write the text `changed` to the file `link` in the workspace."
+  ],
+  "expected": "The read/write tools resolve `link` to its real location /tmp/outside/target.txt, recognise it is outside the workspace and refuse (or ask for approval) instead of accessing it.",
+  "defect": "The read tool returns the content of /tmp/outside/target.txt and the write tool overwrites it through the in-workspace symlink, with no workspace-boundary refusal or approval prompt.",
+  "fault location": [
+    {
+      "file": "packages/agent-tools/src/desktop/local-pi-tools.ts",
+      "function": "resolveLocalCandidatePath",
+      "line_start": 673,
+      "line_end": 682,
+      "commit": "a5639bcc6146754e01f1ae18bb88545f18299fd6",
+      "url": "https://github.com/MiniMax-AI/minimax-code/blob/a5639bcc6146754e01f1ae18bb88545f18299fd6/packages/agent-tools/src/desktop/local-pi-tools.ts#L673-L682",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "Resolves the tool target purely lexically (path.resolve via normalizeLocalExistingPath, deliberately without realpath), so `link` stays a workspace path even though it points outside; read/write/edit then hand it to pi, which follows the symlink."
+    },
+    {
+      "file": "packages/local-runtime/src/permissions/checkers.ts",
+      "function": "isWorkspacePathEscape",
+      "line_start": 924,
+      "line_end": 934,
+      "commit": "a5639bcc6146754e01f1ae18bb88545f18299fd6",
+      "url": "https://github.com/MiniMax-AI/minimax-code/blob/a5639bcc6146754e01f1ae18bb88545f18299fd6/packages/local-runtime/src/permissions/checkers.ts#L924-L934",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The permission checker decides whether an fs tool path escapes the workspace by comparing path.resolve() strings only, so a symlink inside the workspace never triggers the 'path escapes workspace' ask."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). The desktop/local read, write and edit tools (LocalReadTool, LocalWriteTool, LocalEditTool in packages/agent-tools/src/desktop/local-pi-tools.ts) compute their target with resolveLocalCandidatePath/resolveLocalReadPath, which go through normalizeLocalExistingPath, a deliberately lexical path.resolve with no realpath. The only workspace-containment check for these tools is the permission layer's evaluateLocalFsTool -> isWorkspacePathEscape in packages/local-runtime/src/permissions/checkers.ts, which again compares path.resolve() strings. A symlink `link` inside the workspace therefore looks like an in-workspace path to both, no approval is requested, and pi's read/write/edit follow the link to /tmp/outside/target.txt (for a dangling link, writing creates the target outside the workspace). The symlink-aware guard in desktop/path-guard.ts is not used by these tools. Minimal fix: in isWorkspacePathEscape (or a validation step in the three tools) resolve the target through fs.realpath, walking up to the nearest existing ancestor and following a dangling link via readlink, and treat a real location outside the workspace as an escape (ask/deny), while still passing the original lexical path to pi so the ledger key is unchanged. Speculation: in ABB, permission requests are auto-approved, so the observable signal is only the absence of a refusal; the defect is clearest if the fix makes the tools refuse rather than ask."
+}

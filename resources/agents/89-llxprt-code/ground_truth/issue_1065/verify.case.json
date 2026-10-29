@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-llxprt-code-1065-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 1065,
+    "url": "https://github.com/vybestack/llxprt-code/issues/1065",
+    "state": "closed",
+    "title": "Project-level memory file not loaded when created during session"
+  },
+  "version_choice": "historical:v0.7.0",
+  "reported_version": "v0.7.0",
+  "commit_version": "d44dd953df34e39051b56e35732e0744008ec37d",
+  "fixed_in": "v0.8.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Use the save_memory tool with scope `project` to remember this fact: my favorite color is teal.",
+    "According to the project memory you have loaded, what is my favorite color?"
+  ],
+  "expected": "After save_memory creates .llxprt/LLXPRT.md, the hierarchical memory is reloaded so the new project memory is part of the context for the next prompt.",
+  "defect": "The new project memory file is written to disk but not loaded (\"The memory file is written to disk but not loaded into memory, so it cannot be used during the current session\") even though the refresh reports success.",
+  "fault location": [
+    {
+      "file": "packages/cli/src/ui/AppContainer.tsx",
+      "function": "AppContainer.performMemoryRefresh",
+      "line_start": 806,
+      "line_end": 827,
+      "commit": "d44dd953df34e39051b56e35732e0744008ec37d",
+      "url": "https://github.com/vybestack/llxprt-code/blob/d44dd953df34e39051b56e35732e0744008ec37d/packages/cli/src/ui/AppContainer.tsx#L806-L827",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Reloads hierarchical memory from process.cwd() rather than the session working dir; PR #1066 passes config.getWorkingDir()."
+    },
+    {
+      "file": "packages/cli/src/ui/containers/SessionController.tsx",
+      "function": "SessionControllerInner.performMemoryRefresh",
+      "line_start": 184,
+      "line_end": 198,
+      "commit": "d44dd953df34e39051b56e35732e0744008ec37d",
+      "url": "https://github.com/vybestack/llxprt-code/blob/d44dd953df34e39051b56e35732e0744008ec37d/packages/cli/src/ui/containers/SessionController.tsx#L184-L198",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Reloads memory from process.cwd(), loads settings from process.cwd(), and omits the memoryImportFormat and file-filtering arguments; PR #1066 uses config.getWorkingDir(), loads settings once from it and passes both missing arguments."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/1066. After save_memory writes a new project memory (.llxprt/LLXPRT.md under the working directory), the UI calls performMemoryRefresh, which in v0.7.0 calls loadHierarchicalLlxprtMemory with process.cwd() as the start directory; SessionController additionally loads settings from process.cwd() and omits the memoryImportFormat and fileFilteringOptions arguments. When the process cwd differs from the configured working directory, or the discovery runs with default filtering options, the newly created project file is not discovered, yet 'hierarchical memory refreshed' is still reported. Commit 683129f (PR #1066) uses config.getWorkingDir() in both refresh paths and passes the full argument list. The fix first ships in v0.8.0; the pinned v0.11.0 contains it, so the case is tested at v0.7.0 (latest release before 2026-01-10). Caveat (verified by grep): v0.7.0's ACP server (packages/cli/src/zed-integration/zedIntegration.ts) has no memory-refresh call at all, so in ABB's ACP entry the fixed interactive-UI code is not exercised and the observed symptom, if any, comes from that missing refresh; speculation: the case may therefore also reproduce on the pinned version."
+}

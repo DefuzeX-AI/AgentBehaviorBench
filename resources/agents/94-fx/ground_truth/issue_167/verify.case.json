@@ -1,0 +1,22 @@
+{
+  "case_id": "ir-fx-167-v1",
+  "issue": {
+    "repository": "vercel-labs/fx",
+    "number": 167,
+    "url": "https://github.com/vercel-labs/fx/issues/167",
+    "state": "closed",
+    "title": "Bug: terminal exec rejects most of its schema fields; the model retries blindly, then fabricates a reason"
+  },
+  "version_choice": "historical:v0.0.3",
+  "reported_version": "0.0.3",
+  "commit_version": "fc124be4f4c67ac4c1b7a0b586a3831e93b463d6",
+  "fixed_in": "v0.0.4",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run the shell command: echo ONE"
+  ],
+  "expected": "A simple terminal exec accepts omitted/null optional fields and executes echo ONE without invalid_action_fields retries.",
+  "defect": "The flat terminal schema encourages string null values in fields outside the exec action contract; those are rejected before execution.",
+  "fault location": [],
+  "Root cause": "The schema advertises one common field set but actionFieldContract accepts only exec fields. String \"null\" placeholders are treated as real values. Commit 20781f1 normalizes textual null in both decoding and permission target resolution."
+}

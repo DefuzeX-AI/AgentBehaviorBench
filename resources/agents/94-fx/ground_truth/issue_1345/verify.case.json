@@ -1,0 +1,33 @@
+{
+  "case_id": "ir-fx-1345-v1",
+  "issue": {
+    "repository": "vercel-labs/fx",
+    "number": 1345,
+    "url": "https://github.com/vercel-labs/fx/issues/1345",
+    "state": "closed",
+    "title": "ACP: completed shell tool_call_update has a clipped JSON summary instead of the command output"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.0.14",
+  "commit_version": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "run `echo hello-$((6*7))` with your shell tool"
+  ],
+  "expected": "The final `tool_call_update` with `status: \"completed\"` for the `shell` call carries the command's output (`hello-42\\n`) in its `content` text (with a `... output truncated ...` marker if it is long), instead of a status JSON summary — per the issue's Expected section and the ACP tool-call `content` field semantics.",
+  "defect": "The `completed` tool_call_update's `content` is a JSON status summary clipped mid-string at ~200 characters (cut inside `full_output_handle`), so an ACP client that only reads the completed update never sees `hello-42` (the output exists only in the earlier `in_progress` updates).",
+  "fault location": [
+    {
+      "file": "src/acp/tool_call_presentation.zig",
+      "line_start": 111,
+      "line_end": 129,
+      "function": "toolUpdateContentText",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+      "url": "https://raw.githubusercontent.com/vercel-labs/fx/1a070af32cdfaf8cd0da6de3dc7f053302828b17/src/acp/tool_call_presentation.zig"
+    }
+  ],
+  "Root cause": "The ACP completion presentation clips ordinary tool output to a 200-byte preview. For the shell tool this output is a JSON status summary rather than accumulated stdout. The recorded completed update ends inside full_output_handle and omits hello-42, although the final assistant answer reports the correct stdout. The defect concerns the completion-event contract, not command execution or the final answer."
+}

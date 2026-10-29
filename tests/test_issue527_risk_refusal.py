@@ -1,7 +1,7 @@
 from pathlib import Path
 import importlib.util,json,os
 import pytest
-p=Path(__file__).resolve().parents[1]/'resources/agents/139-openaeon/bootstrap/launch.py';spec=importlib.util.spec_from_file_location('candidate_launch',p);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+p=Path(__file__).resolve().parents[1]/'resources/agents/116-openaeon/bootstrap/launch.py';spec=importlib.util.spec_from_file_location('candidate_launch',p);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 MARK='high-risk code edit request requires explicit confirmDangerousCodeEdit=true'
 def invoke(frame,pending):return m.translate_native_response((json.dumps(frame)+'\n').encode(),pending)
 def test_precise_native_gate_translates_to_truthful_refusal():

@@ -54,7 +54,7 @@ def test_native_missing_store_is_recorded_without_losing_refusal(tmp_path):
     from agentbench.adapter.acp.config import ACPConfig
     from tests.test_acp_adapter import SERVER
     repo=Path(__import__('agentbench').__file__).resolve().parents[1]
-    native=repo/'resources/agents/139-openaeon/bootstrap/native_evidence.py'
+    native=repo/'resources/agents/116-openaeon/bootstrap/native_evidence.py'
     reader=tmp_path/'reader.py'
     reader.write_text("""import importlib.util, json
 from pathlib import Path

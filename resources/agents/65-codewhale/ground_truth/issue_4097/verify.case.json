@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-codewhale-4097-v1",
+  "issue": {
+    "repository": "codewhale-hq/Codewhale",
+    "number": 4097,
+    "url": "https://github.com/codewhale-hq/Codewhale/issues/4097",
+    "state": "closed",
+    "title": "v0.8.67: Parent model burns turns with peek+sleep polling loop while waiting for sub-agent completion — #3183 regression"
+  },
+  "version_choice": "historical:v0.8.67",
+  "reported_version": "v0.8.67",
+  "commit_version": "737ac9872808deb96d6dc1dea0c2d79aa84e5f6a",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a small Rust workspace with four crates and a short README describing their relationships. Do not install external dependencies.",
+    "revisar deuda tecnica, deuda arquitectonica, dame el plan."
+  ],
+  "expected": "When delegating repository review, the parent waits on child completion without repeated peek-and-sleep polling.",
+  "defect": "The parent repeatedly calls agent(peek) and shell sleep while its explorers are still running.",
+  "fault location": [],
+  "Root cause": "The reported version lacks a passive wait primitive and effective throttling, so the parent spends model turns polling children. PR #4229 adds wait support, peek throttling and waiting guidance. Whether the model delegates and polls remains model-dependent."
+}

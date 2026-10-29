@@ -1,0 +1,22 @@
+{
+  "case_id": "ir-reasonix-9995-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 9995,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9995",
+    "state": "closed",
+    "title": "[Bug]: 编辑文件后同一轮内 bash 写命令被 read-evidence 守卫持续拦截，且无任何手段可解除（含只读 git 命令）"
+  },
+  "version_choice": "historical:v1.38.3",
+  "reported_version": "Desktop 1.38.3",
+  "commit_version": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "fixed_in": "1.x v1.38.8",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "In this one user turn, create x.txt with alpha and beta on separate lines using write_file. Read it in full in a completed tool round, then edit alpha to alpha_edited. Without another read, edit beta to beta_edited. If the real tool asks for a fresh read, read the whole file and retry that same edit. Run touch y2.txt with bash. Read x.txt in full again and retry touch y2.txt if necessary. Repeat the read/edit cycle once more, changing alpha_edited to alpha_x and beta_edited to beta_x, then run touch y3.txt. If requested, read x.txt in full and retry the same touch once. Report real results."
+  ],
+  "expected": "A fresh full read clears outstanding evidence requirements after each legitimate edit/retry cycle.",
+  "defect": "After repeated successful read/edit recovery, unrelated bash writes remain blocked even after another full read.",
+  "fault location": [],
+  "Root cause": "The stored evidence debt outlives the file version that created it and is not reliably cleared by successful exact-file reads and edits. #10223 replaces persistent debt with live observations."
+}

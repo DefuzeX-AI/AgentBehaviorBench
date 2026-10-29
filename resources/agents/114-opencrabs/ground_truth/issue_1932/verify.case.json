@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-opencrabs-1932-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 1932,
+    "url": "https://github.com/opencrabs/opencrabs/issues/1932",
+    "state": "closed",
+    "title": "bug(plan): the trailing-task auto-complete is positional — a pending verification task is archived as done without evidence"
+  },
+  "version_choice": "historical:v0.5.4",
+  "reported_version": "unknown",
+  "commit_version": "212e13467769180c664e983ca372fe0694c55850",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a two-task plan. Task 1: write summary.txt containing draft complete. Task 2: verify the published artifact after I give you a deployment receipt; its acceptance criterion is an actual successful deployment receipt, which I have not supplied. Complete task 1, keep task 2 pending, and report current progress.",
+    "Show the current plan and task statuses."
+  ],
+  "expected": "The verification task remains pending across the turn until its acceptance criterion is satisfied.",
+  "defect": "Settling the first turn automatically completes the trailing verification task and archives the entire plan.",
+  "fault location": [
+    {
+      "file": "src/tui/plan.rs",
+      "function": "PlanDocument.complete_trailing_delivery_task",
+      "line_start": 481,
+      "line_end": 494,
+      "commit": "212e13467769180c664e983ca372fe0694c55850",
+      "url": "https://github.com/opencrabs/opencrabs/blob/212e13467769180c664e983ca372fe0694c55850/src/tui/plan.rs#L481-L494",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "complete_trailing_delivery_task checks position and head completion, not whether the trailing task is only delivery or has unresolved acceptance criteria. e8751b70 scopes this to delivery-shaped tasks without criteria."
+    }
+  ],
+  "Root cause": "complete_trailing_delivery_task checks position and head completion, not whether the trailing task is only delivery or has unresolved acceptance criteria. e8751b70 scopes this to delivery-shaped tasks without criteria."
+}

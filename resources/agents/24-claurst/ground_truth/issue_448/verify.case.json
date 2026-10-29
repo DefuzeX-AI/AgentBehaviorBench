@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-claurst-448-v1",
+  "issue": {
+    "repository": "Kuberwastaken/claurst",
+    "number": 448,
+    "url": "https://github.com/Kuberwastaken/claurst/issues/448",
+    "state": "closed",
+    "title": "apply_patch: support the Codex *** Begin Patch envelope, expose it to the codex provider, and fix unified-diff corruption bugs"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.1.7",
+  "commit_version": "0f5d970bd78738434afb0c7abae3350d03246938",
+  "fixed_in": "0.2.0 (approx: first release after fix)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a file named notes.txt in the current workspace with exactly these three lines and nothing else:\n\nalpha\n-- old comment\nomega\n\nThen tell me it is done.",
+    "Now apply this unified diff to notes.txt with your apply_patch tool:\n\n```diff\n--- a/notes.txt\n+++ b/notes.txt\n@@ -1,3 +1,2 @@\n alpha\n--- old comment\n omega\n```\n\nAfter applying it, print the full contents of notes.txt."
+  ],
+  "expected": "The hunk header `@@ -1,3 +1,2 @@` declares three old-side lines, so the line `--- old comment` must be consumed as a removal of the content line `-- old comment` (a removed line whose text starts with `--`), not as a `---` file header; after applying, notes.txt must be exactly `alpha` followed by `omega` (three lines minus the removed one), i.e. the trailing context line `omega` survives.",
+  "defect": "The unified-diff parser mistakes the `--- old comment` removal line for a `---` file header and stops processing the hunk, so the file ends early and notes.txt loses the removal and the trailing context line `omega` (issue: \"a `-- comment` removal line ends the file early\").",
+  "fault location": [
+    {
+      "file": "src-rust/crates/tools/src/apply_patch.rs",
+      "line_start": 54,
+      "line_end": 65,
+      "function": "unified diff parser",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "0f5d970bd78738434afb0c7abae3350d03246938",
+      "url": "https://raw.githubusercontent.com/Kuberwastaken/claurst/0f5d970bd78738434afb0c7abae3350d03246938/src-rust/crates/tools/src/apply_patch.rs"
+    }
+  ],
+  "Root cause": "The unified-diff parser treats every line beginning with --- as a new file header before considering whether it is inside a hunk. Removing a source line beginning with two dashes produces exactly this prefix. The parser therefore misclassifies the removal and breaks hunk processing. In the retained run the file remains unchanged despite reported patch success; truncation is not the observed outcome of this selected run."
+}

@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-deepagents-code-1766-v1",
+  "issue": {
+    "repository": "langchain-ai/deepagents",
+    "number": 1766,
+    "url": "https://github.com/langchain-ai/deepagents/issues/1766",
+    "state": "closed",
+    "title": "Commands hang waiting for stdin when executed via `LocalShellBackend`"
+  },
+  "version_choice": "historical:deepagents-code==0.0.1",
+  "reported_version": "unknown",
+  "commit_version": "584ba7029649c75505f8a866d3607d97dbe784a0",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "run python"
+  ],
+  "expected": "A noninteractive Python invocation with no supplied stdin receives EOF rather than waiting indefinitely.",
+  "defect": "LocalShellBackend leaves stdin attached and the command waits until its timeout.",
+  "fault location": [
+    {
+      "file": "libs/deepagents/deepagents/backends/local_shell.py",
+      "function": "LocalShellBackend.execute",
+      "line_start": 307,
+      "line_end": 316,
+      "commit": "584ba7029649c75505f8a866d3607d97dbe784a0",
+      "url": "https://github.com/langchain-ai/deepagents/blob/584ba7029649c75505f8a866d3607d97dbe784a0/libs/deepagents/deepagents/backends/local_shell.py#L307-L316",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "LocalShellBackend.execute calls subprocess.run without stdin=DEVNULL. The child inherits an open input stream and an interactive reader can wait for input. #2427 closes stdin explicitly."
+    }
+  ],
+  "Root cause": "LocalShellBackend.execute calls subprocess.run without stdin=DEVNULL. The child inherits an open input stream and an interactive reader can wait for input. #2427 closes stdin explicitly."
+}

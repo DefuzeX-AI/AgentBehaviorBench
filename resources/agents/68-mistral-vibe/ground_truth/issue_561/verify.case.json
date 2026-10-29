@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-mistral-vibe-561-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 561,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/561",
+    "state": "closed",
+    "title": "bug: Vibe doesn't know today's date"
+  },
+  "version_choice": "historical:2.10.1",
+  "reported_version": "2.7.2",
+  "commit_version": "f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7",
+  "reference_agent_aliases": ["verify561-before"],
+  "fixed_in": "2.11.0",
+  "pinned_contains_fix": false,
+  "steps": [
+    "What is today's date? Answer with the exact calendar date."
+  ],
+  "expected": "Vibe should answer with the actual current calendar date. The historical 2.10.1 baseline did not supply that date in its system prompt.",
+  "defect": "Before v2.11.0 the system prompt carried no current date, so the agent answers with its training-cutoff date (e.g. October 2024) or says it cannot know the date.",
+  "fault location": [
+    {
+      "file": "vibe/core/system_prompt.py",
+      "function": "get_universal_system_prompt",
+      "line_start": 298,
+      "line_end": 384,
+      "commit": "f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7",
+      "url": "https://raw.githubusercontent.com/mistralai/mistral-vibe/f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7/vibe/core/system_prompt.py",
+      "role": "missing_date_injection",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "vibe/core/prompts/cli.md",
+      "function": "CLI system prompt template",
+      "line_start": 1,
+      "line_end": 3,
+      "commit": "f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7",
+      "url": "https://raw.githubusercontent.com/mistralai/mistral-vibe/f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7/vibe/core/prompts/cli.md",
+      "role": "missing_date_placeholder",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "At the selected historical 2.10.1 source revision, get_universal_system_prompt builds the system instructions without the current calendar date. In the retained baseline run on 2026-10-26, the model received no current-date line and answered 2024-06-14. The recorded result demonstrates the date failure on the tested revision. The historical test unit was named verify561-before; reference_agent_aliases maps that original identifier to this registered Agent without changing the saved trajectory."
+}

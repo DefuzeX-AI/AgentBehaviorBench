@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-reasonix-9405-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 9405,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9405",
+    "state": "closed",
+    "title": "[Bug]: shell contract blocks pure verification commands / 纯验证命令被误拦"
+  },
+  "version_choice": "historical:v1.38.3",
+  "reported_version": "unknown",
+  "commit_version": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "fixed_in": "1.x v1.38.8",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create a local Git repository with calc.py containing value = 1, configure user.name Fixture and user.email fixture@example.com, and commit it.",
+    "Read calc.py, use edit_file to change value = 1 to value = 2, commit this change, then run git diff --check as a separate bash call. Show the actual verification result."
+  ],
+  "expected": "A pure verification command is allowed after an edit or commit.",
+  "defect": "The shell contract refuses git diff --check as mixed mutation/verification even though the current call has no mutation.",
+  "fault location": [],
+  "Root cause": "The issue hypothesizes that the shell-contract classifier carries or conservatively infers mutation when evaluating a later verification call. #10223 removes the old evidence-gate machinery in 1.x. The precise branch responsible for this reported session remains inferred until trace validation."
+}

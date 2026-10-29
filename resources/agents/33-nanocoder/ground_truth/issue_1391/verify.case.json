@@ -1,0 +1,43 @@
+{
+  "case_id": "ir-nanocoder-1391-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1391,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1391",
+    "state": "closed",
+    "title": "[Bug] processToolUse never sets isError for a non-zero shell exit, so --json and ACP report failed commands as successful"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Use your shell tool to run the command `exit 7` exactly, then tell me the exit code."
+  ],
+  "expected": "The execute_bash tool call for `exit 7` should be marked as failed (result.isError === true), and therefore the ACP tool-call status should be failed rather than completed; the issue explicitly expects result.isError === true and states acp-conversation.ts derives status from isError.",
+  "defect": "The execute_bash tool call for `exit 7` is reported as completed (isError stays undefined), so a command that exited 7 is indistinguishable from a clean successful run in the ACP trace.",
+  "fault location": [
+    {
+      "file": "source/acp/acp-conversation.ts",
+      "line_start": 459,
+      "line_end": 469,
+      "function": "tool completion status mapping",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/acp/acp-conversation.ts"
+    },
+    {
+      "file": "source/tools/execute-bash.tsx",
+      "line_start": 34,
+      "line_end": 47,
+      "function": "formatBashResultForLLM",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/tools/execute-bash.tsx"
+    }
+  ],
+  "Root cause": "The ACP conversation layer derives tool failure from whether the returned text begins with Error. execute_bash formats a nonzero command exit as EXIT_CODE: 7, so the prefix check marks the call completed. The retained protocol update contains status=completed with rawOutput=EXIT_CODE: 7. The model correctly reports the exit code; the fault is loss of failure semantics in the protocol status."
+}

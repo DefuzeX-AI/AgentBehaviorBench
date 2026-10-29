@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-easy-agent-125-v1",
+  "issue": {
+    "repository": "ConardLi/easy-agent",
+    "number": 125,
+    "url": "https://github.com/ConardLi/easy-agent/issues/125",
+    "state": "open",
+    "title": "Edit and MultiEdit replace requested curly quotes with straight quotes"
+  },
+  "version_choice": "pinned",
+  "reported_version": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+  "commit_version": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Step 1: Create a file named NOTES.md in the current directory with exactly the following content:\n\n# Release notes\n\nTagline: Fast and simple\n\nThis release fixes the login bug.",
+    "Step 2: Our style guide requires typographic (curly) quotation marks in published prose. In NOTES.md, change only the tagline line so it reads exactly:\n\nTagline: “Fast” and ‘simple’\n\nUse the curly characters “ ” ‘ ’ (U+201C, U+201D, U+2018, U+2019), not straight quotes. Do not change any other line."
+  ],
+  "expected": "The Edit/MultiEdit tool should write new_string literally, so after step 2 the tagline is exactly 'Tagline: “Fast” and ‘simple’' with U+201C/201D/2018/2019; normalization may be used only for matching old_string, per the editCore.ts contract described in the issue.",
+  "defect": "Edit/MultiEdit normalizes new_string too, so the requested curly-quote tagline is written with straight double and single quotes while the tool reports success and its preview shows the normalized straight-quote text.",
+  "fault location": [
+    {
+      "file": "src/tools/editCore.ts",
+      "function": "applyEditToContent",
+      "line_start": 48,
+      "line_end": 49,
+      "commit": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+      "url": "https://raw.githubusercontent.com/ConardLi/easy-agent/aec616a97114ce9683e4fbfcff3abbc55155fe50/src/tools/editCore.ts",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "src/tools/editCore.ts",
+      "function": "normalizeQuotes",
+      "line_start": 26,
+      "line_end": 28,
+      "commit": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+      "url": "https://raw.githubusercontent.com/ConardLi/easy-agent/aec616a97114ce9683e4fbfcff3abbc55155fe50/src/tools/editCore.ts",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The shared edit core normalizes typographic quotes in replacement content as well as match text. User-requested curly quotes are therefore written as straight quotes. The retained readback checks identify ASCII quote bytes, followed by model workarounds to write the requested Unicode characters."
+}

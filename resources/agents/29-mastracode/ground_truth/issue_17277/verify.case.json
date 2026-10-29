@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-mastracode-17277-v1",
+  "issue": {
+    "repository": "mastra-ai/mastra",
+    "number": 17277,
+    "url": "https://github.com/mastra-ai/mastra/issues/17277",
+    "state": "closed",
+    "title": "[BUG] read_file reports inverted line range when offset is past EOF"
+  },
+  "version_choice": "pinned",
+  "reported_version": "mastracode@0.21.1",
+  "commit_version": "429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf",
+  "fixed_in": "mastracode@0.21.2",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a file named test.txt containing exactly three lines: `a`, `b`, `c`.",
+    "Use read_file on test.txt (a 3-line file) with offset 10 and show the output."
+  ],
+  "expected": "Reading past EOF reports an explicit empty range such as `lines 0-0 of 3` and renders no line-number marker.",
+  "defect": "The output header shows an inverted range `test.txt (lines 10-3 of 3, ...)` followed by a phantom line `10→`.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/mastra-ai/mastra/pull/17275 (commit 847ff1e0d94368d94b2e173e4e0908e115568ef3). Before the fix, extractLines in packages/core/src/workspace/line-utils.ts clamped the end of the requested range to the file length but kept the requested start, so an offset past EOF produced start > end (10 > 3) with empty content; read-file.ts then formatted that range into the header (`lines 10-3 of 3`) and called formatWithLineNumbers(result.content, result.lines.start), which renders a numbered marker `10→` for the empty content. The fix returns { content: '', lines: { start: 0, end: 0 } } when start > end and skips line numbering when no lines were extracted. The fix (2026-05-29) is first released in mastracode@0.21.2 (@mastra/core@1.38.0); the pinned revision mastracode@0.41.0 already contains it and no pre-fix mastracode release has the ACP entry (first in 0.25.0), so the case is pinned and is not expected to reproduce."
+}

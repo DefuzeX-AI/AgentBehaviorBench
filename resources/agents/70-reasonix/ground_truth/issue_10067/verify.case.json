@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-reasonix-10067-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 10067,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/10067",
+    "state": "closed",
+    "title": "[Bug]: [tools] After edit_file, all bash commands that might write files remain blocked: read_file reports the requirement satisfied, but bash still considers it unmet (inconsistent state)"
+  },
+  "version_choice": "historical:1.38.3",
+  "reported_version": "1.38.0-1.38.3",
+  "commit_version": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "fixed_in": "1.x v1.38.8 (#10223 read-evidence gate removed)",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a small script by running exactly this shell command:\n\n```bash\nmkdir -p tools && printf '%s\\n' 'import sys' \"print('v1')\" > tools/foo.py && cat tools/foo.py\n```",
+    "1. Use edit_file to change `print('v1')` to `print('v2')` in tools/foo.py.\n2. Then run `echo x > tmp.txt` with bash.\n3. Then read tools/foo.py with read_file (intent=full).\n4. Then run `echo x > tmp.txt` with bash again."
+  ],
+  "expected": "Once read_file reports the requirement satisfied, the same bash write runs (issue's expected behaviour: no 'read side satisfied / bash side outstanding' split).",
+  "defect": "bash stays refused with the read-evidence gate message after read_file (intent=full) reported the requirement already satisfied.",
+  "fault location": [
+    {
+      "file": "internal/agent/operation_evidence.go",
+      "function": "checkOperationEvidence",
+      "line_start": 43,
+      "line_end": 60,
+      "commit": "fa018e4109268c912063c8cc619302fccdb57d74",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/fa018e4109268c912063c8cc619302fccdb57d74/internal/agent/operation_evidence.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "internal/agent/operation_evidence.go",
+      "function": "applyEvidenceGates",
+      "line_start": 310,
+      "line_end": 331,
+      "commit": "fa018e4109268c912063c8cc619302fccdb57d74",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/fa018e4109268c912063c8cc619302fccdb57d74/internal/agent/operation_evidence.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "internal/agent/read_pipeline.go",
+      "function": "outstandingReadEvidence",
+      "line_start": 188,
+      "line_end": 212,
+      "commit": "fa018e4109268c912063c8cc619302fccdb57d74",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/fa018e4109268c912063c8cc619302fccdb57d74/internal/agent/read_pipeline.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "A refused edit is retained in turn.evidenceBlocked with its original arguments. After a successful retry changes the file, outstandingReadEvidence rechecks the obsolete edit target. Target declaration can now fail because the old string no longer exists, leaving evidence debt that blocks unrelated bash writes even after a full read. The retained second turn and the local historical before/after report support this stale-state mechanism."
+}

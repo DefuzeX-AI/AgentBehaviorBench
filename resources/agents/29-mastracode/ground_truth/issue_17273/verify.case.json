@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-mastracode-17273-v1",
+  "issue": {
+    "repository": "mastra-ai/mastra",
+    "number": 17273,
+    "url": "https://github.com/mastra-ai/mastra/issues/17273",
+    "state": "closed",
+    "title": "[BUG] workspace grep duplicates context lines across adjacent matches"
+  },
+  "version_choice": "pinned",
+  "reported_version": "mastracode@0.21.1",
+  "commit_version": "429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf",
+  "fixed_in": "mastracode@0.21.2",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a file named f.ts whose content is exactly these five lines: MATCH_A, x, MATCH_B, y, z (one per line).",
+    "Run the workspace grep tool with { \"pattern\": \"MATCH\", \"path\": \"f.ts\", \"contextLines\": 2 } and show the output."
+  ],
+  "expected": "Overlapping context windows are merged into one hunk, so each of the five lines of f.ts appears exactly once in the grep output.",
+  "defect": "Each match's context window is emitted independently, so lines such as `x` and `MATCH_B` appear twice (once as context of MATCH_A and again around MATCH_B).",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/mastra-ai/mastra/pull/17274 (commit 65a72e70c25eedea8ff985a6624b96be2850236b). Before the fix, the host-side search loop in packages/core/src/workspace/tools/grep.ts (grepTool.execute) handled every matching line on its own: it pushed the `contextLines` lines before the match, the match, the lines after it, and then a `--` separator, without remembering which lines had already been emitted. When two matches are within 2*contextLines of each other their windows overlap, so the same source line is printed several times and a matching line can reappear as another match's context; a trailing `--` is also printed after the last hunk. The fix collects match/context line ranges per file and merges overlapping or adjacent windows into single hunks, separating distinct hunks with `--` and omitting the trailing separator. The fix (2026-05-30) is first released in mastracode@0.21.2 (@mastra/core@1.38.0). The pinned revision (mastracode@0.41.0) already contains it, and no mastracode release before the fix provides the ACP entry (ACP first ships in mastracode@0.25.0), so the case is pinned and is not expected to reproduce."
+}

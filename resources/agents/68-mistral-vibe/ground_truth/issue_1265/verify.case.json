@@ -1,0 +1,22 @@
+{
+  "case_id": "ir-mistral-vibe-1265-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 1265,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/1265",
+    "state": "closed",
+    "title": "bug: invalid process.write arguments crash the session instead of failing the tool"
+  },
+  "version_choice": "historical:v2.26.1",
+  "reported_version": "2.26.1",
+  "commit_version": "4ae5c5955da8e761318916bdb1a7f46f0b50c7d0",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Use tools.process.start to launch a background cat process. Then make a tools.process.write call for that process without text, control or bytesBase64, and tell me the actual tool error."
+  ],
+  "expected": "Invalid process.write arguments produce a recoverable tool error and the session remains alive.",
+  "defect": "A ValueError escapes intent reservation, aborting the entire session.",
+  "fault location": [],
+  "Root cause": "_validate_write/_required_string raises ValueError for empty input, but _resolve_action only catches ProcessActionError. The validation exception escapes _drive rather than being converted into an invalid_arguments tool failure."
+}

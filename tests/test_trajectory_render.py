@@ -8,6 +8,26 @@ from agentbench.trajectory.render import render, render_step, render_within
 from tests.trajectory_fixtures import langgraph_attempt
 
 
+def test_shared_context_round_trips_every_field_without_mutating_source(tmp_path):
+    from copy import deepcopy
+    from agentbench.trajectory.render import share_model_context
+    original = validate(build(langgraph_attempt(tmp_path)))
+    sources = [original, deepcopy(original)]
+    before = deepcopy(sources)
+    shared, copies = share_model_context(sources)
+    assert sources == before
+    assert len(json.dumps({'shared': shared, 'copies': copies})) < len(json.dumps(sources))
+    for trajectory in copies:
+        for step in trajectory['steps']:
+            compact = step['input']
+            restored = dict(compact['fields'])
+            for key, reference in compact['context_refs'].items():
+                restored[key] = ([shared[item] for item in reference]
+                                 if isinstance(reference, list) else shared[reference])
+            step['input'] = restored
+    assert copies == sources
+
+
 def test_full_mode_keeps_every_request_and_response(tmp_path):
     value = validate(build(langgraph_attempt(tmp_path)))
     text = render(value, 'full')

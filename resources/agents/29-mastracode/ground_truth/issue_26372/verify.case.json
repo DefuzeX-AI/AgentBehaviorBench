@@ -1,0 +1,58 @@
+{
+  "case_id": "ir-mastracode-26372-v1",
+  "issue": {
+    "repository": "mastra-ai/mastra",
+    "number": 26372,
+    "url": "https://github.com/mastra-ai/mastra/issues/26372",
+    "state": "closed",
+    "title": "[BUG] mastracode --acp: the active turn ends with stopReason \"cancelled\" (no client cancel) right after an Observational Memory observer call returns"
+  },
+  "version_choice": "pinned",
+  "reported_version": "mastracode@0.41.0",
+  "commit_version": "429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf",
+  "fixed_in": "mastracode@0.48.0",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Inspect the current workspace and report what files and directories are present.",
+    "Create a minimal compiler toolchain project structure with a source file, a build script, and a test script.",
+    "Implement an as-of evidence snapshot mechanism that records the state of the project at a given timestamp."
+  ],
+  "expected": "Each turn runs to completion (stopReason end_turn) unless the client sends session/cancel; background Observational Memory work does not end the user's turn.",
+  "defect": "A turn ends with stopReason \"cancelled\" although the client never sent session/cancel, shortly after an Observational Memory observer request returns, and the in-flight main model request is dropped.",
+  "fault location": [
+    {
+      "file": "packages/core/src/agent-controller/session-run-engine.ts",
+      "function": "SessionRunEngine.processStreamChunk",
+      "line_start": 1156,
+      "line_end": 1173,
+      "commit": "429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf",
+      "url": "https://github.com/mastra-ai/mastra/blob/429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf/packages/core/src/agent-controller/session-run-engine.ts#L1156-L1173",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "On a data-om-buffering-failed chunk (background async buffering) the engine emits om_buffering_failed and then calls abortForOmFailure (lines 450-456: emit error + session.abortRun()), aborting the active turn; PR #27438 (commit 368149c) removes the abort so buffering failures leave the turn running."
+    },
+    {
+      "file": "mastracode/sdk/src/acp/agent.ts",
+      "function": "MastraCodeAcpAgent.prompt",
+      "line_start": 173,
+      "line_end": 176,
+      "commit": "429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf",
+      "url": "https://github.com/mastra-ai/mastra/blob/429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf/mastracode/sdk/src/acp/agent.ts#L173-L176",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Returns stopReason: mapStopReason(reason) for whatever reason the run ended, so an internal abort is reported to the ACP client like a user cancel; PR #27438 throws an internal error when the run aborted with a recorded error and no client cancel."
+    },
+    {
+      "file": "mastracode/sdk/src/acp/agent.ts",
+      "function": "mapStopReason",
+      "line_start": 228,
+      "line_end": 229,
+      "commit": "429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf",
+      "url": "https://github.com/mastra-ai/mastra/blob/429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf/mastracode/sdk/src/acp/agent.ts#L228-L229",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Maps the internal run end 'aborted' unconditionally to the ACP stopReason 'cancelled', hiding the OM failure from the client."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/mastra-ai/mastra/pull/27438 (commit 368149c27954f6d578d3561cc1801cb415b78aa7). Mastra Code enables Observational Memory with async buffering by default. When a background buffering cycle reports a failure, the memory processor emits a data-om-buffering-failed chunk; SessionRunEngine.processStreamChunk in packages/core/src/agent-controller/session-run-engine.ts then calls abortForOmFailure, which emits an error event and calls session.abortRun(), so the user's in-flight turn (including the streaming main-model request) is aborted even though buffering is background work. The run ends with reason 'aborted', and the ACP server's MastraCodeAcpAgent.prompt returns mapStopReason(reason), which maps 'aborted' to stopReason 'cancelled', so the client sees a cancel it never sent and no error text. The fix stops aborting on buffering failures (the failed input stays pending and the synchronous threshold path applies failurePolicy), ignores retryable errors in the ACP event mapper, and makes the ACP prompt throw an internal error instead of returning 'cancelled' when a run aborted with a recorded error and no client cancel. The fix (2026-10-17) is first released in mastracode@0.48.0 / @mastra/core@1.79.0; the pinned revision mastracode@0.41.0 does not contain it. Speculation: the issue reports the observer request returning HTTP 200, so the buffering failure is presumably raised after the model call (e.g. while processing or persisting the observation); the trigger is timing-dependent and not deterministic."
+}

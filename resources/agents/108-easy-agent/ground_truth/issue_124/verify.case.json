@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-easy-agent-124-v1",
+  "issue": {
+    "repository": "ConardLi/easy-agent",
+    "number": 124,
+    "url": "https://github.com/ConardLi/easy-agent/issues/124",
+    "state": "open",
+    "title": "Edit and MultiEdit interEdit and MultiEdit interpret replacement text as JavaScript substitution patternspret replacement text as JavaScript substitution patterns"
+  },
+  "version_choice": "pinned",
+  "reported_version": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+  "commit_version": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create a file named split_lines.sh in the current directory with exactly the following content (keep every character as given):\n\n#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone",
+    "In split_lines.sh, change only the line `IFS=,` to `IFS=$'\\n'` so the fields are split on newlines instead of commas. Do not change any other line."
+  ],
+  "expected": "Edit (or MultiEdit) should insert new_string literally: line 3 becomes IFS=$'\\n' and the other six lines remain unchanged. The Edit tool is documented as replacing a string in a file, new_string is documented as replacement text, and the system prompt calls for Edit to make precise changes.",
+  "defect": "In the non-replace_all path, Edit calls String.prototype.replace(string, string). JavaScript interprets $' in new_string as a replacement pattern, so the saved file contains 'IFS=' followed by the original content from line 4 onward and a literal \\n' instead of the requested line. The script grows from 7 to 12 lines and Bash reports unexpected EOF, even though the tool reports completion and its diff preview shows the requested text.",
+  "fault location": [
+    {
+      "file": "src/tools/editCore.ts",
+      "function": "applyEditToContent",
+      "line_start": 68,
+      "line_end": 68,
+      "commit": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+      "url": "https://raw.githubusercontent.com/ConardLi/easy-agent/aec616a97114ce9683e4fbfcff3abbc55155fe50/src/tools/editCore.ts",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The non-replace_all branch passes newString as a string argument to String.replace. JavaScript expands replacement patterns such as $', $&, $` and $$ instead of inserting those bytes literally. The archived Edit corrupts the script and the model later rewrites it. The final repaired file does not negate the intermediate tool failure."
+}

@@ -1,0 +1,257 @@
+{
+  "run_id": "run_3f9a69cdbfd742db9b77d21cbc118a8d",
+  "case_id": "ir-claurst-448-v1",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "Done. I created `notes.txt` in the workspace with exactly these three lines and verified the contents:\n\n```\nalpha\n-- old comment\nomega\n```",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/notes.txt",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:1fb2a40ada9693600d8bc83a7cb72cfc0804199d37db134187310560580048e7",
+        "before_size": null,
+        "after_size": 27,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/notes.txt\n@@ -0,0 +1,3 @@\n+alpha\n+-- old comment\n+omega\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_3f9a69cdbfd742db9b77d21cbc118a8d",
+      "case_id": "ir-claurst-448-v1",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "965cb4e2e890497bdd91bf627bef6ad6",
+          "span_id": "2ee51ea8249c1ef7",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1793123577806216780,
+          "end_time_unix_nano": 1793123595024796376,
+          "duration_nano": 17218579596,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.initialize",
+              "time_unix_nano": 1793123578091588138,
+              "attributes": {}
+            },
+            {
+              "name": "acp.session",
+              "time_unix_nano": 1793123578092773944,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1793123578093544971,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1793123587358025998,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1793123591007917145,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1793123595022726844,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "965cb4e2e890497bdd91bf627bef6ad6",
+          "span_id": "cd753ef229334c79",
+          "parent_span_id": "2ee51ea8249c1ef7",
+          "name": "Write: /home/agent/workspace/notes.txt",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1793123587315704349,
+          "end_time_unix_nano": 1793123587364055881,
+          "duration_nano": 48351532,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Write: /home/agent/workspace/notes.txt",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "content": "alpha\n-- old comment\nomega\n",
+              "file_path": "/home/agent/workspace/notes.txt"
+            },
+            "gen_ai.tool.call.result": "Created /home/agent/workspace/notes.txt (3 lines, 27 bytes)",
+            "gen_ai.tool.call.id": "call_339cb7294ca04760911cd285"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "965cb4e2e890497bdd91bf627bef6ad6",
+          "span_id": "2d9d3f098dc3f5cc",
+          "parent_span_id": "2ee51ea8249c1ef7",
+          "name": "Read: /home/agent/workspace/notes.txt",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1793123591001511714,
+          "end_time_unix_nano": 1793123591017958580,
+          "duration_nano": 16446866,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Read: /home/agent/workspace/notes.txt",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "file_path": "/home/agent/workspace/notes.txt"
+            },
+            "gen_ai.tool.call.result": "1\talpha\n2\t-- old comment\n3\tomega\n",
+            "gen_ai.tool.call.id": "call_0c4877b6062e4b319122643a"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_3f9a69cdbfd742db9b77d21cbc118a8d",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-9f7ba5d3c5dd960c040430e05833befd",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "notes.txt",
+          "change_type": "created",
+          "size_bytes": 27,
+          "after_sha256": "1fb2a40ada9693600d8bc83a7cb72cfc0804199d37db134187310560580048e7"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "206ef059b8a651252cc90817a4c3cce5c05cdd8b6d4eb4b2aca1e0b0943f2514",
+          "size_bytes": 2848,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "271927e53e17cc5eb8549f7bd8781dda499f004770edab4ea4e10ec2e40dabda"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      "notes.txt": 0
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 1,
+      "retained_count": 1,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

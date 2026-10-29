@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-llxprt-code-3037-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3037,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3037",
+    "state": "closed",
+    "title": "Tool errors discard the model-facing llmContent remedy and surface only the terse error.message"
+  },
+  "version_choice": "historical:v0.10.0",
+  "reported_version": "v0.10.0",
+  "commit_version": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+  "fixed_in": "v0.11.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create notes.txt containing 7 lines: line1, line2, line3, line4, line5, line6, line7 (one per line).",
+    "Call insert_at_line on notes.txt with line_number 999 and content `extra`, and report exactly what error the tool returned."
+  ],
+  "expected": "The model receives the tool's model-facing llmContent, including the remedy (e.g. \"Use line_number <= 9 to append.\").",
+  "defect": "The model receives only the terse error.message, e.g. {\"error\":\"line_number 999 exceeds file length (8)\"}, and the remedy written into llmContent is dropped.",
+  "fault location": [
+    {
+      "file": "packages/agents/src/scheduler/result-aggregator.ts",
+      "function": "ResultAggregator.publishResult",
+      "line_start": 376,
+      "line_end": 384,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/agents/src/scheduler/result-aggregator.ts#L376-L384",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "On a tool error it builds the response from result.error.message only and never looks at result.llmContent; PR #3051 passes extractModelFacingErrorText(result.llmContent, ...) to createErrorResponse."
+    },
+    {
+      "file": "packages/core/src/utils/generateContentResponseUtilities.ts",
+      "function": "createErrorResponse",
+      "line_start": 427,
+      "line_end": 445,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/core/src/utils/generateContentResponseUtilities.ts#L427-L445",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The functionResponse sent to the model is { error: error.message }; PR #3051 adds a modelFacingContent parameter and uses it in preference to error.message."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3051. Tools return a ToolResult whose llmContent is written for the model (constraint plus remedy) and whose error.message is a terse log/UI string. In v0.10.0, when a tool result has an error, ResultAggregator.publishResult wraps result.error.message in a new Error and calls createErrorResponse, which builds the tool_response part as { error: error.message }; result.llmContent is discarded at this boundary. For insert_at_line the model therefore sees 'line_number 999 exceeds file length (8)' instead of 'Cannot insert at line 999: exceeds file length (8). Use line_number <= 9 to append.' Commit 85ce51c (PR #3051, 'Deliver the model-facing llmContent remedy on tool errors') adds extractModelFacingErrorText (with the same output limiting as the success path) and passes it into createErrorResponse, which prefers it over error.message. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0."
+}
