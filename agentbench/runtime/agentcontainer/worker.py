@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-from agentbench.observe.store import TraceStore, atomic_json, environment_secrets
+from agentbench.observe.store import TraceStore, atomic_json
 from agentbench.observe.result import sanitize_result
 from agentbench.observe.correlation import model_correlation
 from agentbench.runtime.interception import InterceptionConfig
@@ -124,6 +124,9 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         store.record("execution_start", input=envelope["input"])
         with span('Load Agent adapter', kind='preparation'):
             adapter = session.load(root, envelope)
+        observe_secrets = getattr(adapter, 'observation_secrets', None)
+        if callable(observe_secrets):
+            observed.add_secrets(observe_secrets())
         interception = InterceptionConfig.from_agent_dir(root)
         hosts = [host for route in (*interception.routes, *interception.tool_routes)
                  for host in route.host_patterns] if interception else []
@@ -153,7 +156,7 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
                 result["cleanup_error"] = {"type": type(exc).__name__, "message": str(exc)}
                 if result.get("status") == "succeeded":
                     result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
-        result, receipt = sanitize_result(result, environment_secrets())
+        result, receipt = sanitize_result(result, observed.redaction_secrets)
         atomic_json(output / "result-redaction.json", receipt)
         atomic_json(output / "result.json", result)
         if hasattr(store, 'close'):

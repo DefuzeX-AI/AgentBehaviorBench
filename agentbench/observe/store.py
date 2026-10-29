@@ -125,6 +125,13 @@ class TraceStore:
         self._lock = threading.Lock()
         self._secrets = environment_secrets(environ)
 
+    def add_secrets(self, secrets):
+        values = tuple(value for value in secrets if isinstance(value, str) and value)
+        if not values:
+            return
+        with self._lock:
+            self._secrets = tuple(dict.fromkeys((*self._secrets, *values)))
+
     def record(self, event: str, **data):
         row = {"schema": "abb.observe.event.v1", "run_id": self.run_id,
                "source": self.source, "event": event,
