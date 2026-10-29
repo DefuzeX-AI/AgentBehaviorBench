@@ -123,7 +123,7 @@ class ServiceConfig:
         if (not isinstance(redaction_secret_files, list)
                 or not all(isinstance(path, str) and path.strip() for path in redaction_secret_files)):
             raise ServiceConfigurationError('redaction_secret_files must be a string list')
-        redaction_secrets = tuple(_read_secret(path) for path in redaction_secret_files)
+        redaction_secrets = tuple(_read_redaction_secret(path) for path in redaction_secret_files)
         return cls(
             mode=mode,
             observation_headers=_observation_headers(raw.get("observation_headers", {})),
@@ -259,6 +259,14 @@ def _egress_proxy(value: object) -> tuple[str, int] | None:
 
 def _read_secret(path: str) -> str:
     value = Path(path).read_text(encoding="utf-8").strip()
+    if not value:
+        raise ServiceConfigurationError(f"Secret file is empty: {path}")
+    return value
+
+
+def _read_redaction_secret(path: str) -> str:
+    """Preserve exact env values so whitespace-sensitive credentials redact consistently."""
+    value = Path(path).read_text(encoding="utf-8")
     if not value:
         raise ServiceConfigurationError(f"Secret file is empty: {path}")
     return value

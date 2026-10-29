@@ -11,6 +11,11 @@ class WireExporter(SpanExporter):
         self.error = None
         self.secrets = environment_secrets()
 
+    def add_secrets(self, secrets):
+        values = tuple(value for value in secrets if isinstance(value, str) and value)
+        if values:
+            self.secrets = tuple(dict.fromkeys((*self.secrets, *values)))
+
     def export(self, spans):
         try:
             if self.destination is None:

@@ -34,7 +34,8 @@ async def serve(root=Path('/opt/agent'), requests=REQUESTS, responses=RESPONSES)
                 atomic_json(folder / 'done.json', {'sequence': sequence, 'session': session.snapshot()})
                 return
             exporter.destination = folder / 'spans.jsonl'
-            await execute(root, request, folder, provider=provider, session=session)
+            await execute(root, request, folder, provider=provider, session=session,
+                          observation_secret_sink=exporter.add_secrets)
             if not provider.force_flush() or exporter.error:
                 raise RuntimeError('Agent telemetry transport failed')
             from agentbench.sdk.common.output_permissions import share_output

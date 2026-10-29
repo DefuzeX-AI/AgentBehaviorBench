@@ -159,7 +159,7 @@ class NativeObserveTest(unittest.TestCase):
             self.assertEqual(parsed.mode,'observe')
 
     def test_mcp_redaction_secret_file_protects_intercepted_network_evidence(self):
-        value = '{{INTERCEPTED_MCP_SECRET_126a}}'
+        value = '  {{INTERCEPTED_MCP_SECRET_126a}} \t'
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             secret = root / 'redaction-0.secret'
@@ -171,6 +171,7 @@ class NativeObserveTest(unittest.TestCase):
                     'methods': ['POST'], 'path_patterns': ['/v1/messages'],
                     'protocol_plugin': 'anthropic-messages'}]}))
             config = ServiceConfig.load(config_path)
+            self.assertEqual(config.redaction_secrets, (value,))
             addon = ModelInterceptorAddon(config)
             body = json.dumps({'model': 'native', 'messages': [{'role': 'user', 'content': value}]})
             request = flow('https://native.example/v1/messages', body.encode(),

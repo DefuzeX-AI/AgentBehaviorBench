@@ -103,6 +103,15 @@ for line in sys.stdin:
             notify(result['content'][0]['text'])
             send({'id': ident, 'result': {'stopReason': 'end_turn'}})
             continue
+        if text == 'mcp-secret-metadata':
+            value = os.environ['ABB_MCP_TEST_VALUE']
+            tool(sessionUpdate='tool_call', toolCallId=value, title=value,
+                 status='in_progress', rawInput={'text': 'metadata redaction'})
+            tool(sessionUpdate='tool_call_update', toolCallId=value,
+                 status='completed', rawOutput={'ok': True})
+            notify('metadata redaction')
+            send({'id': ident, 'result': {'stopReason': 'end_turn'}})
+            continue
         if text == 'terminal-reference':
             term = call('terminal/create', command=sys.executable,
                         args=['-c', "import sys; print('SQL syntax error'); sys.exit(7)"])['terminalId']

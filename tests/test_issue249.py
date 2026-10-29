@@ -255,6 +255,53 @@ def test_mcp_environment_echo_is_redacted_from_worker_artifacts(tmp_path, monkey
     assert '[REDACTED]' in evidence
 
 
+def test_mcp_environment_echo_is_redacted_from_channel_span_transport(tmp_path, monkeypatch):
+    pytest.importorskip('acp')
+    pytest.importorskip('opentelemetry.sdk')
+    from agentbench.runtime.agentcontainer.channel import serve
+
+    key = 'ABB_MCP_TEST_VALUE'
+    value = '{{CHANNEL_MCP_SECRET_8df2}}'
+    monkeypatch.setenv(key, value)
+    root = _agent(tmp_path / 'agent', runtime_keys=(key,),
+                  server_entries=_entry(name='echo', command=sys.executable,
+                                        args=(str(MCP_SERVER), '--env-key', key), env_keys=(key,)))
+    requests = tmp_path / 'requests'
+    responses = tmp_path / 'responses'
+    requests.mkdir()
+    responses.mkdir()
+
+    async def run_channel():
+        channel = asyncio.create_task(serve(root=root, requests=requests, responses=responses))
+        try:
+            (requests / '00000000.json').write_text(json.dumps({
+                'schema': 'abb.invocation.v1',
+                'run_id': 'issue-249-channel-redaction',
+                'session_id': 'issue-249-channel-redaction',
+                'agent_id': 'issue-249-fixture',
+                'framework': 'acp',
+                'input': 'mcp-secret-metadata',
+            }))
+            await asyncio.wait_for(_wait_for_file(responses / '00000000' / 'done.json'), timeout=15)
+            (requests / '00000001.json').write_text(json.dumps({'operation': 'close'}))
+            await asyncio.wait_for(channel, timeout=15)
+        finally:
+            if not channel.done():
+                channel.cancel()
+                await asyncio.gather(channel, return_exceptions=True)
+
+    asyncio.run(run_channel())
+
+    spans = (responses / '00000000' / 'spans.jsonl').read_text()
+    assert value not in spans
+    assert '[REDACTED]' in spans
+
+
+async def _wait_for_file(path):
+    while not path.is_file():
+        await asyncio.sleep(0.01)
+
+
 def test_mcp_environment_echo_is_redacted_from_host_observation(tmp_path):
     pytest.importorskip('opentelemetry.sdk')
     from agentbench.observe.host import HostObservation
