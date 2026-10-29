@@ -134,25 +134,28 @@ def validate_candidate_observation(reply, candidate):
         raise ValueError('Claimed candidate observation is absent from the decisive step')
 
 
-def _validate_decision(reply, reference_ids, candidate_ids, candidate):
-    reply = validate_match(reply, reference_ids, candidate_ids)
-    validate_candidate_observation(reply, candidate)
+def _validate_decision(reply, reference_ids, candidate_ids, candidate, *, require_reference=True,
+                       observation_validator=validate_candidate_observation):
+    reply = validate_match(reply, reference_ids, candidate_ids, require_reference=require_reference)
+    observation_validator(reply, candidate)
     if reply['match'] is False and not reply['candidate_step_ids']:
         raise ValueError('A negative detection decision must cite candidate execution evidence')
     return reply
 
 
-def assess(reference, candidate, *, directory, environ, model, ask=None, retry_failed=False):
+def assess(reference, candidate, *, directory, environ, model, ask=None, retry_failed=False,
+           system=SYSTEM, protocol=PROTOCOL, payload_builder=payload_for, require_reference=True,
+           observation_validator=validate_candidate_observation):
     if candidate.get('agent_id') != reference['agent_id']:
         raise ValueError('Candidate trajectory belongs to another Agent')
     if candidate.get('status') == 'failed' or not candidate.get('steps'):
         raise ValueError('Candidate trajectory has no usable execution evidence')
     secrets = environment_secrets(environ)
-    payload = redact(payload_for(reference, candidate), secrets)
+    payload = redact(payload_builder(reference, candidate), secrets)
     limit = int(environ.get('ABB_GT_MAX_BYTES', str(8 * 1024 * 1024)))
     if len(json.dumps(payload, ensure_ascii=False).encode('utf-8')) > limit:
         raise ValueError('Oracle context too large; evidence was not truncated')
-    request = {'protocol': PROTOCOL, 'system': SYSTEM, 'payload': payload,
+    request = {'protocol': protocol, 'system': system, 'payload': payload,
                'model': model.model, 'endpoint': model.base_url,
                'source_sha256': hashlib.sha256(json.dumps([reference, candidate],
                    sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()}
@@ -179,26 +182,28 @@ def assess(reference, candidate, *, directory, environ, model, ask=None, retry_f
         def retain(raw):
             record['response'] = raw
             record['usage'] = raw.get('usage')
-        reply = (ask(model, system=SYSTEM, payload=payload) if ask is not None else
-                 ask_once(model, system=SYSTEM, payload=payload, on_response=retain))
+        reply = (ask(model, system=system, payload=payload) if ask is not None else
+                 ask_once(model, system=system, payload=payload, on_response=retain))
         if isinstance(reply, dict) and reply.get('request_full_context') is True:
-            full = redact(payload_for(reference, candidate, full_context=True), secrets)
+            full = redact(payload_builder(reference, candidate, full_context=True), secrets)
             if len(json.dumps(full, ensure_ascii=False).encode('utf-8')) > limit:
                 raise ValueError('Oracle context too large; evidence was not truncated')
-            record['context_request'] = {'system': SYSTEM, 'payload': full}
+            record['context_request'] = {'system': system, 'payload': full}
             files.save(filename, record)
             def retain_context(raw):
                 record['context_response'] = raw
                 record['context_usage'] = raw.get('usage')
-            reply = (ask(model, system=SYSTEM, payload=full) if ask is not None else
-                     ask_once(model, system=SYSTEM, payload=full, on_response=retain_context))
+            reply = (ask(model, system=system, payload=full) if ask is not None else
+                     ask_once(model, system=system, payload=full, on_response=retain_context))
             if isinstance(reply, dict) and reply.get('request_full_context') is True:
                 raise ValueError('Full context was supplied; oracle returned no decision')
-        reference_ids = {reference_step_id(t['attempt'], s['step_id'])
-                         for t in reference['trajectories'] for s in t['steps']}
+        reference_ids = ({reference_step_id(t['attempt'], s['step_id'])
+                          for t in reference['trajectories'] for s in t['steps']}
+                         if require_reference else set())
         candidate_ids = {s['step_id'] for s in candidate['steps']}
         try:
-            reply = _validate_decision(reply, reference_ids, candidate_ids, candidate)
+            reply = _validate_decision(reply, reference_ids, candidate_ids, candidate,
+                                       require_reference=require_reference, observation_validator=observation_validator)
         except ValueError as error:
             # One evidence-grounded correction of an invalid reply, never a transport retry.
             available = record.get('context_request', {}).get('payload', payload)
@@ -207,7 +212,7 @@ def assess(reference, candidate, *, directory, environ, model, ask=None, retry_f
                       'valid_reference_step_ids': sorted(reference_ids)}
             if 'shared_model_context' in available:
                 repair['shared_model_context'] = available['shared_model_context']
-            repair_system = SYSTEM + '''
+            repair_system = system + '''
 Correct the invalid decision using ONLY the actual candidate steps supplied here.
 The previous reply may have copied reference behavior into the candidate; discard
 any unsupported claim. A true decision needs an exact candidate output excerpt
@@ -221,7 +226,8 @@ Return a final decision, not a request for more context.'''
                 record['repair_usage'] = raw.get('usage')
             reply = (ask(model, system=repair_system, payload=repair) if ask is not None else
                      ask_once(model, system=repair_system, payload=repair, on_response=retain_repair))
-            reply = _validate_decision(reply, reference_ids, candidate_ids, candidate)
+            reply = _validate_decision(reply, reference_ids, candidate_ids, candidate,
+                                       require_reference=require_reference, observation_validator=observation_validator)
         decision = {'hit': reply['match'], 'reason': reply['reason'], 'match': reply,
                     'evidence': {'reference': cited_steps(reference['trajectories'], set(reply['reference_step_ids'])),
                                  'candidate': cited_steps([candidate], set(reply['candidate_step_ids']))}}

@@ -16,7 +16,7 @@ from agentbench.observe.store import TraceStore, json_value, redact
 from agentbench.runtime.contracts.execution import Deadline, DockerCleanupError, RunCancelled, RunControl, RuntimeLimits
 from agentbench.runtime.docker import DockerRuntime
 from agentbench.runtime.docker.execution_policy import ControllerExecutionPolicy
-from agentbench.runtime.docker.worker_build import _ignore
+from agentbench.runtime.docker.worker_build import source_build_ignore as _ignore
 from agentbench.runtime.interception import TraceEvent
 from agentbench.runtime.agentcontainer.config import tomllib
 from agentbench.sdk.contracts import SDKRunnerContext

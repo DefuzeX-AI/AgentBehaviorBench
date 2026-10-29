@@ -25,7 +25,7 @@ at which the defect became inevitable. False requires concrete contradicting
 steps. Missing or truncated evidence means null.'''
 
 
-def validate_match(value, reference_ids=None, candidate_ids=None):
+def validate_match(value, reference_ids=None, candidate_ids=None, *, require_reference=True):
     """Check a matcher reply; cited steps must exist in the supplied trajectories."""
     if not isinstance(value, dict) or 'match' not in value:
         raise ValueError('Matcher must return match and reason')
@@ -41,7 +41,7 @@ def validate_match(value, reference_ids=None, candidate_ids=None):
         decisive = value.get('candidate_decisive_step')
         if decisive is not None and (type(decisive) is not int or decisive not in value['candidate_step_ids']):
             raise ValueError('Decisive candidate step must be one of the cited candidate steps')
-        if value['match'] is True and (not value['reference_step_ids'] or not value['candidate_step_ids']
+        if value['match'] is True and ((require_reference and not value['reference_step_ids']) or not value['candidate_step_ids']
                                        or decisive is None):
             raise ValueError('Confirmed match requires steps from both trajectories and a decisive candidate step')
         if value['match'] is False and not (value['reference_step_ids'] or value['candidate_step_ids']):
