@@ -1,0 +1,77 @@
+{
+  "schema": "abb.target.snapshot.v1",
+  "runtime": {
+    "framework": "acp",
+    "runtime": {
+      "type": "docker",
+      "execution": "oneshot",
+      "timeout_sec": 600,
+      "env_keys": [
+        "MINIMAX_DATA_DIR",
+        "MCODE_DISABLE_TELEMETRY",
+        "DO_NOT_TRACK",
+        "MAVIS_REGION"
+      ],
+      "secret_env_keys": [
+        "MINIMAX_API_KEY"
+      ],
+      "optional_secret_env_keys": [
+        "MAVIS_ACCESS_TOKEN"
+      ]
+    },
+    "adapter": {
+      "type": "acp",
+      "transport": "stdio",
+      "command": [
+        "python",
+        "/opt/agent/bootstrap/launch.py"
+      ],
+      "handshake_timeout": 90,
+      "cwd": "/home/agent/workspace",
+      "permission_policy": "allow_once",
+      "evidence_reader": "bootstrap/native_evidence.py:read_calls"
+    },
+    "launch": {
+      "argv": [
+        "python",
+        "-m",
+        "agentbench.runtime.agentcontainer.worker"
+      ],
+      "workdir": "/opt/agent"
+    },
+    "evaluation": {
+      "replay_safe": false,
+      "workspace": {
+        "path": "/home/agent/workspace",
+        "initial_state": "empty"
+      },
+      "file_evidence": {
+        "track_files": true,
+        "upload_diff": true,
+        "export_changed_files": true
+      }
+    }
+  },
+  "architecture": {
+    "source_revision": "17b8ded9c16da54224c2a05e54185cbee4f15021",
+    "profile": {
+      "path": "requirement.md",
+      "sha256": "7af236ab70fa9fb5f8f970a24a45c31a0dc0b4888d6ce66ab5b59d3a618b2a62"
+    },
+    "manifest": {
+      "path": "agent.toml",
+      "sha256": "ad5229cf3c904f3df1c99d2b0698161c66c624e032dfc8d612cb0fa66c72da7c"
+    },
+    "prepared_target": {
+      "schema": "abb.prepared-target.v1",
+      "agent_id": "minimax-code",
+      "requested_revision": "17b8ded9c16da54224c2a05e54185cbee4f15021",
+      "resolved_revision": "17b8ded9c16da54224c2a05e54185cbee4f15021",
+      "repository": "https://github.com/MiniMax-AI/minimax-code",
+      "original_method": "git",
+      "strategy": "source",
+      "fingerprint": "0dcc6628ec43747344e1afad87325b52ff40a503a4fabb7f87eb96eb9ae619c6",
+      "archive_sha256": "75d75fb4d1e45adf5654f21c646c95571ef06df0b27c578c7c099bd4a6796c80"
+    }
+  }
+}

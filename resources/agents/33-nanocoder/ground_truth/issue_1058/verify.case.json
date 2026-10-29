@@ -14,7 +14,8 @@
   "pinned_contains_fix": false,
   "steps": [
     "Create spec.docx by running the following Python code, then read spec.docx with read_file:\nfrom zipfile import ZipFile, ZIP_DEFLATED\nentries = {\n    '[Content_Types].xml': '<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>',\n    '_rels/.rels': '<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>',\n    'word/document.xml': '<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>Hello World</w:t></w:r></w:p></w:body></w:document>',\n}\nwith ZipFile('spec.docx', 'w', ZIP_DEFLATED) as z:\n    for name, text in entries.items():\n        z.writestr(name, text)\n",
-    "Use string_replace on spec.docx to replace the word World in the returned text with Team. Report the result."
+    "Use string_replace on spec.docx to replace the word World in the returned text with Team. Report the result. Do not repair or rewrite the document afterwards.",
+    "Do not edit or repair spec.docx. Use your shell tool to run this read-only check and quote its complete output: python3 -c \"from pathlib import Path; import zipfile; p=Path('spec.docx'); b=p.read_bytes(); print('FILE_SIZE',len(b)); print('FIRST_64_BYTES',repr(b[:64])); print('IS_ZIP',zipfile.is_zipfile(p)); z=zipfile.ZipFile(p) if zipfile.is_zipfile(p) else None; print('DOCX_XML',z.read('word/document.xml').decode() if z else 'INVALID_ZIP'); print('ZIP_TEST',z.testzip() if z else 'NOT_RUN')\""
   ],
   "expected": "Text edit tools refuse to write a derived Markdown transcript over a binary DOCX file.",
   "defect": "The tool reads a Markdown conversion, edits that text and overwrites the original ZIP-format document as UTF-8.",
@@ -31,5 +32,13 @@
       "explanation": "getCachedFileContent converts PDF/DOCX to Markdown without carrying writable-content provenance. Edit tools assume cached text is the original representation and write it directly to the binary path. Commit 126e76f6 adds document-format refusal."
     }
   ],
-  "Root cause": "getCachedFileContent converts PDF/DOCX to Markdown without carrying writable-content provenance. Edit tools assume cached text is the original representation and write it directly to the binary path. Commit 126e76f6 adds document-format refusal."
+  "Root cause": "getCachedFileContent converts PDF/DOCX to Markdown without carrying writable-content provenance. Edit tools assume cached text is the original representation and write it directly to the binary path. Commit 126e76f6 adds document-format refusal.",
+  "reference_refresh": {
+    "date": "2026-10-29",
+    "role": "supplemental evidence capture",
+    "selected_attempt": "16af17e56a9e46b089d71bd474d5aeb8",
+    "prior_validation": "Existing ten-run validation is retained as reported by the authors. This refresh replaces the representative evidence only.",
+    "archive": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\archived-references\\nanocoder-1058",
+    "source_run": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\nanocoder-1058\\execution\\agents\\nanocoder\\cases\\5bcb498b22135ec8b970ec25006d14bc\\attempts\\16af17e56a9e46b089d71bd474d5aeb8"
+  }
 }
