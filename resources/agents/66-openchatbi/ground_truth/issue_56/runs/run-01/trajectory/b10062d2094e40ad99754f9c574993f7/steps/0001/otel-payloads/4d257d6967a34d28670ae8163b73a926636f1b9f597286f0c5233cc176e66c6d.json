@@ -1,0 +1,248 @@
+[
+  [
+    {
+      "content": "You are a helpful BI assistant that can answer user's question. \nUse the instructions below and the tools available to you to assist the user.\n\n# Capabilities:\n1. Answer general question.\n2. Answer question based on knowledge base.\n3. Answer question regarding data query by call the SQL graph to write SQL to answer the question.\n4. Answer question that need to analyze the data by write and execute python code.\n5. Perform complex data analysis (trend forecasting, anomaly detection, root cause drill-down) via the specialized data analysis agent.\n\n# Guidelines:\n- You should be concise, direct, and to the point.\n- No fabricate information, if you don't know, just say you don't know.\n- Summarize the information you found to answer the question.\n- When data analysis results include \"Visualization Created\" message, acknowledge that an interactive chart has been automatically generated and focus on interpreting the data insights rather than creating additional charts.\n\n\n# Tool usage policy\n- For data-fact questions, you MUST use tools first. Data-fact questions include: metrics, counts, totals, time series, rankings/top-N, and detailed records.\n  - Exception: you MAY answer without a new tool call only when ALL conditions are true:\n    1) The current conversation already contains sufficient and trustworthy tool outputs for the required numbers/results.\n    2) The requested scope is unchanged (same metric, time range, filters, grouping, and granularity).\n    3) The user only asks to restate/interpret/translate/format the existing results.\n  - If any scope element changes, or the available tool outputs are incomplete, call tools again.\n  - If you answer under this exception, explicitly state that your answer is based on the existing tool results in this conversation.\n  - Under this exception, do not introduce any new data facts, numbers, or claims that are not present in prior tool outputs.\n  - Never use model memory or general world knowledge to fabricate or replace missing data facts.\n- For `run_python_code` tool, you can use these libs when writing python code: pandas numpy matplotlib seaborn requests json5\n- IMPORTANT: DO NOT create charts/visualizations with Python code if the text2sql tool response already indicates \"Visualization Created\". The interactive chart is automatically generated and displayed in the UI. Simply summarize the results without duplicating the visualization.\n- Use `search_schema` when the user asks which tables/columns can support a query, which table contains a metric, or when you need to discover candidate tables/date fields before data retrieval.\n- Use `show_schema` when the user asks to inspect the schema of known table names.\n- Use `search_knowledge` for business knowledge, field descriptions, metric definitions, and SQL examples. Do NOT use it to discover candidate tables.\n- Use `text2sql` only for concrete data retrieval queries. Do NOT call it to explore schema, list tables, or find candidate tables/columns.\n- For `text2sql`, set `visualize=false` when the user explicitly asks for no chart, only data, or only SQL/query results. Use the default `visualize=true` when the user asks for a chart/visualization or when an interactive chart would be part of the final answer.\n- When the user expresses staged intent such as \"first... then...\", \"step 1/step 2\", or explicitly asks to prioritize one result (for example \"show total ASAP, then show trend\"), you MUST decompose into sequential sub-tasks and call tools in order.\n  - For SQL retrieval tasks, call `text2sql` multiple times sequentially (one SQL per call), instead of merging all asks into one query.\n  - Do not issue these staged tool calls in parallel. Finish the first sub-task, return/inspect its result, then execute the next sub-task.\n  - After each staged sub-task finishes (especially the first high-priority one), provide an immediate concise user-facing result in natural language before triggering the next tool call.\n  - The staged interim response must be explicit and self-contained (for example: \"The historical total order count is 5,908\"), not just a planning sentence.\n  - Example Workflow for staged tasks:\n    [Turn 1] Call `text2sql` for Subtask 1\n    [Turn 2] Receive Tool Result 1 -> Output natural language: \"The total is 5,908.\" -> Call `text2sql` for Subtask 2\n  - Do context isolation by slots, not by deleting information. For each `text2sql` call in a staged workflow, structure the context with:\n    - Shared Context: stable business background, entities, metrics, key filters from conversation.\n    - Current Subtask (User's latest question): The ONLY specific query to execute NOW.\n    - Carry-over From Previous Step: prior SQL/result and the exact delta to apply (optional, for example \"keep SELECT/GROUP BY, only change WHERE to last 30 days\").\n    - Deferred Tasks: remaining stages to ignore for now (optional).\n  - If the current stage depends on a previous stage, preserve reusable SQL intent via Carry-over and apply only the requested delta.\n- If user provide personalized information that need to remember or want to forget or correct something mentioned before, use `manage_memory` tool to save, delete or update the long term memory\n- If the question is related to user information, characteristic or preference, proactively use `search_memory` tool to get the long term memory\n- If the question is not clear, or some information is missing, ask the user to clarify by calling AskHuman tool.\n- For complex data analysis tasks (like trend forecasting, anomaly detection, root cause drill-down, correlation, or combination analysis), delegate the task to the `data_analysis` tool instead of orchestrating the individual analysis tools yourself.\n  - **Write the delegated task clearly and unambiguously.** The data analysis agent does NOT know\n    the current time or the conversation context, so YOU must resolve everything before delegating:\n    - Convert every relative time expression into CONCRETE absolute dates/datetimes using the current\n      time from the Realtime Environment section. For example, with current time 2026-06-02, \"today\" /\n      \"the last week\" must become an explicit range like \"2026-05-27 to 2026-06-02 (daily)\".\n    - For anomaly detection, state both the detection range (the period of interest to scan, e.g. the\n      last 24 hours) and that enough preceding history should be fetched.\n    - Spell out the metric, dimensions, granularity, and any filters explicitly.\n    - Never pass vague relative phrases like \"today\" or \"yesterday\" to the `data_analysis` tool.\n- Do NOT delegate to `data_analysis` for straightforward SQL aggregation/retrieval requests\n  that can be answered directly with SQL results, including totals, counts, simple trends\n  (GROUP BY time), rankings/top-N, or basic breakdowns. For these, use `text2sql` directly\n  (and sequentially if the user asks for staged outputs).\n- When generating reports, analysis results, or data summaries that users might want to save or share,\n  use the `save_report` tool to save the content to a file and provide a download link.\n- **When text2sql returns empty SQL**: explain that the requested data or analysis is not available\n  in the current system, and suggest supported alternatives.\n- **When text2sql returns 0 data rows**: say no data was found for the requested period/filter.\n  This includes a CSV result with only headers and no data rows. Do not invent numbers,\n  estimates, sample values, or tables. If the empty result may be caused by a narrow time filter,\n  you may retry once with a broader/removed time filter; explain the scope change. If still empty,\n  report no data and stop.\n\n## Knowledge Search Optimization\n- **AVOID excessive knowledge searches** for data queries that contain standard business terms already covered in your basic knowledge\n- **ONLY search knowledge** when:\n  - User asks about unfamiliar business terms, metrics, or dimensions not in basic knowledge\n  - Question contains ambiguous terminology that needs clarification\n  - Need to understand complex business relationships or derived metrics\n  - User explicitly asks \"what is [term]\" or requests definitions\n- **Use `search_schema`, not `search_knowledge`, when the user asks what tables or columns are available for a query**\n- **SKIP knowledge search** for straightforward data queries since `text2sql` tool will handle it\n- **Prioritize direct SQL execution** over knowledge lookup for routine data analysis requests\n\n- Try your best to give appropriate parameters when calling tools.\n- Use English when calling schema related tools \n\n\n# Basic Business Knowledge:\n# Sales Business System Glossary\n\n## Overview\nYou're answering questions related to a sales order tracking business system that manages the complete customer order lifecycle from placement to delivery.\n\n## Key Business Concepts\n\n**Customer Management:**\n- Customer: Individual or entity who places orders\n- Customer Details: Additional information like contact info, preferences, or notes\n\n**Order Processing:**\n- Order: A request from a customer to purchase products\n- Order Status: Current state - Valid values: \"Shipped\", \"Packing\", \"On Road\"\n- Order Item: Individual product within an order (orders can contain multiple items)\n- Order Item Status: Status of specific items - Valid values: \"Finish\", \"Payed\", \"Cancel\"\n\n**Product Catalog:**\n- Product: Items available for purchase\n- Product Name (`product_name`): Represents the product category. Values include food, book,\n  clothes, electronics, kitchen, beauty, toy, music, outdoor, garden, sports, office, pet,\n  health, and phone. Some values use `category-code` format (e.g. `beauty-1050`); the prefix\n  before `-` is the category. For category aggregation, normalize with:\n  `CASE WHEN INSTR(product_name, '-') > 0 THEN SUBSTR(product_name, 1, INSTR(product_name, '-') - 1)\n  ELSE product_name END`.\n- Product Details: Specifications, descriptions, or additional product information\n\n**Fulfillment & Shipping:**\n- Shipment: Physical delivery package sent to customer\n- Shipment Items: Specific order items included in a shipment\n- Tracking Number: Unique identifier for package tracking\n- Shipment Date: When package was dispatched\n\n**Financial Processing:**\n- Invoice: Bill generated for completed orders\n- Invoice Number: Unique identifier for billing purposes\n- Invoice Date: When billing document was created\n\n## Business Rules\n- One order can have multiple items (products)\n- One order can be fulfilled through multiple shipments\n- Each shipment links to one invoice for billing\n- Order items can have different statuses within the same order\n- Customers can have multiple orders over time\n\n\n# Realtime Environment\n\nCurrent time is 2026-10-24 16:11:45 (format 'yyyy-MM-dd HH:mm:ss')\n\nReview current state and decide what to do next.\nIf the information is sufficient to answer the question, generate the well summarized final answer.\n\n",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Please run an anomaly detection on our daily order volume for the last 3 months and tell me which days were anomalous and how severe each anomaly was.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "a81cf070-35cd-428b-a7cf-0bb561ea373a"
+    },
+    {
+      "content": "I'll run an anomaly detection on your daily order volume over the last 3 months (2026-07-24 to 2026-10-24). Let me delegate this to the data analysis agent.",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 538,
+          "prompt_tokens": 4615,
+          "total_tokens": 5153,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 153,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 2176
+          },
+          "prompt_cache_hit_tokens": 2176,
+          "prompt_cache_miss_tokens": 2439
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "1327f612-9407-4964-a536-0faa663e11bc",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16ead-8166-7770-bb56-5d1a5ac5a51b-0",
+      "tool_calls": [
+        {
+          "name": "data_analysis",
+          "args": {
+            "reasoning": "The user wants anomaly detection on daily order volume over the last 3 months, which requires a statistical anomaly detection analysis rather than a simple SQL aggregation.",
+            "task": "Perform anomaly detection on daily order volume (the count of orders per day) for the period from 2026-07-24 to 2026-10-24 (inclusive), using a daily granularity.\n\nMetric: Daily order volume = number of orders placed on each calendar day. Use the order creation/order date field to group orders by day.\n\nAnalysis goal:\n1. Identify which specific days within 2026-07-24 to 2026-10-24 are anomalous (statistically unusual) relative to the normal daily pattern over this period.\n2. For each anomalous day, report the actual order count, what the expected/normal value would be, and a severity measure (e.g., deviation magnitude, z-score, or percent above/below expected).\n3. Rank or classify the anomalies by severity (e.g., low/medium/high or by absolute deviation).\n4. Provide a brief interpretation of each anomaly (e.g., spike vs. drop).\n\nPlease use an appropriate anomaly detection method (e.g., statistical control limits / z-score / IQR / seasonal decomposition) suitable for a single daily metric time series. Report the total number of anomalous days found and the full list of anomalous days with dates, actual values, expected values, deviation, and severity."
+          },
+          "id": "call_00_ztpBfGL4dm0gMimVTpVy7794",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 4615,
+        "output_tokens": 538,
+        "total_tokens": 5153,
+        "input_token_details": {
+          "cache_read": 2176
+        },
+        "output_token_details": {
+          "reasoning": 153
+        }
+      }
+    },
+    {
+      "content": "Error occurred during data analysis: Recursion limit of 25 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "data_analysis",
+      "id": "ebc4f058-7cc5-4c59-8769-c370d9785d0f",
+      "tool_call_id": "call_00_ztpBfGL4dm0gMimVTpVy7794",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "The data analysis agent hit a recursion limit. Let me handle this directly — first I'll pull the daily order volume data, then run the anomaly detection myself.",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 263,
+          "prompt_tokens": 5227,
+          "total_tokens": 5490,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 46,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 2176
+          },
+          "prompt_cache_hit_tokens": 2176,
+          "prompt_cache_miss_tokens": 3051
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "a5a03e81-c217-48e6-8bc6-bbdd1954a0d9",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16eae-73d8-76d3-bc94-e29d21c8891d-0",
+      "tool_calls": [
+        {
+          "name": "text2sql",
+          "args": {
+            "reasoning": "I need to retrieve the daily order volume (count of orders per day) for the period 2026-07-24 to 2026-10-24 to perform anomaly detection in Python.",
+            "context": "Retrieve daily order volume: for each calendar day between 2026-07-24 and 2026-10-24 (inclusive), count the number of orders placed that day. Group by order date (day), order chronologically, and return columns: date and order_count. Include only days that have orders. This is data retrieval only (no visualization needed).",
+            "visualize": false
+          },
+          "id": "call_00_kFEiIN5dz7FLPq0Q4RcO4428",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 5227,
+        "output_tokens": 263,
+        "total_tokens": 5490,
+        "input_token_details": {
+          "cache_read": 2176
+        },
+        "output_token_details": {
+          "reasoning": 46
+        }
+      }
+    },
+    {
+      "content": "SQL Query:\n```sql\nSELECT DATE(date_order_placed) AS date, COUNT(*) AS order_count\nFROM Orders\nWHERE date_order_placed >= '2026-07-24'\n  AND date_order_placed < '2026-10-25'\nGROUP BY DATE(date_order_placed)\nORDER BY date;\n```\n\n\nQuery Results (CSV format):\n```csv\ndate,order_count\n\n```",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "text2sql",
+      "id": "00a9b7ac-ea5f-467a-9958-961f8cc6b6e7",
+      "tool_call_id": "call_00_kFEiIN5dz7FLPq0Q4RcO4428",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "The query returned no data rows. Let me verify the table schema and check the actual date range of orders before concluding.",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 365,
+          "prompt_tokens": 5586,
+          "total_tokens": 5951,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 94,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 2176
+          },
+          "prompt_cache_hit_tokens": 2176,
+          "prompt_cache_miss_tokens": 3410
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "727c893f-9a5f-487a-a1c3-a71c6e1c1dec",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16eae-943e-7f01-994b-63502c0f8d88-0",
+      "tool_calls": [
+        {
+          "name": "show_schema",
+          "args": {
+            "reasoning": "To verify the correct table and date column name/format for order dates so I can correctly retrieve daily order volume.",
+            "tables": [
+              "Orders"
+            ]
+          },
+          "id": "call_00_QwY3sNpBzmsWXvI28dkN2180",
+          "type": "tool_call"
+        },
+        {
+          "name": "text2sql",
+          "args": {
+            "context": "I want to understand the actual date range of orders in the Orders table. Return MIN(date_order_placed) and MAX(date_order_placed), and also the total count of rows in the Orders table. This will help me understand why a query for 2026-07-24 to 2026-10-24 returned no rows.",
+            "reasoning": "The previous query returned no rows for the 3-month window. I need to check the actual min/max order dates and total row count to determine if the date range or column is the issue.",
+            "visualize": false
+          },
+          "id": "call_01_1UMYgJBmqsinCOojkNNO1774",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 5586,
+        "output_tokens": 365,
+        "total_tokens": 5951,
+        "input_token_details": {
+          "cache_read": 2176
+        },
+        "output_token_details": {
+          "reasoning": 94
+        }
+      }
+    },
+    {
+      "content": "{\"schemas\": [{\"table\": \"Orders\", \"description\": \"Main order table containing order status, placement date, and customer relationships\", \"selection_rule\": \"Select when queries involve order status, order history, or customer order relationships\", \"sql_rule\": \"Use order_id as primary key. Join with Customers via customer_id for customer information\", \"derived_metric\": \"\", \"columns\": [{\"column_name\": \"order_id\", \"display_name\": \"Order ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for orders\", \"alias\": \"ord_id\"}, {\"column_name\": \"customer_id\", \"display_name\": \"Customer ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for customers\", \"alias\": \"cust_id\"}, {\"column_name\": \"order_status\", \"display_name\": \"Order Status\", \"category\": \"status\", \"type\": \"VARCHAR(10)\", \"description\": \"Current status of the order (Shipped|Packing|On Road)\", \"alias\": \"ord_status\"}, {\"column_name\": \"date_order_placed\", \"display_name\": \"Order Placed Date\", \"category\": \"temporal\", \"type\": \"DATETIME\", \"description\": \"Date and time when the order was placed\", \"alias\": \"ord_date\"}, {\"column_name\": \"order_details\", \"display_name\": \"Order Details\", \"category\": \"attribute\", \"type\": \"VARCHAR(255)\", \"description\": \"Additional order information\", \"alias\": \"ord_details\"}], \"date_columns\": [\"date_order_placed\"], \"metric_columns\": [], \"dimension_columns\": []}], \"missing_tables\": [], \"warnings\": []}",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "show_schema",
+      "id": "724fdcef-7ff3-4084-a0c2-146fc0b6b354",
+      "tool_call_id": "call_00_QwY3sNpBzmsWXvI28dkN2180",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "SQL Query:\n```sql\nSELECT MIN(date_order_placed) AS ord_date_min, MAX(date_order_placed) AS ord_date_max, COUNT(*) AS order_count\nFROM Orders\n```\n\n\nQuery Results (CSV format):\n```csv\nord_date_min,ord_date_max,order_count\n2025-11-30 07:00:25,2026-05-31 21:32:28,5893\n\n```",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "text2sql",
+      "id": "301ec50a-4581-48ad-87a8-b860d9e36320",
+      "tool_call_id": "call_01_1UMYgJBmqsinCOojkNNO1774",
+      "artifact": null,
+      "status": "success"
+    }
+  ]
+]

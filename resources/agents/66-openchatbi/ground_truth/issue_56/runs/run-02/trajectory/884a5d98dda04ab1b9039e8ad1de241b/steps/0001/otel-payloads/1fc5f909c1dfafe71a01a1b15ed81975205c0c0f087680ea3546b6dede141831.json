@@ -1,0 +1,77 @@
+{
+  "messages": [
+    {
+      "content": "",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 342,
+          "prompt_tokens": 4615,
+          "total_tokens": 4957,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 78,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 2176
+          },
+          "prompt_cache_hit_tokens": 2176,
+          "prompt_cache_miss_tokens": 2439
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "dba34a8c-8342-49c3-85e0-da218b838f70",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a173b1-765f-7502-8e1e-9fdc9e682090-0",
+      "tool_calls": [
+        {
+          "name": "data_analysis",
+          "args": {
+            "reasoning": "The user wants anomaly detection on daily order volume, which is a single-metric anomaly detection task requiring the specialized data analysis agent.",
+            "task": "Perform anomaly detection on daily order volume (the count of orders placed per day) for the period 2026-07-25 to 2026-10-25 inclusive (the last 3 months). \n\nDetails:\n- Metric: daily order volume = number of orders per calendar day.\n- Granularity: daily.\n- Time range: 2026-07-25 through 2026-10-25.\n- Use a statistical anomaly detection method (e.g., robust z-score / MAD or seasonal decomposition) on the daily series.\n\nFor each detected anomaly, report:\n1. The specific date.\n2. The actual daily order count.\n3. The anomaly severity (e.g., z-score / deviation magnitude and direction: spike vs. drop), and classify as anomaly or severe anomaly.\n\nAlso provide a brief summary of the overall daily order volume trend over the period and the dates of the most severe anomalies."
+          },
+          "id": "call_00_LDBDsfgkluMl3uf25pC77219",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 4615,
+        "output_tokens": 342,
+        "total_tokens": 4957,
+        "input_token_details": {
+          "cache_read": 2176
+        },
+        "output_token_details": {
+          "reasoning": 78
+        }
+      }
+    }
+  ],
+  "history_messages": [
+    {
+      "content": "Please run an anomaly detection on our daily order volume for the last 3 months and tell me which days were anomalous and how severe each anomaly was.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "cf93e704-f5d2-401e-bd95-357ce5230b3f"
+    }
+  ],
+  "sends": [
+    {
+      "type": "Send",
+      "value": "Send(node='use_tool', arg={'messages': [AIMessage(content='', additional_kwargs={}, response_metadata={}, tool_calls=[{'name': 'data_analysis', 'args': {'reasoning': 'The user wants anomaly detection on daily order volume, which is a single-metric anomaly detection task requiring the specialized data analysis agent.', 'task': 'Perform anomaly detection on daily order volume (the count of orders placed per day) for the period 2026-07-25 to 2026-10-25 inclusive (the last 3 months). \\n\\nDetails:\\n- Metric: daily order volume = number of orders per calendar day.\\n- Granularity: daily.\\n- Time range: 2026-07-25 through 2026-10-25.\\n- Use a statistical anomaly detection method (e.g., robust z-score / MAD or seasonal decomposition) on the daily series.\\n\\nFor each detected anomaly, report:\\n1. The specific date.\\n2. The actual daily order count.\\n3. The anomaly severity (e.g., z-score / deviation magnitude and direction: spike vs. drop), and classify as anomaly or severe anomaly.\\n\\nAlso provide a brief summary of the overall daily order volume trend over the period and the dates of the most severe anomalies.'}, 'id': 'call_00_LDBDsfgkluMl3uf25pC77219', 'type': 'tool_call'}], invalid_tool_calls=[])]})"
+    }
+  ]
+}

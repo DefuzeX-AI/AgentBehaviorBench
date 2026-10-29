@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-openchatbi-56-v1",
+  "issue": {
+    "repository": "zhongyu09/openchatbi",
+    "number": 56,
+    "url": "https://github.com/zhongyu09/openchatbi/issues/56",
+    "state": "closed",
+    "title": "`data_analysis` sub-agent inherits `recursion_limit=25` from the tool's RunnableConfig, overriding deepagents' 9,999 — multi-step analyses abort with `GraphRecursionError` and the main agent silently redoes the work"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.0.0b1 (main@97818e4f)",
+  "commit_version": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+  "pinned_contains_fix": false,
+  "fixed_in": "unreleased:29b04c81e7e09500dc40cb0757df89200f321c00 (PR #60, merged 2026-10-28)",
+  "steps": [
+    "Please run an anomaly detection on our daily order volume for the last 3 months and tell me which days were anomalous and how severe each anomaly was."
+  ],
+  "expected": "The data_analysis sub-agent (deepagents.create_deep_agent, which binds recursion_limit 9,999) should be able to run a multi-step analysis - a few text2sql calls plus a few run_python_code iterations - to completion, and if it does fail the failure must be surfaced to the user rather than silently re-executed by the main agent with its own tools.",
+  "defect": "After 7-9 sub-agent tool calls the data_analysis ToolMessage is 'Error occurred during data analysis: Recursion limit of 25 reached without hitting a stop condition...' (GraphRecursionError raised from analysis/agent.py:219; traceback in container stdout). The main agent then re-runs the whole analysis with its own text2sql / run_python_code calls and the final anomaly report never mentions the failure (35 and 27 LLM calls in the two failing runs versus 20 in the run where the sub-agent finished within 7 tool calls). Observed in 2 of 3 runs of this prompt.",
+  "fault location": [
+    {
+      "file": "openchatbi/analysis/agent.py",
+      "function": "_build_sub_agent_config",
+      "line_start": 42,
+      "line_end": 46,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/analysis/agent.py#L42-L46",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "sub_config = {k: v for k, v in config.items() if k != 'configurable'} forwards recursion_limit (and metadata) from the tool's RunnableConfig; inside ToolNode that config always carries recursion_limit=25 (langchain-core DEFAULT_RECURSION_LIMIT inserted by ensure_config()), which then overrides deepagents' bound 9_999 at agent.invoke(). PR #60 drops recursion_limit/metadata and sets the new analysis_recursion_limit (default 9_999) explicitly."
+    },
+    {
+      "file": "openchatbi/analysis/agent.py",
+      "function": "call_data_analysis_sync",
+      "line_start": 216,
+      "line_end": 227,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/analysis/agent.py#L216-L227",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "agent.invoke({'messages': task}, config=sub_config) at line 219; the generic except at 224-227 returns the exception text as a plain tool string with no guidance, so the main agent treats it as a soft result and redoes the analysis. PR #60 returns [DATA_ANALYSIS_FAILED][RETRYABLE|PERMANENT] markers and adds a prompt policy against silent redo."
+    },
+    {
+      "file": "openchatbi/prompts/agent_prompt.md",
+      "function": "Guidelines",
+      "line_start": 10,
+      "line_end": 16,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/prompts/agent_prompt.md#L10-L16",
+      "role": "source_review",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "The main-agent prompt contains no instruction to report a failed data_analysis delegation; PR #60 adds that policy."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zhongyu09/openchatbi/pull/60. A tool executed by LangGraph's ToolNode receives its RunnableConfig through langchain-core ensure_config(), which fills in recursion_limit=25 (langchain_core/runnables/config.py DEFAULT_RECURSION_LIMIT; a plain graph node sees no recursion_limit at all). _build_sub_agent_config (analysis/agent.py:42-46) copies every key except 'configurable' into the sub-agent config, so recursion_limit=25 reaches agent.invoke() (line 219) and, because a call-time value overrides a bound one, replaces the recursion_limit 9_999 that deepagents.create_deep_agent binds (deepagents 0.6.7 graph.py:822). With deepagents' middleware nodes 25 super-steps amount to roughly 7-8 tool calls, which an anomaly-detection task exceeds whenever the first query window is empty and must be re-issued. deepagents' own _build_subagent_config deliberately does not forward recursion_limit/metadata. The GraphRecursionError is caught at 224-227 and returned as text, and nothing in the prompt tells the main agent to disclose it, so it quietly redoes the analysis. Verified without an LLM in the pinned image: a probe tool inside ToolNode sees recursion_limit 25 and _build_sub_agent_config forwards it; a toy graph bound with recursion_limit 9_999 fails with 'Recursion limit of 25 reached' when invoked with config {'recursion_limit': 25}. Retained evidence: run-01 = ABB suite_affa363acce743bf8296aa2d705e17b8 (sub-agent 3 text2sql + 3 run_python_code + 1 show_schema, then the error; main agent redid 3 text2sql + 1 run_python_code; 35 LLM calls); run-02 = suite_530ef5119eb0492994c5197890a4d720 (8 sub-agent tool calls, then the error; 27 LLM calls). The non-failing control run suite_c5bd88e1d0b841c38029c7c4fb0ce810 (20 LLM calls) is not retained here."
+}

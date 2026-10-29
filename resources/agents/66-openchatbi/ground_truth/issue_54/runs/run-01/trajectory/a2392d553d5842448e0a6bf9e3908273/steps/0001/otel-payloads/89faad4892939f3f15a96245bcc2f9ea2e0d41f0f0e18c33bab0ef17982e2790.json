@@ -1,0 +1,90 @@
+{
+  "messages": [
+    {
+      "content": "I'll look up the order item table structure first.",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 244,
+          "prompt_tokens": 4646,
+          "total_tokens": 4890,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 65,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 2176
+          },
+          "prompt_cache_hit_tokens": 2176,
+          "prompt_cache_miss_tokens": 2470
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "1572f268-d5f0-4fcc-9471-7d589a355b79",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16da1-1c29-7ce1-a3f5-3625fc1ad6f2-0",
+      "tool_calls": [
+        {
+          "name": "search_schema",
+          "args": {
+            "reasoning": "Find the order item table and its status column to list open order items",
+            "query_list": [
+              "order item",
+              "order_item_status",
+              "order_item_id",
+              "order_id"
+            ],
+            "dimensions": [
+              "order_item_status",
+              "order_id",
+              "order_item_id"
+            ],
+            "metrics": [],
+            "max_tables": 5,
+            "include_columns": true
+          },
+          "id": "call_00_937E9uRzfAO4KumpwWWV0353",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 4646,
+        "output_tokens": 244,
+        "total_tokens": 4890,
+        "input_token_details": {
+          "cache_read": 2176
+        },
+        "output_token_details": {
+          "reasoning": 65
+        }
+      }
+    }
+  ],
+  "history_messages": [
+    {
+      "content": "The warehouse team is reconciling open order items. Please list every order item that is still open (order_item_status is neither 'Finish' nor 'Canceled'), with order_item_id, order_id and order_item_status, and tell me how many open items are in that list. No chart needed.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "11f715e4-06eb-42f3-8a21-be33ee5b3253"
+    }
+  ],
+  "sends": [
+    {
+      "type": "Send",
+      "value": "Send(node='use_tool', arg={'messages': [AIMessage(content=\"I'll look up the order item table structure first.\", additional_kwargs={}, response_metadata={}, tool_calls=[{'name': 'search_schema', 'args': {'reasoning': 'Find the order item table and its status column to list open order items', 'query_list': ['order item', 'order_item_status', 'order_item_id', 'order_id'], 'dimensions': ['order_item_status', 'order_id', 'order_item_id'], 'metrics': [], 'max_tables': 5, 'include_columns': True}, 'id': 'call_00_937E9uRzfAO4KumpwWWV0353', 'type': 'tool_call'}], invalid_tool_calls=[])]})"
+    }
+  ]
+}

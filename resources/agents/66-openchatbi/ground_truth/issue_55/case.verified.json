@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-openchatbi-55-v1",
+  "issue": {
+    "repository": "zhongyu09/openchatbi",
+    "number": 55,
+    "url": "https://github.com/zhongyu09/openchatbi/issues/55",
+    "state": "open",
+    "title": "Model responses with malformed tool-call arguments (`invalid_tool_calls`) are treated as the final answer — the turn ends with an interim sentence and no result"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.0.0b1 (main@97818e4f)",
+  "commit_version": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+  "pinned_contains_fix": false,
+  "fixed_in": "not-fixed (fix PR #62 'retry malformed tool calls and avoid emitting interim text as final answer' open as of 2026-10-29)",
+  "steps": [
+    "The warehouse team is reconciling open order items. Please list every order item that is still open (order_item_status is neither 'Finish' nor 'Canceled'), with order_item_id, order_id and order_item_status, and tell me how many open items are in that list. No chart needed."
+  ],
+  "expected": "If the model returns a tool call whose arguments are not valid JSON (AIMessage.invalid_tool_calls non-empty, tool_calls empty, finish_reason 'tool_calls'), the agent must retry the call with the parse error fed back to the model, as it already does for unknown tool names, or return an explicit error. The model's transitional sentence must never be delivered as the final answer, and the data already retrieved (the open-item list and its count) should reach the user.",
+  "defect": "The last LLM response carried one text2sql call whose 'arguments' contained an unquoted string ('\"context\": Shared Context: Table Order_Items (...)'); LangChain surfaced it as invalid_tool_calls with error 'Function text2sql arguments: ... are not valid JSON'. call_llm_chat_model_with_retry accepted the response without retry, _call_model saw tool_calls == [] and routed to END, container stdout shows 'Tool Call: ' with no tool name, and the user received exactly 'I found the open items. Let me get the status breakdown to summarize them properly.' (83 characters) with no list, no count and no error. Observed in 1 of 10 runs of this prompt (prompt size 117,635 tokens at that point); a deterministic unit-level reproduction with a fake chat model is in the issue.",
+  "fault location": [
+    {
+      "file": "openchatbi/llm/llm.py",
+      "function": "call_llm_chat_model_with_retry",
+      "line_start": 179,
+      "line_end": 201,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/llm/llm.py#L179-L201",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "After a successful HTTP call the only retry conditions are 'more than one tool call in non-parallel mode' and 'unknown tool name'; response.invalid_tool_calls is never inspected. PR #62 (open) adds has_malformed_tool_calls() and a retry prompt here."
+    },
+    {
+      "file": "openchatbi/agent_graph.py",
+      "function": "_call_model",
+      "line_start": 281,
+      "line_end": 310,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/agent_graph.py#L281-L310",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Branches on response.tool_calls only; an empty list is treated as the final answer (final_answer = get_text_from_content(response.content), agent_next_node = END). PR #62 adds a guard that returns an explicit error instead."
+    },
+    {
+      "file": "openchatbi/agent_graph.py",
+      "function": "get_call_model (bind_tools)",
+      "line_start": 247,
+      "line_end": 248,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/agent_graph.py#L247-L248",
+      "role": "source_review",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "bind_tools(tools, strict=True) is requested, but OpenAI-compatible third-party backends (deepseek here) do not enforce strict schemas, so the client-side check is the only protection for non-OpenAI models."
+    }
+  ],
+  "Root cause": "At 97818e4f neither the retry helper nor the agent node looks at AIMessage.invalid_tool_calls. langchain-openai parses a tool call with non-JSON arguments into invalid_tool_calls and leaves tool_calls empty; call_llm_chat_model_with_retry (llm.py:179-201) returns such a response unchanged, and _call_model (agent_graph.py:281-310) interprets 'no tool_calls' as 'final answer', so the model's interim sentence becomes final_answer and the graph ends. recover_incomplete_tool_calls (utils.py:233) addresses a different state (AIMessage with tool_calls but no ToolMessage) and does not apply. The malformed call was produced after a 10,000-row CSV had been placed in context (see issue #54), which plausibly raised the odds of the malformed output, but the handling gap is model-independent and reproducible offline with a fake model that returns an AIMessage carrying only an invalid_tool_call. Retained evidence: run-01 = ABB suite_6573d2dc2c154a1789fccbf38c22ff81, attempt 59123b1b6d494f75b9831d48e3e957d7 (framework.jsonl holds the invalid_tool_call record; the derived trajectory flags 'tool call call_00_w0gszTe6Z1Wz0E5P0r3X2645 was emitted but its execution was not observed'; result.json output is the 83-character interim sentence). Upstream fix PR #62 (not merged as of 2026-10-29) adds has_malformed_tool_calls() plus a retry prompt and an explicit error after exhausted retries."
+}

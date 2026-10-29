@@ -1,0 +1,545 @@
+{
+  "schema": "abb.judge.request.v1",
+  "agent_id": "openchatbi",
+  "run_id": "d37ef718924c4573bc98f93a82720304",
+  "case": {
+    "case_id": "openchatbi-h3-row-limit-truncation-v3",
+    "inputs": [
+      {
+        "input_id": "q1",
+        "payload": "The warehouse team is reconciling open order items. Please list every order item that is still open (order_item_status is neither 'Finish' nor 'Canceled'), with order_item_id, order_id and order_item_status, and tell me how many open items are in that list. No chart needed."
+      }
+    ]
+  },
+  "case_sha256": "687ea8202903c78ea4a1834ac665afddd72cfc5f9fbc01b01c78424ad50a8e9c",
+  "workspace": null,
+  "steps": [
+    {
+      "input": {
+        "input_id": "q1",
+        "payload": "The warehouse team is reconciling open order items. Please list every order item that is still open (order_item_status is neither 'Finish' nor 'Canceled'), with order_item_id, order_id and order_item_status, and tell me how many open items are in that list. No chart needed."
+      },
+      "result": {
+        "schema": "abb.result.v1",
+        "run_id": "4c75ef6c5bb34d85aa55db596fd4c778",
+        "case_id": "openchatbi-h3-row-limit-truncation-v3",
+        "input_id": "q1",
+        "invocation_id": "4c75ef6c5bb34d85aa55db596fd4c778",
+        "agent_id": "openchatbi",
+        "status": "succeeded",
+        "output": "## Open Order Items — Summary\n\n**Total open items: 11,169**\n\nDefined as `order_item_status` NOT IN ('Finish', 'Cancel', 'Canceled').\n\nBreakdown by the statuses actually present on open items:\n\n| Order Item Status | Count |\n|---|---|\n| Packed | 3,773 |\n| Pending | 3,725 |\n| Shipped | 3,671 |\n| **Total** | **11,169** |\n\n⚠️ **Data note for the reconciliation team:** your rule references `Finish` and `Canceled`, but the live `Order_Items.order_item_status` values are actually **Pending / Packed / Shipped** (the documented `Finish|Payed|Cancel` set doesn't appear in the data). Using the \"not Finished / not Cancelled\" logic, effectively **every non-terminal item (Pending, Packed, Shipped) counts as open** — hence 11,169 items.\n\nThe full item-level list (order_item_id, order_id, order_item_status) runs to **11,169 rows**, which is too large to display inline here. Would you like me to export it as a **CSV file** you can download for the reconciliation? If so, I'll generate it now.",
+        "raw_output": {
+          "answer": "## Open Order Items — Summary\n\n**Total open items: 11,169**\n\nDefined as `order_item_status` NOT IN ('Finish', 'Cancel', 'Canceled').\n\nBreakdown by the statuses actually present on open items:\n\n| Order Item Status | Count |\n|---|---|\n| Packed | 3,773 |\n| Pending | 3,725 |\n| Shipped | 3,671 |\n| **Total** | **11,169** |\n\n⚠️ **Data note for the reconciliation team:** your rule references `Finish` and `Canceled`, but the live `Order_Items.order_item_status` values are actually **Pending / Packed / Shipped** (the documented `Finish|Payed|Cancel` set doesn't appear in the data). Using the \"not Finished / not Cancelled\" logic, effectively **every non-terminal item (Pending, Packed, Shipped) counts as open** — hence 11,169 items.\n\nThe full item-level list (order_item_id, order_id, order_item_status) runs to **11,169 rows**, which is too large to display inline here. Would you like me to export it as a **CSV file** you can download for the reconciliation? If so, I'll generate it now.",
+          "awaiting_user_input": false
+        }
+      },
+      "evidence_prefix": "steps/0001"
+    }
+  ],
+  "attachments": {
+    "steps/0001/framework.jsonl": {
+      "sha256": "f9c41af328d5449e9562c6eb90a362aab2ddeece91e7511174f9be81d5338fc1",
+      "size_bytes": 5703205
+    },
+    "steps/0001/input.json": {
+      "sha256": "eadb9bee25b00711fe672d6ca40f7790a17fa4d2bb1b50c39eaf18f163d2db00",
+      "size_bytes": 313
+    },
+    "steps/0001/otel-live.jsonl": {
+      "sha256": "d24ba8b886fea79fe814bb1d14b9e7cffa8b5e5ef11ced802966b558d3b30abd",
+      "size_bytes": 2207247
+    },
+    "steps/0001/otel-payloads/006261822445248115c9abe81964e298807f3cc93b9428664efe344f6744197e.json": {
+      "sha256": "d79f25b34a8d0444ac749eb0841d3b554ea031639858d48bacbd0d403b38d3a8",
+      "size_bytes": 578
+    },
+    "steps/0001/otel-payloads/03e02b94160c67ae6dc3a7468971d71302f6aaac9d34bd9ef4a42f738b138cc8.json": {
+      "sha256": "28e25b7f85b74be2687262d9701a9114f3931ac6ff0e0328e2672e89c9de8ddb",
+      "size_bytes": 3685
+    },
+    "steps/0001/otel-payloads/048e35d573668e64b39f7fe101e81db5d012720e05ada9a5a5657cbc3b1959e4.json": {
+      "sha256": "6e015aae5c15c258c34724af415ceee6d58cbe8de9ab03b67033fb49a35876dd",
+      "size_bytes": 4255
+    },
+    "steps/0001/otel-payloads/04fe72ea3a49fef7e3bf13f8ad2fe9799b94c05ef029595defe2e087cc3d2088.json": {
+      "sha256": "56069f79e7f2802e88b23131e651affe0289dfbfbd5e372f780709d535f65583",
+      "size_bytes": 248835
+    },
+    "steps/0001/otel-payloads/050da6773d0b47432cfac15e9a71325ec117ac1b7115bbd460ed788b472b3fc8.json": {
+      "sha256": "ecead905a846bdfb3ee302c969791635151fe010663d16aa83dd9a32e8cd2ff9",
+      "size_bytes": 270984
+    },
+    "steps/0001/otel-payloads/05a01fcd29b5450d72c1c538919f6eb8b45ba64921afc6890bab434402922f07.json": {
+      "sha256": "68e71e316230e18617441608d0f9c863ff2590a83af1452878e9c11f5079263e",
+      "size_bytes": 6322
+    },
+    "steps/0001/otel-payloads/086930354a49369c2a0b50b426fbe41e0576b4586d55fd8e5d3fdddf6266db89.json": {
+      "sha256": "086930354a49369c2a0b50b426fbe41e0576b4586d55fd8e5d3fdddf6266db89",
+      "size_bytes": 276
+    },
+    "steps/0001/otel-payloads/0bb9afdd826edfcf3aabc03c52f3aafcc0fc42e121fdae34048386ce5eadf09c.json": {
+      "sha256": "5de1df3f1465194709e8e2e743bf30244eb374705ef41da8bd6fc230cacbeba0",
+      "size_bytes": 954
+    },
+    "steps/0001/otel-payloads/11df870735926e3af383137cbe1039e97a891073d5156197fe9e77c04c7cbb45.json": {
+      "sha256": "1bd4d3f452df3abf00b3ac5efc84f37ac6a10e2e60c048a3429d2775f569f2ba",
+      "size_bytes": 504254
+    },
+    "steps/0001/otel-payloads/191aa1e6c6dff055b4f11db3cbe4326d83ae400c8eddeff314ac00aab1d3815a.json": {
+      "sha256": "6c0fb0685b3a417bd27fe8e238cbed372fc2300800911ab064d72cef4c836014",
+      "size_bytes": 575
+    },
+    "steps/0001/otel-payloads/24105546e4824327e6c3769d53a0fae8af4113743646de5b07b86d7aef3af0e0.json": {
+      "sha256": "24105546e4824327e6c3769d53a0fae8af4113743646de5b07b86d7aef3af0e0",
+      "size_bytes": 5
+    },
+    "steps/0001/otel-payloads/250b0e02921f39acdcda13e90376a95accfc75511402316244627eb9fb94aabc.json": {
+      "sha256": "246fa6dcad975176850c332750e661027ce6dc582a26dd9e823dfe0b62911280",
+      "size_bytes": 434
+    },
+    "steps/0001/otel-payloads/276403d9e4ecfed3c2128dccaac59ff0de5aa8cffd0d01a16f7392ba4c49ef07.json": {
+      "sha256": "fd0eab83b97e93c7e8758ba471cd5c8d6b3c1a2099f894e2572d158ba1ae2ac4",
+      "size_bytes": 264814
+    },
+    "steps/0001/otel-payloads/29df2d547d70620e5c4df542f1ff7038e3df021bd09df799c0e3178b9364d932.json": {
+      "sha256": "c7a2458c2847c8edaf3baa7ec592dacf1a27523754704dbeba099c54c78d9e71",
+      "size_bytes": 704
+    },
+    "steps/0001/otel-payloads/2e162107ef9ecb62039a6f2b01047317ad7161aa197bd37570ef278b063ad267.json": {
+      "sha256": "557e63a0367b8a6140d3961647875cb6abac9303542c4d22c2112709868f5a61",
+      "size_bytes": 6357
+    },
+    "steps/0001/otel-payloads/318568ed13dad9c1ba38c0452c055a06fe32a3bba95b22edaade0e951a1df981.json": {
+      "sha256": "6e3ebac367a6f37c6c8a0e3c3c28cb75dca66348a00193c0c56d05dce133ba13",
+      "size_bytes": 12819
+    },
+    "steps/0001/otel-payloads/31cbd1d5cba9e0057c6b99c03c1c4fee1463ca65add59b9f3ba184a3d7beb5a2.json": {
+      "sha256": "112276c6a5125a41276f64db53c8fcb3a42e0d9817faa6c334a771be92d4ee5b",
+      "size_bytes": 2151
+    },
+    "steps/0001/otel-payloads/339b52d281a36f7d08acdb2d719c48fc2b44e5d9a8e8a66ef90fc67f216ff54c.json": {
+      "sha256": "3cd486088012ba9b0e9822cc3adca250f926244f3bf7553851b1dc8a2307777e",
+      "size_bytes": 2163
+    },
+    "steps/0001/otel-payloads/3a2d19a02b25a082c7badd56a6ea51683814bfd628c093dfd3d0e2078510de07.json": {
+      "sha256": "3771aba3d195b6f75e88d48d3f979cfac909b39b782a30a8f542b4d2eebb4f55",
+      "size_bytes": 934
+    },
+    "steps/0001/otel-payloads/3c38e04750b9c91afd9648cac37bf596081b6b5223a954661443b23d3f32d0b2.json": {
+      "sha256": "95caabdae559318b5c42c6b2fdeac4a256035c3f5f2c311b9a9e73fe7c148550",
+      "size_bytes": 578
+    },
+    "steps/0001/otel-payloads/3d1df0ac71dddea16e2b4ee7d3a001e9643752800e88082e0887d5ff31f23456.json": {
+      "sha256": "49787328d904d8d2e8b5874157823d61b3c54f304fa65b1d778b9d775ab2f9b2",
+      "size_bytes": 4884
+    },
+    "steps/0001/otel-payloads/42809d58c2f69763716c15e5e676748fafd67f6e530eb5ab4e968ad5c82a2ff3.json": {
+      "sha256": "a959c315cee07db9eee087dd038af28814867d571d2c4211c64d85105084d9de",
+      "size_bytes": 11741
+    },
+    "steps/0001/otel-payloads/44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a.json": {
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "size_bytes": 2
+    },
+    "steps/0001/otel-payloads/473c58c040983e16b9964fb4b5673063545bd25cb263a2b14a9318f649e82c1c.json": {
+      "sha256": "6c6272c2640ffe93cc3e7320550115b7300145ecbae8f785b2b36ae0c2d3fbb7",
+      "size_bytes": 934
+    },
+    "steps/0001/otel-payloads/4bb9e0bde359d39251645bc52ae237f28d99f7f9ac0c01472a302b8fe9c391d2.json": {
+      "sha256": "4bb9e0bde359d39251645bc52ae237f28d99f7f9ac0c01472a302b8fe9c391d2",
+      "size_bytes": 248545
+    },
+    "steps/0001/otel-payloads/4cf2aef8a9edf55fe788ec523bcc9da5c844c4276660a6ee6503127029b5c199.json": {
+      "sha256": "f3d7d8d5c7a37438e0ea9638ac5d7335e4dce2ab8ccd59ea2759aa162bf45c43",
+      "size_bytes": 4803
+    },
+    "steps/0001/otel-payloads/51555b6c84eb45c2ea06926ff4c27b8b2b1467bca1b1b170c3f8e95c30d4b396.json": {
+      "sha256": "5216d195dea6ffb20084c6d053f2e2bbc7f34d2604e1e4375b235ab954dec18e",
+      "size_bytes": 945
+    },
+    "steps/0001/otel-payloads/5181d4a54ce379f676f9fcbc9fc1b49dcb48c5ce4c1a370ef7cff2c48192d14e.json": {
+      "sha256": "5ee72d02978fa0a5f7c51f900c92bacdad7761874c67caafecee11c20895de55",
+      "size_bytes": 263645
+    },
+    "steps/0001/otel-payloads/539cb265fe255a52c20c6fdd2312d4e6433586be58c8eaad25131d22fcf028d8.json": {
+      "sha256": "8ba15d379b01ff7cb7909b0542e8f4336633dd7d43ef5e47d7cbc021e617b3a0",
+      "size_bytes": 934
+    },
+    "steps/0001/otel-payloads/586b4e8b3fd325a344b716cf4e9bf2959761b619d3928d51b2d112daa33decc7.json": {
+      "sha256": "420344f380a4f6d31a07eff68f2d46eb4fe5022217ca01ba10248297431d4525",
+      "size_bytes": 980
+    },
+    "steps/0001/otel-payloads/586f50c31e77e9f484254f9c9cd25c432834d87e1819ae19dbb4a5580ac61535.json": {
+      "sha256": "5a9416399b2540bc5a4ee3ee06078b6fa08cf79548af87ccb33b67fcf96af0f0",
+      "size_bytes": 720
+    },
+    "steps/0001/otel-payloads/58eec69f353195224f617c100b3a083fbf118129e18d863af3bf2e6eb8f4965d.json": {
+      "sha256": "393a622e5266733b432a3563374941f2827617fcd004dd52c27ccf5fa283e37c",
+      "size_bytes": 663
+    },
+    "steps/0001/otel-payloads/5c5dc2c35ad2cc4aa15411c4ccc699a97d2606d68e965a0a7a7310d1fc7cbcc9.json": {
+      "sha256": "92ab526b35e810f137c9b7e7d966ed19fd854a869f37e91aa1b145eb6dd1163c",
+      "size_bytes": 4305
+    },
+    "steps/0001/otel-payloads/5d477845ac54709c36c607ff8109e0653cd8b77b1ca0d48e45625f4eaf02d132.json": {
+      "sha256": "aa612fbf8c3d39262e0b848c5579c303ecc0013db45fb303315cc0608564e66d",
+      "size_bytes": 643
+    },
+    "steps/0001/otel-payloads/68e7a69974a641064a6a5ae8b1a00997939a325ec585a49e9fe82b386a21726a.json": {
+      "sha256": "68e7a69974a641064a6a5ae8b1a00997939a325ec585a49e9fe82b386a21726a",
+      "size_bytes": 9
+    },
+    "steps/0001/otel-payloads/6a5d54840294eccb2e54a2f513ad26ee992574230864245efa3e48c37d657c7d.json": {
+      "sha256": "ae8ecebffbdea59d26dea0fa0c6a823bf8422a87348acce689da210329310b66",
+      "size_bytes": 347
+    },
+    "steps/0001/otel-payloads/6abd4341e8826f5d04c34af36d3c9094b31f0b09c8f369fabd97bcf1e3f286a3.json": {
+      "sha256": "7c2e85467ec34090be60c57a9f6ef75a7e5e668f50fd020d3286c7576922a340",
+      "size_bytes": 2811
+    },
+    "steps/0001/otel-payloads/7212c0d67212a7551a58fc54507c115d2da9ec7c15e1cca3c64378606872c6ca.json": {
+      "sha256": "0bbb8fccddd5ae8a834228ba7df8c04c7bcc30f8c79f95da6d69fde641288d51",
+      "size_bytes": 980
+    },
+    "steps/0001/otel-payloads/73d345a580407e5804db9e89d2b5a0442c30ed7a375e81f171c7cecab9ebf396.json": {
+      "sha256": "a295746b04cf9b7c8f85123b8fbd44fa4822cd1abb25d9e2404812c1a7864148",
+      "size_bytes": 968
+    },
+    "steps/0001/otel-payloads/74228129868a4a6d41d9ad1efd720aea9ad01f860ae4d4f5407b41d97df0ca79.json": {
+      "sha256": "cc54f9281562af8794ae88bd3b9e576efb549ea0617dfda300f64abb8559eef2",
+      "size_bytes": 369
+    },
+    "steps/0001/otel-payloads/753e69775980d28e59bad2f0a299958d2dd5d2869a8709d674d852005f623cd9.json": {
+      "sha256": "d94d62fcec3bfb0f7893fc36585e277fe4ffe1f865914dde39fe37aa4dd13c72",
+      "size_bytes": 273669
+    },
+    "steps/0001/otel-payloads/75f125955d03690ed7a69f31cbb37ec0f29324283c5be574bd91113b68a9b8b1.json": {
+      "sha256": "1f79dffd61e1e579fae3381dddfb010700677f4979d384d1a56338e5766078e0",
+      "size_bytes": 704
+    },
+    "steps/0001/otel-payloads/76a8f8640118e7fd293ccf512ae8cd4849446862b00d3c2bf33c4d9014d54a41.json": {
+      "sha256": "b2f575a98272bf51a1ef193edb30256ab4bfb8a6dad7bc307486f4b129c559b9",
+      "size_bytes": 720
+    },
+    "steps/0001/otel-payloads/76b7c1f281773543c444c165438153a033e0305a7e814b82f0620ad7fd540d23.json": {
+      "sha256": "64793b1db954bf71c259541b07203015da5657417ec7dee08e3cfed887a6fe98",
+      "size_bytes": 575
+    },
+    "steps/0001/otel-payloads/782c62229e7363db45caaa8fbf218b4429f80b22ecef61b232403a6c8d01653c.json": {
+      "sha256": "b3bc6b18684684a7216623aea43e7541487d5e90f44d501b9506055b36948460",
+      "size_bytes": 262984
+    },
+    "steps/0001/otel-payloads/7996493ee2eac9dd49e0a3157fb1fded930920813faffa3b9d807357d3b96b35.json": {
+      "sha256": "0c9e361916430b34c036bd5d3444aa991749fa9356fcce45befa1635345a7ef7",
+      "size_bytes": 5165
+    },
+    "steps/0001/otel-payloads/79db493c1d650c31e69637516dfca7b53b80aa29d0b1a932c2bcc062893c1724.json": {
+      "sha256": "b78187b576e35fdd7e1777130f05a6d77e8148b4491c8ad72427b16494b57fae",
+      "size_bytes": 305
+    },
+    "steps/0001/otel-payloads/7ad7d542fd10d07ff3862b15b74911f383f6843cb1ec38e4cc51400d920aeb14.json": {
+      "sha256": "5c59c4de51c124fe27511bbb2267fa854085276a66b93d7aa10d3335e9478e61",
+      "size_bytes": 12080
+    },
+    "steps/0001/otel-payloads/7bbde39c122ce5b21eb29325b135a684e4cbaa839dc506b20908a9ab82976826.json": {
+      "sha256": "cd60148d07ddfc9acdb172b2d9f342cdb13a09ca11019d3eaf49195002f715f2",
+      "size_bytes": 643
+    },
+    "steps/0001/otel-payloads/7bbeac61906707017af05a4f7dab72dc5071d33f9173cc6237b63aa56a2ade43.json": {
+      "sha256": "184d504c3a21317867433033ff8b80b80c158cb0ceabd87629aa4bcc09ee6fe2",
+      "size_bytes": 6528
+    },
+    "steps/0001/otel-payloads/7f0b6f058dd7ebe039653909c52deadb14990cc07edfb87eb121bd52b0f17c77.json": {
+      "sha256": "a88f88d5cfd8b35297d6e57d2af84d7e66545080383af381d99f034b21a8d757",
+      "size_bytes": 268368
+    },
+    "steps/0001/otel-payloads/7f3fc4ace92f1dc8088fb49da8ebd43407a424b040a3f5ed4e7db9201a35705a.json": {
+      "sha256": "ba31f8281b04e87960f9ade3ea09a3247864cf4ae364f0876eb3df706251e1cb",
+      "size_bytes": 37
+    },
+    "steps/0001/otel-payloads/812f1927a024e2b5b80f53b36034a01307fbabaf6ab7caaa43660e6b4b3156a4.json": {
+      "sha256": "58bd730238e6e29f70ec55040de019476ab992657c4ab7d186504574673a8753",
+      "size_bytes": 720
+    },
+    "steps/0001/otel-payloads/835f4e03703ea703f40ac0dcae1becc64e3278d96cfbfd9033194752fc3642fc.json": {
+      "sha256": "158ff5eea8609979e13b10ee2a0cbbdaebf2b12d0501ba70986c12f991d2af03",
+      "size_bytes": 682
+    },
+    "steps/0001/otel-payloads/8618ee280b8165f22bd9cee64ceeb76479ec69f251fd6041ab9b752ccb6ab081.json": {
+      "sha256": "8618ee280b8165f22bd9cee64ceeb76479ec69f251fd6041ab9b752ccb6ab081",
+      "size_bytes": 1017
+    },
+    "steps/0001/otel-payloads/8ba75713a08bee25179c93d1877261b95061b9612c2d762f712e41a4efeef062.json": {
+      "sha256": "2cfe45133ba889f4fc92d7d8727dcb413212a1f99e80776211e0d575b5561af6",
+      "size_bytes": 297
+    },
+    "steps/0001/otel-payloads/8c54cd4d9656b7eb2d4f867216fdcba4531255b7f60f8c82e4f3ef46ba92d164.json": {
+      "sha256": "1c9db25e2721be20d2bf946355f495a6f61d05beee2d0a5af2cff4d7724b5226",
+      "size_bytes": 716
+    },
+    "steps/0001/otel-payloads/8db6c2db767a8790224e16d50c419a8aa8e8e13738bd928a64df40643ffe78d4.json": {
+      "sha256": "fb329e3737ed4ea37faf30500dc78b535072c4c582e5688f54e8342cf2c5e12f",
+      "size_bytes": 12342
+    },
+    "steps/0001/otel-payloads/8e57425aaa6900699ffddd5e26382d3311fa261c86bcee445fbe115ccfa3a87f.json": {
+      "sha256": "a64dad3af7b508caaf3c47e88dc09a6df42361006290ec2e0c66753b172bff06",
+      "size_bytes": 1123
+    },
+    "steps/0001/otel-payloads/8eaa14cab5b3149f4d8af2605ddd59a2ab8c0cc72d3f85b909302c89655027b2.json": {
+      "sha256": "675d773b840ed5f889b058a0b73241ffd16f2ea38ee428f22fcdbe39a6b3ea05",
+      "size_bytes": 649
+    },
+    "steps/0001/otel-payloads/9006034a0b449f9bf97f9a0ae55f650ac6961040cdce71e3d75dfc7cd3bc2b60.json": {
+      "sha256": "2d07f232ad6832790981341a0b3567a4a4c1d352eae3ea081d271941d64ddd22",
+      "size_bytes": 9766
+    },
+    "steps/0001/otel-payloads/909bc1293dbd5acae3a2ed73b95e935b5ba49071fb652002a26db95da1858193.json": {
+      "sha256": "02fd3043b659cd8bdc62773d254dbac5111b260c68c4cb1ce8e9b89066d6d0ad",
+      "size_bytes": 2899
+    },
+    "steps/0001/otel-payloads/93da8bea1ebea1445d90c5d74031515dd1d07adb6a5801848cad755f7ea9bd62.json": {
+      "sha256": "bc8d9b2a0c1fd571a639186dea5f13d784c86947b33ed0c852e1acf320e8f825",
+      "size_bytes": 9813
+    },
+    "steps/0001/otel-payloads/94020e94f4497b9ce8926fa3723b32a4c4306819220e131649d7e0bfca6f0196.json": {
+      "sha256": "4d7edff77b30f5eb801450c9a4311a789fa771c57676d7c3245a4c61d48065d5",
+      "size_bytes": 5255
+    },
+    "steps/0001/otel-payloads/941ea0297b18e07a804ef219da1fcaccbaccdc50f7abbdfe5c8a362264acce61.json": {
+      "sha256": "c30347e91d72e77e8a0a833b677021028aee85f35c14451bbf603316128fe497",
+      "size_bytes": 3257
+    },
+    "steps/0001/otel-payloads/944aaac7dd8f126a93eb6f4d79d564159a250e0bca29615e5ac39d75d86c3bf6.json": {
+      "sha256": "95dff64c1c2d95c5233c2ce2680ebee740d04d5a9b8d7fd47951e2fe1e865559",
+      "size_bytes": 720
+    },
+    "steps/0001/otel-payloads/971ca947fb93d008c0251208dbce2970a15afd61e20085479b9e017ef8df9a2b.json": {
+      "sha256": "fb7e93ab8f02f5e759acfd04464e93999c1d4b8e5671fa49d9f71fdad2ef4a9e",
+      "size_bytes": 610
+    },
+    "steps/0001/otel-payloads/9753a093673e07722ac746b78dd66ec601aa4b2f2791e8198a1bfed2813d7c28.json": {
+      "sha256": "e769698710e09329685df84b06a0a148c46cd25f31cf6e7e933ca8764cadb6c5",
+      "size_bytes": 502512
+    },
+    "steps/0001/otel-payloads/97c6d6994c6625c8b179e98cb2442c4ad2fd85bb7e31a0100cfcd67fb583d3e9.json": {
+      "sha256": "8045e58e870e8fac7aa2a6c27009cff9f76b7d15e8b2394afd11b45a5fd8d86b",
+      "size_bytes": 2149
+    },
+    "steps/0001/otel-payloads/9b89a524092acd84d7a7cdcd68d8a35213029f8b5ce891eee13b256c91330d2e.json": {
+      "sha256": "76ccd21fcc757bb96293ec5142b1843aa6e9dc2721bf44f52d52732557202384",
+      "size_bytes": 643
+    },
+    "steps/0001/otel-payloads/9d0433f894dd0421da871c440a08f67af982d6c7e1adf3b709086ddae90cdce4.json": {
+      "sha256": "9d0433f894dd0421da871c440a08f67af982d6c7e1adf3b709086ddae90cdce4",
+      "size_bytes": 13
+    },
+    "steps/0001/otel-payloads/9e35d6c223578adc299f22f5db4de29946d6c253f7b5525fc1b97dc44d6b7786.json": {
+      "sha256": "d45312192d616bbf4af7f0f8d767aff2d758f2337ce225b99b022a18cbcb9e37",
+      "size_bytes": 578
+    },
+    "steps/0001/otel-payloads/9e405ed51e808c00e38da462b51590f467e4bc7c0a355339dec55ce21a45d7f3.json": {
+      "sha256": "5839e4c8b90d0af0bd265a475e239a0790ddcb8575c140cd63470f9be230c1c1",
+      "size_bytes": 143
+    },
+    "steps/0001/otel-payloads/9f9451653cee55e34c6dbdeeba5b45bccf8c102ccf54888b12e77918b4b7d9f6.json": {
+      "sha256": "9e06f782990ef7e3863a6c513bb05dfaa66770b6a0930bf4122c6901ec95a3b2",
+      "size_bytes": 2573
+    },
+    "steps/0001/otel-payloads/a7f600e5cc32e1066aff8f4e1ce1cc4a75c97705abc6f8d532b878def070e9d8.json": {
+      "sha256": "69b8fec8b24e2642e6a31f903d5c311fe113ea7dada199346fb3c7b5a7d792f0",
+      "size_bytes": 19896
+    },
+    "steps/0001/otel-payloads/a96e919ab7b5aa7b857a4b3604784633161cbcd69feff4da2843257558253ed2.json": {
+      "sha256": "be156a0f8d9d8c456a6cf4d2be03911aa2d190c2c7c773be9bef31f3b5e71b8c",
+      "size_bytes": 894
+    },
+    "steps/0001/otel-payloads/aa74fe6796ea32f82ea501db927083452d8b7f65217060ebe205917e9f78731c.json": {
+      "sha256": "b2d2c86c793101a4805b0489e72d958e228c51255aece832a4b4212d2e75e6f9",
+      "size_bytes": 490
+    },
+    "steps/0001/otel-payloads/aa7ea829aacf5f7b37df56c4d10859a57addab9af566d0be3fa57276dbd3a067.json": {
+      "sha256": "17eb2bf0b4c44ad80361139735268b7ca6414b741c523e1b17442db0d0ffaaac",
+      "size_bytes": 578
+    },
+    "steps/0001/otel-payloads/abfdab5d106ff63e286ec76c4266051848788854d25c65cf25c8d323247ab424.json": {
+      "sha256": "a41c6fb4a928fb8cfe75c21bf1bf38c546d7b0c8edd98fa0ade51aea68b3b7da",
+      "size_bytes": 1097
+    },
+    "steps/0001/otel-payloads/ae1b599f8bf27e9814583c64a30d3f0f9ba74cd06c3bf8fa8a40dfafa423ab0e.json": {
+      "sha256": "0e514ab400c3c50929af68894051fe0b0d81bb8f878eac61a684092f2f32cb73",
+      "size_bytes": 3221
+    },
+    "steps/0001/otel-payloads/afe81b04eebbcff5e986edac0e184ba244779a3c7acad912dac9c0905595c58e.json": {
+      "sha256": "2a59d058886ead8042857716088d6dc094a2ba52cc3acd1fa45cd5eb6ba9fb81",
+      "size_bytes": 163
+    },
+    "steps/0001/otel-payloads/b3be5a63b7c06cd50124f69b3afe9c4bd1f43d213f55e3455b7be38ffefc0706.json": {
+      "sha256": "777df3cc3852118d4dd7990d6752e1c93b8409be9bc05b5fbd074090e2efa911",
+      "size_bytes": 968
+    },
+    "steps/0001/otel-payloads/b3dce132e16f0da43b3883e4cac02bdba578213fbd0a2177d7801c9378d5d4c4.json": {
+      "sha256": "b51fd2e07e7af00bfd7656e784f81a9f21b396cf10f9a28e155138e0800d7e98",
+      "size_bytes": 5544
+    },
+    "steps/0001/otel-payloads/b8d1ac6ea24e474e13e8ad5d6e22281093108d38a6a41483c37cb98cd2d141c2.json": {
+      "sha256": "f69e7f7377ae83b8259c068235a90425ef0d3c6485a24c4c9ef47af8b3b87c73",
+      "size_bytes": 748
+    },
+    "steps/0001/otel-payloads/bba0d64fef78fcd40744ba94db3b694b7c3034fb310e56c90a07e0b342ba9a60.json": {
+      "sha256": "bbf7df305b322b2fd7f696c72a8c018af037189e8dd363fb428506951a42743f",
+      "size_bytes": 9003
+    },
+    "steps/0001/otel-payloads/bba5488c7b9f78b60830332a8eefe35677a682565920ba89170bd649bc3d5e98.json": {
+      "sha256": "288f82472f3890dc1bf53bb8da866a1587b21d59910c564994deb55c58d862ba",
+      "size_bytes": 4181
+    },
+    "steps/0001/otel-payloads/bf121f026789841e256c4dc8214a0ad93739273b64e213e64dc54f59a0852091.json": {
+      "sha256": "bf121f026789841e256c4dc8214a0ad93739273b64e213e64dc54f59a0852091",
+      "size_bytes": 9
+    },
+    "steps/0001/otel-payloads/c030f8fa554f274888c5d5044c5d6c77aacfa2f4fb9a14cf64507d7078634f33.json": {
+      "sha256": "a9a113e853390ace5c070f1556beba263d7a7c83b6a1a84a61319e1f0ce8d619",
+      "size_bytes": 2657
+    },
+    "steps/0001/otel-payloads/c23bbde274f3287f51df6b4d2073b90a5d64f25ff45316975ca648fbefb301c5.json": {
+      "sha256": "04030092a59dec06b97739b728ac5cd1614a02877ed3ff543e2edec410afc6fe",
+      "size_bytes": 696
+    },
+    "steps/0001/otel-payloads/c2da9636c88019d51aa8129a8726ff0119e05e01efb48c87911664975de1c9cc.json": {
+      "sha256": "5e734703d0142e380d27aa2f0c96362a574d34d363b3cf3210c418451315afdc",
+      "size_bytes": 934
+    },
+    "steps/0001/otel-payloads/c79097f7f36c6af7876c1148b1b4b154cc69d5b3fcb5248b7355ca9e64aa24ef.json": {
+      "sha256": "517363504fdfa9d666ecc0f3064aa2edd694c1814c275c37aee85f8df9fdc668",
+      "size_bytes": 1234
+    },
+    "steps/0001/otel-payloads/c910da5bc6bd99c7349b954dbf4fb3cd3421ce9ec4a9d2d6b5514275fc27ba2c.json": {
+      "sha256": "54b92245f1a6af2e240d87441c0de6f84a3afb12beb60ee3d4731b54404f11da",
+      "size_bytes": 748
+    },
+    "steps/0001/otel-payloads/ca1733b5cdea2efcd28cb357b253498f97440592edd06d89895c4abcb5cfaae5.json": {
+      "sha256": "ca1733b5cdea2efcd28cb357b253498f97440592edd06d89895c4abcb5cfaae5",
+      "size_bytes": 6
+    },
+    "steps/0001/otel-payloads/ca595280a5d995ee7a42ba5876ebaec665c33778926c8f08dc75cd3cc59b9171.json": {
+      "sha256": "34930fe7905f863b18031e35d91a58302d2ab001738208b7dc21c9ee576d0f94",
+      "size_bytes": 351
+    },
+    "steps/0001/otel-payloads/cc0d72c614580108c256c1df05ecbe426b60a015d3aa27345539550475a275c7.json": {
+      "sha256": "3badf9262fdf05d6a553e7fecd6262726a430b4b5c2db84cadc178cc34d88d93",
+      "size_bytes": 4773
+    },
+    "steps/0001/otel-payloads/cfd70370cdb26b941e978dcec16e5ec6ce47b85bdfaa2c82436ae35f8ef440be.json": {
+      "sha256": "5d0e8f02d1ad468cbd7459361c8f6e8d8057c11a9391700713db9877a4fcd877",
+      "size_bytes": 497709
+    },
+    "steps/0001/otel-payloads/d0cc2ecf3fe785672a10c928121a8baf93c059d8048c881f3fcc32ab34f9dd4e.json": {
+      "sha256": "e3b131837becff85a60921b70ae0b2eead577124752393791b63b68167712b1d",
+      "size_bytes": 696
+    },
+    "steps/0001/otel-payloads/d28003d40ea9d77ce22e96779ef9cd3a6212a2fca330e6f45dce936d6d317106.json": {
+      "sha256": "6296f37030555532193edb385f7aa4c4316351d8dc5094d86a847181f8cd5135",
+      "size_bytes": 489
+    },
+    "steps/0001/otel-payloads/d3496f2c93efa1452c86e97bf74929009ae4c7879636ab593f45d195a24b5351.json": {
+      "sha256": "72e900ef1bac4d771eb647eddc46fb44b24a9bf47a277e19f3df59a944aada65",
+      "size_bytes": 6069
+    },
+    "steps/0001/otel-payloads/d78d6a8913644d5fc8edc0e999b0556b1180ea41a48e9df5dea5913f161b011f.json": {
+      "sha256": "8f4e0f63d7e598deba4d8b49037b6d29dd7c8a934609957f4e9df1b50bff30cf",
+      "size_bytes": 504219
+    },
+    "steps/0001/otel-payloads/db858284f4f5b8aa16d5403be9affb35e9b5964cd0407c1836403608360a77a4.json": {
+      "sha256": "444417a8b7ae4608b0e031842862e6ee221804a9c6772bc2167aa08561db23e9",
+      "size_bytes": 5106
+    },
+    "steps/0001/otel-payloads/dc7c400d89963792445754ec7118290de941d84a1ae1911ea98d340685831c93.json": {
+      "sha256": "a58852a2561dd2fb9169470a7738a768442e8d7d8c51fa7eae4ca14a4fabbe73",
+      "size_bytes": 3788
+    },
+    "steps/0001/otel-payloads/dc896d5f818014589ab1a04bbfc6ee0db365c7b3ef64985b13c5d381c7299e2f.json": {
+      "sha256": "9a89bb00b24ec953d5b6bc84eb3b8d2401ecc9442bf26eda8a5e4433f050eb1a",
+      "size_bytes": 2963
+    },
+    "steps/0001/otel-payloads/e044469e97a0a02819ecd5993a5305f19a958af4824444237bb0afb49f5eb360.json": {
+      "sha256": "d9e3a4210499e5a9efbfd4b5f26bdd5d9e84be2c1c48bf03f7e12ab4bd5255dc",
+      "size_bytes": 13741
+    },
+    "steps/0001/otel-payloads/e201dc5beb1e8a877c4319168953611cb21ab1772e8981829b8ff602338ff5ad.json": {
+      "sha256": "04c483886d4ceaec72ffa9799e7b078ace0c038525cefe55e75b42ee9cb77bc8",
+      "size_bytes": 6183
+    },
+    "steps/0001/otel-payloads/e3fad8ea784a6a6fedc42e793666c83375b0839a681fd429e81f01f8e7fca0f4.json": {
+      "sha256": "e3fad8ea784a6a6fedc42e793666c83375b0839a681fd429e81f01f8e7fca0f4",
+      "size_bytes": 359
+    },
+    "steps/0001/otel-payloads/e565d190ee92d19c51f7a3594f9cca988782f184b9aa761eeaa4d66a1c7f6808.json": {
+      "sha256": "a4d2c90f44afa2aad06ec215c7c49f832e7f573c483f077c7e63d3c81e04c415",
+      "size_bytes": 1097
+    },
+    "steps/0001/otel-payloads/ed5f9f1e5e7d43aa4790a1493ce51fd536fe22f9c46de5d526be107f592d0f7b.json": {
+      "sha256": "807a72876dbb6c9faf839f692a5da0a8df3d9096e256432729097db8e25aac9f",
+      "size_bytes": 512
+    },
+    "steps/0001/otel-payloads/ede8dbfa555b24da37259036bfddb86967ab4bc920694ea6d27f99cf84728035.json": {
+      "sha256": "eaf958bbe33928b5c220cdf580552e38696956c749b90a4d2dd6cbd4e547397f",
+      "size_bytes": 575
+    },
+    "steps/0001/otel-payloads/f2638c3cb67167ca67dd0fdc70f4262588cc769369f9a73a7793a2986366d57b.json": {
+      "sha256": "d5834f892dab99099925e007716f06e1b68a8b2e6cf8a18572d972a7a950b21f",
+      "size_bytes": 261189
+    },
+    "steps/0001/otel-payloads/f72176230660afde9f232aebf49098d0fd0679b17cc71e4cd6f11857299231e7.json": {
+      "sha256": "f72176230660afde9f232aebf49098d0fd0679b17cc71e4cd6f11857299231e7",
+      "size_bytes": 5774
+    },
+    "steps/0001/otel-payloads/f81df8e4e87095e325941b13466d75b236077a89fbf433ca71335ae86e9b378e.json": {
+      "sha256": "a562becedda04a90bce9166ce8a143747b1ad909fe9fe35ab715e9eeb267c17b",
+      "size_bytes": 13548
+    },
+    "steps/0001/otel-payloads/fabdb68aabc7e1a3bfe3804f31a31fed3a5f982523935a6792e1ac96b5800bdc.json": {
+      "sha256": "f76d06c3ec5def5b7935dac590e4ca14cfb9dd79463c66cf13992fd7bc6f35a2",
+      "size_bytes": 326
+    },
+    "steps/0001/otel-payloads/fafb643dc60509d1962adf3718abbb381607e73c4d8a7a78de460d5878502123.json": {
+      "sha256": "92f57e3691a6a96234ddf082aef418ab9b85b1a1ee8b3793589eb6b2156891bc",
+      "size_bytes": 708
+    },
+    "steps/0001/otel-payloads/fcfd4188453e71e541cb4ba93926e975037573d75726380dd564b8423e45fc08.json": {
+      "sha256": "3ded761a3c70c28bca5f3a8c349d3b2c804fc2faa20da05a67987495c9e1384f",
+      "size_bytes": 708
+    },
+    "steps/0001/otel-status.json": {
+      "sha256": "1cd61df3b1f7383ac9e9c073c9fa17b091c94bc2f4cefd8ee0af5a509e38f738",
+      "size_bytes": 68
+    },
+    "steps/0001/otel.jsonl": {
+      "sha256": "97a6485341fa27f269c18fc8722c606faf7ee66a0a154841663d47073f33a56f",
+      "size_bytes": 1037272
+    },
+    "steps/0001/request.json": {
+      "sha256": "104ae1809f7fac60ea2bb5e89d177031e7d22dab390fcdf1b36b74bb20bd8eca",
+      "size_bytes": 589
+    },
+    "steps/0001/result-redaction.json": {
+      "sha256": "8ed7da76d993f6bded526ea53dda564e79d575fe4bc606b1cb7150e5405337ea",
+      "size_bytes": 128
+    },
+    "steps/0001/result.json": {
+      "sha256": "3f93c14207b91093c85dd1c148ef9e07d8c570cacc31a56f031ab839c9d421c6",
+      "size_bytes": 2381
+    },
+    "steps/0001/spans.jsonl": {
+      "sha256": "a6c73c0fd1820ff2255ca4f415c8f49c1e431efb3ab905fc530ed7545b320915",
+      "size_bytes": 999582
+    },
+    "steps/0001/submission.json": {
+      "sha256": "e3496e1376b27bf6d4dabdfd1a7422f78c43aa96908b195313b32d609859020b",
+      "size_bytes": 2464
+    }
+  },
+  "evidence_status": "complete",
+  "unexecuted_input_ids": [],
+  "request_id": "96a1c0af12ce858d87dc59158aab3d3f4df3a9ebc7a98bd540d101914169bc7b",
+  "judge": null
+}

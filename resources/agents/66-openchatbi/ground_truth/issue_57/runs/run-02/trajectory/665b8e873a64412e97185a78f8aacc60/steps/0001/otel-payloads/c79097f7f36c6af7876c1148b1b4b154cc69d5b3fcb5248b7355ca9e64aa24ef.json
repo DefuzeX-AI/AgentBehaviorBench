@@ -1,0 +1,39 @@
+{
+  "sql_execution_result": "SQL_SUCCESS",
+  "schema_info": {
+    "columns": [
+      "Order Item Status",
+      "Open Order Items"
+    ],
+    "column_types": {
+      "Order Item Status": "object",
+      "Open Order Items": "int64"
+    },
+    "row_count": 3,
+    "numeric_columns": [
+      "Open Order Items"
+    ],
+    "categorical_columns": [
+      "Order Item Status"
+    ],
+    "datetime_columns": [],
+    "unique_counts": {
+      "Order Item Status": 3
+    },
+    "result_limit": 10000
+  },
+  "data": "Order Item Status,Open Order Items\nPacked,3773\nPending,3725\nShipped,3671\n",
+  "messages": [
+    {
+      "content": "```sql\nSELECT order_item_status AS \"Order Item Status\", COUNT(order_item_id) AS \"Open Order Items\"\nFROM Order_Items\nWHERE order_item_status NOT IN ('Finish', 'Cancel', 'Canceled')\nGROUP BY order_item_status;\n```\nSQL Result (limited to first 10000 rows):\n```csv\nOrder Item Status,Open Order Items\nPacked,3773\nPending,3725\nShipped,3671\n\n```",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "a16db7eb-9364-4938-b94c-cd0af64d62d9",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

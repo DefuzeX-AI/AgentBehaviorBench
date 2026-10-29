@@ -1,0 +1,74 @@
+{
+  "messages": [
+    {
+      "content": "",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 309,
+          "prompt_tokens": 6299,
+          "total_tokens": 6608,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 82,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 2176
+          },
+          "prompt_cache_hit_tokens": 2176,
+          "prompt_cache_miss_tokens": 4123
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "cc3584b9-dab8-464e-a69d-e171a93083bc",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16d92-b54d-7303-9739-03cd20e2b2d6-0",
+      "tool_calls": [
+        {
+          "name": "text2sql",
+          "args": {
+            "reasoning": "Retrieve all open order items (status not Finish / Cancel) with IDs and status, plus the count",
+            "context": {
+              "Shared Context": "Sales order tracking system. Table Order_Items has order_item_id, order_id, order_item_status (valid values Finish|Payed|Cancel; some sources write 'Canceled').",
+              "Current Subtask": "List every order item that is still open, i.e. order_item_status is neither 'Finish' nor 'Canceled' (also exclude 'Cancel' to cover the documented value). Return columns order_item_id, order_id, order_item_status ordered by order_item_id, and also return the total count of such open items.",
+              "Deferred Tasks": "None",
+              "Note": "No chart needed - set visualize false"
+            },
+            "visualize": false
+          },
+          "id": "call_00_bURI0kNx2PhTuVxfVRu94819",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 6299,
+        "output_tokens": 309,
+        "total_tokens": 6608,
+        "input_token_details": {
+          "cache_read": 2176
+        },
+        "output_token_details": {
+          "reasoning": 82
+        }
+      }
+    }
+  ],
+  "history_messages": [],
+  "sends": [
+    {
+      "type": "Send",
+      "value": "Send(node='use_tool', arg={'messages': [AIMessage(content='', additional_kwargs={}, response_metadata={}, tool_calls=[{'name': 'text2sql', 'args': {'reasoning': 'Retrieve all open order items (status not Finish / Cancel) with IDs and status, plus the count', 'context': {'Shared Context': \"Sales order tracking system. Table Order_Items has order_item_id, order_id, order_item_status (valid values Finish|Payed|Cancel; some sources write 'Canceled').\", 'Current Subtask': \"List every order item that is still open, i.e. order_item_status is neither 'Finish' nor 'Canceled' (also exclude 'Cancel' to cover the documented value). Return columns order_item_id, order_id, order_item_status ordered by order_item_id, and also return the total count of such open items.\", 'Deferred Tasks': 'None', 'Note': 'No chart needed - set visualize false'}, 'visualize': False}, 'id': 'call_00_bURI0kNx2PhTuVxfVRu94819', 'type': 'tool_call'}], invalid_tool_calls=[])]})"
+    }
+  ]
+}
