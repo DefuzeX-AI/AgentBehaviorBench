@@ -61,10 +61,10 @@ def test_complete_stream_fits_default_limit_without_losing_events(tmp_path, monk
     assert restore_trace(seen[0]['steps'][0]['traces']['framework.jsonl']) == records
 
 
-def test_genuinely_oversized_unique_content_still_stops_before_model(tmp_path, monkeypatch):
+def test_explicit_limit_stops_genuinely_oversized_unique_content(tmp_path, monkeypatch):
     request, _, _ = request_for(tmp_path, [{'text': 'z' * 130000}])
     seen = capture_model(monkeypatch)
-    answer = provider.judge.judge(request, directory=tmp_path, environ={})
+    answer = provider.judge.judge(request, directory=tmp_path, environ={'ABB_LOCAL_JUDGE_MAX_CHARS': '120000'})
     assert seen == []
     assert answer['status'] == 'inconclusive'
     assert answer['evidence_gaps'] == ['Evidence exceeds this local provider limit (120000 characters).']

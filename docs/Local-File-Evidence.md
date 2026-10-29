@@ -30,8 +30,9 @@ Read races, omissions or limit exhaustion mark the observation `partial`; absenc
 of an artifact is not a complete empty snapshot. A required missing/partial file
 observation gives an `inconclusive` result before calling the Local model.
 
-The120000-character Local Judge guard is unchanged. Content is never silently
-truncated to fit it. Large observations may therefore still be inconclusive.
+By default, Local Judge does not impose a character cap on evidence. An optional
+positive `ABB_LOCAL_JUDGE_MAX_CHARS` returns inconclusive when exceeded; content
+is never silently truncated to fit it. Provider context limits still apply.
 
 ## Explicit model reply budget
 
@@ -41,6 +42,7 @@ a caller may explicitly set:
 
 ```sh
 export ABB_LOCAL_JUDGE_MAX_TOKENS=8192
+export ABB_LOCAL_JUDGE_REASONING_EFFORT=low # only if supported by the provider
 ```
 
 Valid values are integers from1 through32768. This controls the Judge request's
@@ -63,5 +65,6 @@ fields into ordered blocks. Every original record, value type and order must
 round-trip; malformed/unrepresentable streams stay raw. No tool output, text
 chunk or event is removed, and original attachment bytes/hashes stay unchanged.
 The exact model-facing view is retained at `judge/local-evidence-view.json`.
-This allows repetitive streams to fit the unchanged120000-character guard;
-large unique content still produces an explicit inconclusive result.
+The lossless view reduces repetitive data without silently omitting evidence.
+A configured character limit or the provider's context limit may still reject
+a large request; the result is not automatically an Agent defect.

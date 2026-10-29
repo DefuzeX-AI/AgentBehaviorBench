@@ -50,7 +50,8 @@ def generate_cases(registration, *, limit, environ, output, context=None):
         raise ValueError('Agent Profile exceeds local provider context limit')
     if len(case_bytes(context)) > 120000:
         raise ValueError('Agent Profile exceeds local provider context limit')
-    generation_environment = {k: v for k, v in environ.items() if k != 'ABB_LOCAL_JUDGE_MAX_TOKENS'}
+    generation_environment = {k: v for k, v in environ.items() if k not in
+                              ('ABB_LOCAL_JUDGE_MAX_TOKENS', 'ABB_LOCAL_JUDGE_REASONING_EFFORT')}
     model = judge_model(generation_environment)
     files = Artifacts(output / 'local-generation' / uuid4().hex, environ=environ)
     files.save('context.json', context)
