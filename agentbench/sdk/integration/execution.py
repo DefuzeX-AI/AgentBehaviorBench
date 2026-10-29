@@ -138,7 +138,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     shutil.copystat(Path(source), Path(target))
                     return target
                 with span('Prepare Case workspace', kind='preparation'):
-                    policy = workspace_policy(tomllib.loads((descriptor.path / 'agent.toml').read_text()))
+                    policy = workspace_policy(tomllib.loads((descriptor.path / 'agent.toml').read_text(encoding='utf-8')))
                     target = policy.path or repository_target
                     ledger_root = directory / 'sdk-repo'
                     Path(ledger_root).mkdir()
@@ -151,7 +151,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                             item.chmod(0o777 if item.is_dir() else (item.stat().st_mode & 0o111) | 0o666)
                         files.save('workspace.json', contract)
                         settings_path = directory / 'request/evaluation.json'
-                        settings = json.loads(Path(settings_path).read_text())
+                        settings = json.loads(Path(settings_path).read_text(encoding='utf-8'))
                         settings['workspace'] = contract
                         files.save('request/evaluation.json', settings)
                         if require_workspace_identity or expected_environment_sha256 is not None:
@@ -188,7 +188,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     Path(replay_directory).chmod(0o777)
                 from agentbench.sdk.integration.context import ExecutionChannel
                 channel = ExecutionChannel.create(directory / 'channel') if execute_agent else None
-                settings = json.loads(Path(directory / 'request/evaluation.json').read_text())
+                settings = json.loads(Path(directory / 'request/evaluation.json').read_text(encoding='utf-8'))
                 publications = ()
                 if artifact_store is not None and not execute_agent:
                     indices = generation_indices or ()
@@ -229,7 +229,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     agent_process = agent_runtime.start(
                         descriptor, invocation=(public_inputs, agent_outputs),
                         argv=('python', '-m', 'agentbench.runtime.agentcontainer.channel'),
-                        exclude_environment=tuple(tomllib.loads((descriptor.path / 'agent.toml').read_text())
+                        exclude_environment=tuple(tomllib.loads((descriptor.path / 'agent.toml').read_text(encoding='utf-8'))
                                                   .get('runtime', {}).get('worker_env_keys', ())) +
                                             tuple(excluded_agent_environment),
                         preparation_deadline=preparation)
@@ -303,7 +303,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     manifest = destination / 'manifest.json'
                     if Path(manifest).is_file() and not Path(manifest).is_symlink():
                         try:
-                            status['sdk_run_id'] = json.loads(Path(manifest).read_text()).get('run_id')
+                            status['sdk_run_id'] = json.loads(Path(manifest).read_text(encoding='utf-8')).get('run_id')
                         except (OSError, ValueError, AttributeError):
                             pass  # Preserve the original container/validation outcome.
                     if (status['cleanup_status'] == 'succeeded'

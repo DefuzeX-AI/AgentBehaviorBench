@@ -37,3 +37,25 @@ def summarize_rounds(rows):
         result.append({'round_index': number, 'hit': hit, 'case_count': len(members),
                        'execution_wall_seconds': sum(r['execution_wall_seconds'] or 0 for r in members)})
     return result
+
+
+def aggregate(experiments):
+    """Combine explicitly selected v2 experiments, retaining every Issue once."""
+    identities, issues = set(), []
+    for experiment in experiments:
+        if experiment.get('schema') != 'abb.exp1.v2' or experiment.get('metrics_unit') != 'case_executions':
+            raise ValueError('Only execution-based v2 experiments can be aggregated; read legacy results separately')
+        for issue in experiment['issues']:
+            identity = (experiment['agent_id'], issue['issue_id'])
+            if identity in identities:
+                raise ValueError(f'Duplicate Issue in aggregation: {identity[0]} / {identity[1]}')
+            identities.add(identity)
+            issues.append({**issue, 'agent_id': experiment['agent_id'],
+                           'experiment_id': experiment['experiment_id']})
+    # Do not improve a score by dropping Issues with smaller declared budgets.
+    budget = min(e['budget'] for e in experiments)
+    metrics = summarize(issues, budget)
+    return {'schema': 'abb.exp1.aggregate.v1', 'metrics_unit': 'case_executions',
+            'issue_count': len(issues), 'budget': budget, 'issues': issues, 'metrics': metrics,
+            'experiments': [e['directory'] for e in experiments],
+            'status': 'partial' if any(e['status'] != 'completed' for e in experiments) else 'completed'}
