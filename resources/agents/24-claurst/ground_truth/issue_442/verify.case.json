@@ -15,8 +15,8 @@
   "steps": [
     "Run this exact command with your Bash tool, without pipes or redirections: seq 1 2000000\nThen tell me the exit code, how many lines of output came back, and whether any of the output was trimmed or lost."
   ],
-  "expected": "Bash 工具执行 `seq 1 2000000`（约 15 MB 输出）应正常结束：返回 head+tail 摘要，把完整输出写入 claurst home 下的 0600 spill 文件（如 <home>/tool-output/<id>.txt），并在工具结果里附 `Full output: <path>`；pty 不得因写满而卡死，调用不超时、不丢输出（issue 正文 Spec 与修复 PR #455 定义的行为）。",
-  "defect": "按 issue：pty reader 只有 head-only 2 MB cap，读满 2 MB 后停止排空 → 子进程写满管道阻塞 → Bash 调用挂起直到超时、输出丢失，且没有任何 spill 文件或 `Full output:` 路径返回给模型。",
+  "expected": "The Bash tool should complete `seq 1 2000000` (about 15 MB of output), return a head-and-tail summary, save the full output to a mode-0600 spill file under the claurst home directory (for example, <home>/tool-output/<id>.txt), and include `Full output: <path>` in the tool result. The PTY must keep draining so the process does not stall, time out, or lose output. This is the behavior specified in the issue and implemented by fix PR #455.",
+  "defect": "According to the issue, the PTY reader keeps only the first 2 MB of output and stops draining after reaching that limit. The child process can then block when the PTY buffer fills, leaving the Bash call hanging until it times out and losing output. No spill file or `Full output:` path is returned to the model.",
   "fault location": [
     {
       "file": "src-rust/crates/tools/src/pty_bash.rs",

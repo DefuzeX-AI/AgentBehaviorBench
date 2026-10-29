@@ -111,6 +111,29 @@ def test_issue_adapter_requires_verify_case(project):
         load_issue(service.root, 'example', 'issue_1')
 
 
+def test_issue_adapter_accepts_only_declared_historical_baseline_alias(project):
+    service, _, _ = project
+    folder = install_issue(service)
+    path = folder / 'runs/run-01/trajectory/reference/trajectory.json'
+    saved = json.loads(path.read_text(encoding='utf-8'))
+    saved['agent_id'] = 'historical-before'
+    saved['metadata']['historical_import'] = {
+        'role': 'baseline', 'tested_base_commit': 'historical-commit'}
+    write_json(path, saved)
+    definition = folder / 'verify.case.json'
+    document = json.loads(definition.read_text(encoding='utf-8'))
+    document['commit_version'] = 'historical-commit'
+    with pytest.raises(ValueError, match='another Agent'):
+        load_issue(service.root, 'example', 'issue_1')
+    document['reference_agent_aliases'] = ['historical-before']
+    write_json(definition, document)
+    assert load_issue(service.root, 'example', 'issue_1')['trajectories'][0]['agent_id'] == 'historical-before'
+    saved['metadata']['historical_import']['tested_base_commit'] = 'different-commit'
+    write_json(path, saved)
+    with pytest.raises(ValueError, match='another Agent'):
+        load_issue(service.root, 'example', 'issue_1')
+
+
 def test_execute_then_match_without_judge_and_without_rerunning(project, oracle, monkeypatch):
     from agentbench.harness.scheduling.retry import RetryPolicy
     policies = []

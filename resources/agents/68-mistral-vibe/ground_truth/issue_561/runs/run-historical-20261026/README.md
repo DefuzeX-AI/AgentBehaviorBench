@@ -1,16 +1,7 @@
 # Archived historical reproduction
 
-The baseline final answer is 2024-06-14 while the recorded container date is 2026-10-26. The repair control injects that date and answers 2026-10-26.
+The retained baseline answered `2024-06-14` when the recorded container date was `2026-10-26`. Its system prompt did not include the current date. This is an existing experiment from 2026-10-26, copied on 2026-10-28; the Agent was not rerun for this archive.
 
-These are existing 2026-10-26 experiments, copied on 2026-10-28. No Agent was rerun.
-Original artifacts and existing Issue runs were not modified. Baselines reproduce the defect; repair controls demonstrate its removal.
+[Baseline trajectory](trajectory/2d86056f47d245e4a1d16c8c0a52aff8/trajectory.json) · [Archive index](archive.json) · [File integrity manifest](file-integrity.json)
 
-| Role | Local trajectory |
-| --- | --- |
-| baseline | [2d86056f47d245e4a1d16c8c0a52aff8](trajectory/2d86056f47d245e4a1d16c8c0a52aff8/trajectory.json) |
-| repair_control | [500aafbc76c44e7ab41a74375e0621ab](trajectory/500aafbc76c44e7ab41a74375e0621ab/trajectory.json) |
-
-[Archive index](archive.json) · [Verification summary](verification/verification-summary.json) · [File integrity manifest](file-integrity.json)
-
-Trajectories were derived offline from the copied raw evidence. A partial trajectory status describes capture/association limitations, not whether the defect reproduced.
-Historical reports are preserved verbatim under verification. Their old path strings are provenance, not the navigation index; use the local paths above.
+The historical test unit was named `verify561-before`. The Case explicitly permits this baseline alias for the registered `mistral-vibe` Agent; the recorded trajectory and raw artifacts retain their original identifiers. A partial trajectory status describes capture and association limits, not whether the wrong date was observed.

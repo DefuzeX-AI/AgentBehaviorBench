@@ -10,6 +10,7 @@
   "version_choice": "commit:a708a88a75302d2ff4391cea6a041c0072ffc618",
   "reported_version": "a708a88a75302d2ff4391cea6a041c0072ffc618",
   "commit_version": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+  "reference_agent_aliases": ["verify-reasonix14403-before"],
   "fixed_in": "merged PR #14404; merge commit e29812d38f8aebb24151f983c5e1dbade0181edd; first release: unknown",
   "pinned_contains_fix": false,
   "steps": [
@@ -27,7 +28,7 @@
       "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/a708a88a75302d2ff4391cea6a041c0072ffc618/internal/tools/builtin/encoding_helpers.go#L42-L50",
       "role": "recorded_ABB_reproduction",
       "verification": "source_confirmed_at_tested_revision",
-      "explanation": "字面匹配跳过换行转换。"
+      "explanation": "A literal match bypasses line-ending conversion."
     },
     {
       "file": "internal/tools/builtin/encoding_helpers.go",
@@ -38,7 +39,7 @@
       "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/a708a88a75302d2ff4391cea6a041c0072ffc618/internal/tools/builtin/encoding_helpers.go#L92-L105",
       "role": "recorded_ABB_reproduction",
       "verification": "source_confirmed_at_tested_revision",
-      "explanation": "replace_all 字面分支原样写入。"
+      "explanation": "The replace_all literal branch inserts the replacement unchanged."
     },
     {
       "file": "internal/tools/builtin/encoding_helpers.go",
@@ -49,8 +50,8 @@
       "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/a708a88a75302d2ff4391cea6a041c0072ffc618/internal/tools/builtin/encoding_helpers.go#L144-L154",
       "role": "recorded_ABB_reproduction",
       "verification": "source_confirmed_at_tested_revision",
-      "explanation": "单次字面分支原样写入。"
+      "explanation": "The single-edit literal branch inserts the replacement unchanged."
     }
   ],
-  "Root cause": "已确认：matchLineEndings 在 old_string 字面匹配时直接返回原 new_string；applyOldStringEdit 的单次及 replace_all 字面分支直接替换，未按目标行换行符规范化。CRLF settings.ini 中以单行 retries=3 匹配并插入含 LF 的多行文本，会混入裸 LF。源码 SHA a708a88a75302d2ff4391cea6a041c0072ffc618 已确认；提交说明关联 Studio 2.48.0，但本次未独立验证发布标签映射，故使用 commit 固定。修复 PR #14404 已合并，merge SHA e29812d38f8aebb24151f983c5e1dbade0181edd；首次发布版本 unknown。复现前须提供含 [client]、retries=3、backoff=2 的 CRLF settings.ini。验证时需要检查工具输入和编辑后的原始文件字节，不能仅凭文件名或成功提示认定复现。 核对版 pinned_contains_fix 按本文件 commit_version 理解为 false（该测试提交仍含缺陷）；原始 case 的 true 不应解释为历史测试提交已修复。"
+  "Root cause": "At the selected commit, matchLineEndings returns new_string unchanged when old_string matches literally. The single-edit and replace_all literal branches of applyOldStringEdit then write that replacement without adapting its line endings to the CRLF file. In the retained baseline, an edit of retries=3 in a CRLF settings.ini inserts a bare LF; the subsequent od -c output shows retries=3 followed by LF while the surrounding lines retain CRLF. The historical test used a pre-created CRLF fixture containing [client], retries=3, and backoff=2. Fix PR #14404 was merged, but its first release is unknown. The historical test unit was named verify-reasonix14403-before; reference_agent_aliases maps that original identifier to the registered Agent without changing the saved trajectory."
 }

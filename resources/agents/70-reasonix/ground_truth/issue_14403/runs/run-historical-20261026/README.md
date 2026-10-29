@@ -1,17 +1,7 @@
 # Archived historical reproduction
 
-Both baselines insert a bare LF in the CRLF fixture. The repair control preserves CRLF. Raw before/after file bytes are copied under verification/evidence.
+The retained baseline inserted a bare LF into a CRLF settings.ini. The edit_file call used old_string `retries=3` and new_string containing a line break before `timeout=30`; the recorded `od -c` output shows the resulting mixed line endings. This is an existing experiment from 2026-10-26, copied on 2026-10-28; the Agent was not rerun for this archive.
 
-These are existing 2026-10-26 experiments, copied on 2026-10-28. No Agent was rerun.
-Original artifacts and existing Issue runs were not modified. Baselines reproduce the defect; repair controls demonstrate its removal.
+[Baseline trajectory](trajectory/cbfe63c1f831434ba249930b75fe08f4/trajectory.json) · [Archive index](archive.json) · [File integrity manifest](file-integrity.json)
 
-| Role | Local trajectory |
-| --- | --- |
-| baseline | [cbfe63c1f831434ba249930b75fe08f4](trajectory/cbfe63c1f831434ba249930b75fe08f4/trajectory.json) |
-| baseline_repeat | [abc3beaeb98d4d719037a7182dc8936f](trajectory/abc3beaeb98d4d719037a7182dc8936f/trajectory.json) |
-| repair_control | [b0fa629a0ccf44bf8d23eba1aefcc2e1](trajectory/b0fa629a0ccf44bf8d23eba1aefcc2e1/trajectory.json) |
-
-[Archive index](archive.json) · [Verification summary](verification/verification-summary.json) · [File integrity manifest](file-integrity.json)
-
-Trajectories were derived offline from the copied raw evidence. A partial trajectory status describes capture/association limitations, not whether the defect reproduced.
-Historical reports are preserved verbatim under verification. Their old path strings are provenance, not the navigation index; use the local paths above.
+The historical test used a pre-created CRLF fixture and the unit name `verify-reasonix14403-before`. The Case explicitly permits this baseline alias for the registered `reasonix` Agent; the raw trajectory retains its original identifier. A partial trajectory status describes capture and association limits, not whether the byte-level defect was observed.
