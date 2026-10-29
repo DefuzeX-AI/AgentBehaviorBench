@@ -43,8 +43,9 @@ contains environment variable names, not values. Each name must also be declared
 by the unit's runtime or adapter environment settings. ABB resolves the values
 when starting the session and sends ACP v1's `env` array of `{name, value}`
 objects. A declared but unset key fails before the ACP Agent starts. Secret values
-are added to the evidence redactor before ACP events are observed, and values are
-never stored in `agent.toml`.
+are registered with redactors before the Agent starts. ABB redacts matching values
+from observation artifacts and from the invocation output submitted to the
+evaluation SDK. Values are never stored in `agent.toml`.
 
 Do not set a `type` or `transport` field on an MCP entry: ACP v1 stdio server
 objects have no discriminator. HTTP and SSE MCP servers are rejected explicitly;
