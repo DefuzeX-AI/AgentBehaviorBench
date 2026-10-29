@@ -5,7 +5,8 @@
     "number": 17,
     "url": "https://github.com/zamalali/langchain-code/issues/17",
     "state": "open",
-    "title": "Deep mode: delegating to a sub-agent (`task`) always fails with \"StructuredTool does not support sync invocation\""
+    "title": "Deep mode: delegating to a sub-agent (`task`) always fails with \"StructuredTool does not support sync invocation\"",
+    "body": "**What happens**\n\nIn `--mode deep`, whenever the model calls the `task` tool the turn ends with\n\n```\nAgent error: StructuredTool does not support sync invocation.\n```\n\nThe sub-agent never runs.\n\n**Environment**\n\nlangchain-code `d75d039` (current main), Linux, Python 3.11, OpenAI-compatible model (DeepSeek `deepseek-v4-flash`).\n\n**Steps to reproduce**\n\n1. `langcode chat --mode deep`\n2. Ask: `Please delegate this job to your general-purpose sub-agent rather than doing it yourself: the sub-agent should create the file report/total.txt containing only the sum of 17, 25 and 58.`\n3. The model calls `task` and the turn fails with the error above. No file is created.\n\nReproduced in 10 out of 10 fresh runs.\n\n**Likely cause**\n\n`task` in `agent/subagents.py` (L107) only has an `async def` implementation, but the CLI runs the deep agent with the sync `agent.invoke(...)` (`cli/commands/chat.py` L568), so the async-only tool gets called synchronously.\n"
   },
   "version_choice": "pinned",
   "reported_version": "d75d039",

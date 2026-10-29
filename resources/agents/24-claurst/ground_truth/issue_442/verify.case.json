@@ -5,7 +5,8 @@
     "number": 442,
     "url": "https://github.com/Kuberwastaken/claurst/issues/442",
     "state": "closed",
-    "title": "Bash tool runtime: multibyte truncation panic, 2 MB reader stall, no PAGER, spill large output to a file"
+    "title": "Bash tool runtime: multibyte truncation panic, 2 MB reader stall, no PAGER, spill large output to a file",
+    "body": "Found in the 2026-10-14 pi-vs-claurst and codex-vs-claurst audits (refs/audit, gitignored).\n\n- Output truncation slices by byte offset (`crates/tools/src/pty_bash.rs` ~701-719) and can panic on a non-char boundary with multibyte output.\n- The reader has a head-only 2 MB cap after which it stops reading, so a chatty command fills the pipe, the child blocks, and the call times out with output lost.\n- No `PAGER=cat` / `GIT_PAGER=cat` in the child env, so `git log`, `git diff`, `man` etc. can hang in `less`.\n- The Monitor path is unbounded.\n\nSpec:\n- Keep a rolling tail (last ~2000 lines / 50 KB) plus a head window instead of a head-only cap; never stop draining the pty.\n- Truncate on char boundaries (`is_char_boundary` back-off) everywhere output is cut.\n- When output exceeds the cap, write the full output to a 0600 spill file under the claurst home (e.g. `<home>/tool-output/<id>.txt`) and append `Full output: <path>` to the tool result; the model can Read it with offset.\n- Set `PAGER=cat`, `GIT_PAGER=cat`, `TERM` sensibly, and `GIT_TERMINAL_PROMPT=0` in the child env (codex and pi both do); keep existing env handling otherwise.\n- Apply the same tail/spill bound to the Monitor path.\n- Tests: multibyte output at the cut point does not panic; 10 MB of output completes and yields head+tail plus a spill path; the spill file is 0600."
   },
   "version_choice": "pinned",
   "reported_version": "0.1.7",

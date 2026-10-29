@@ -5,7 +5,8 @@
     "number": 3698,
     "url": "https://github.com/gptme/gptme/issues/3698",
     "state": "closed",
-    "title": "ux: 'read' tool error should explain how to enable it (disabled_by_default=True)"
+    "title": "ux: 'read' tool error should explain how to enable it (disabled_by_default=True)",
+    "body": "## Summary\n\nWhen a model tries to use the `read` tool (which is `disabled_by_default=True`), the error message gives no guidance on how to enable it.\n\n**gptme version**: 0.33.0+076e433c\n**Provider**: openrouter/openrouter/free\n**Install**: uv tool install gptme\n\n## Steps to reproduce\n\n```bash\ngptme -m \"openrouter/openrouter/free\" --non-interactive \"create test.txt then read it back\"\n```\n\nThe model creates the file with `save`, then tries `read`, and gets:\n\n```\nTool 'read' is not runnable; emitting an error tool_result to keep the tool_use/tool_result pairing valid.\nSystem: Tool 'read' is not available for execution.\n```\n\n## Expected\n\nThe error should tell the user how to enable the tool:\n\n> Tool 'read' is disabled by default. Enable it with `--tools +read` or use `shell` to read files instead.\n\n## Root cause\n\n`read` tool has `disabled_by_default=True` in its `ToolSpec`. It appears in `gptme --help` under \"Available tools\" (which implies it's usable), so models and users expect it to work. When invoked, the cryptic \"not runnable\" error provides no path forward.\n\n## Suggested fix\n\nIn the tool-not-runnable error path, check if the tool is `disabled_by_default` and append: `\"Add --tools +<name> to enable this tool.\"` One-line change in tool dispatch.\n\n`shell` works as a workaround (`cat file.txt`)."
   },
   "version_choice": "historical:v0.33.0",
   "reported_version": "0.33.0+076e433c",

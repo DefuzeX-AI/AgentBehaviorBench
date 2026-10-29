@@ -5,7 +5,8 @@
     "number": 8299,
     "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/8299",
     "state": "closed",
-    "title": "[Bug]: Built-in grep mishandles encoding in some files mixing Chinese and Western text"
+    "title": "[Bug]: Built-in grep mishandles encoding in some files mixing Chinese and Western text",
+    "body": "### Version line\n\nv2 — Go rewrite (1.x), main-v2 (active development)\n\n### Exact version\n\n1.23.0\n\n### What happened?\n\ngrep 搜索部分中西文混合文件时无法正确处理编码问题。以下是Reasonix自己的报告：\n\n> 诊断完成，证据链完整。以下是内置 grep 的完整情况说明。\n> \n> 结论\n> 内置 grep 工具（Go 重写版，docs/MIGRATING.md 说明它「匹配前会解码文件」）对无 BOM 的纯中文 UTF-8 文件做了错误的编码检测：把 UTF-8 字节按 GBK/GB18030 解码。结果：\n> \n> 中文 pattern → 匹配不到（pattern 是 UTF-8，与 GBK 解码后的乱码文本比对自然失败）；\n> ASCII pattern（如 1931、thesis-citation）→ 能匹配，但输出行中文全部乱码；\n> 文件本身没有任何问题——read_file、外部命令行 rg 都正常。\n> 证据链\n> 乱码确认：内置 grep 搜 `待排印正文/02-02-第2章第2节.md` 的 1931，输出 `## 绗�簩鑺傘€€鈥滅粺涓€鎴樼嚎鈥...`。我用 PowerShell 模拟「取原文 UTF-8 字节 → 按 GBK 解码」，得到完全一致的乱码：`## 绗簩鑺傘€€鈥滅粺涓€鎴樼嚎鈥...`。反向还原也成立。\n> 与 ASCII 占比强相关（全仓统计）：\n> 误判失败：待排印正文 全部正文文件，ASCII 占比 0.8%–15.4%（中文为主）。\n> 正常：`论文.md`（19.8%，且开头是 YAML front matter）、`研究工作/.../1994俄文档案集...md`（18.7%）、`项目治理/状态/当前占用.md`（45.9%）、`00-03-英文摘要占位稿.md`（100%）。\n> 带 BOM 的 UTF-8 文件正常：`冷审计/档案/材料索引/文件索引_中文.csv`（UTF-8-sig）搜「统一战线」完美命中——说明 BOM 能帮助检测器正确识别编码。\n> 阈值大致在 ASCII 占比 16% 上下（15.4% 的 03-02 未逐一验证，但 18.7% 以上正常）。\n\n### Steps to reproduce\n\n见上\n\n### OS / platform\n\nwin10 19045.7548\n\n### Relevant logs or output\n\n```shell\n\n```"
   },
   "version_choice": "historical:1.23.0",
   "reported_version": "1.23.0",

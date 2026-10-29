@@ -5,7 +5,8 @@
     "number": 9994,
     "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9994",
     "state": "closed",
-    "title": "[Bug]: edit_file 后 read-evidence 无法清除，bash 被永久阻塞，且报错路径指向已删除的文件"
+    "title": "[Bug]: edit_file 后 read-evidence 无法清除，bash 被永久阻塞，且报错路径指向已删除的文件",
+    "body": "### Version line\n\nv2 — Go rewrite (1.x), main-v2 (active development)\n\n### Exact version\n\n1.38.3\n\n### What happened?\n\n在 edit_file 修改 <workspace>/calc_metrics.py 之后，read_file 已成功读到最新内容并回复 “The requested read requirement is already satisfied on this unchanged source version.”，但 bash 依然被拦：[evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (<workspace>/calc_metrics.py); use the exact file tool for those paths\n\n即 read-evidence 无法被 read_file 清除。之后即使把该文件 move_file 移走、或 write_file 覆盖重写，bash 仍报同一个已不存在的路径；所有可能写文件的命令（python、rm）全局被拦（echo、ls 正常），任务只能放弃。\n\n### Steps to reproduce\n\nwrite_file 创建 <workspace>/calc_metrics.py\nread_file 读取该文件 → 成功\nedit_file 修改该文件 → 成功\nread_file 再次读取该文件 → 成功（回显最新内容）\nbash 执行 cd <workspace> && python calc_metrics.py → 被拦截\n\n### OS / platform\n\nWindows 10\n\n### Relevant logs or output\n\n```shell\n\n```"
   },
   "version_choice": "historical:v1.38.3",
   "reported_version": "1.38.3",

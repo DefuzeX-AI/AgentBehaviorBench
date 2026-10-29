@@ -5,7 +5,8 @@
     "number": 992,
     "url": "https://github.com/gptme/gptme/issues/992",
     "state": "closed",
-    "title": "fix: shell bg command fails when not first command in code block"
+    "title": "fix: shell bg command fails when not first command in code block",
+    "body": "## Bug Description\n\nThe `bg` shell feature for background jobs fails when used after other commands in the same code block. It appears to only work when `bg` is the first (and only) command.\n\n## Steps to Reproduce\n\n### Fails - bg after cd:\n```shell\ncd /some/directory\nbg npm run dev\n```\nError: `bash: line 32: bg: no job control`\n\n### Fails - bg with &&:\n```shell\ncd /some/directory && bg npm run dev\n```\nError: `bash: bg: no job control`\n\n### Works - bg alone:\n```shell\nbg npm run dev\n```\nOutput: `Started background job **#1**: \\`npm run dev\\``\n\n## Expected Behavior\n\nThe `bg` command should work regardless of its position in the code block, or at minimum provide a clear error message explaining the limitation.\n\n## Possible Cause\n\nThe shell tool likely parses the code block looking for `bg` at a specific position (start of block or start of line), and when it's part of a compound command or follows other commands, the parsing fails and it falls through to bash's built-in `bg` command.\n\n## Environment\n\n- gptme v0.31.0\n- macOS 15.4.1"
   },
   "version_choice": "pinned",
   "reported_version": "v0.31.0",

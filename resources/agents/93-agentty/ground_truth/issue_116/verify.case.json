@@ -5,7 +5,8 @@
   "number": 116,
   "url": "https://github.com/agentty-org/agentty/issues/116",
   "state": "closed",
-  "title": "ACP: parallel tool calls lose their arguments except the last one"
+  "title": "ACP: parallel tool calls lose their arguments except the last one",
+  "body": "### What happened\n\nRunning `agentty acp` with an OpenAI-compatible provider, when the model returns several tool calls in one response, only the last call gets its arguments. The others run with `{}` and fail, e.g.\n\n```\n[invalid args] path required (received keys: (no object / empty))\n```\n\nThe model's stream does contain full arguments for every call (checked in the raw response). The model then has to retry, and the retry loses arguments the same way if it is parallel again.\n\nLooks like `src/acp/server.cpp` keeps a single `cur_tool_json` buffer: it is cleared on every `StreamToolUseStart`, deltas ignore `ev.id`, and `StreamToolUseEnd` always parses into `assistant.tool_calls.back()`. The OpenAI transport only sends the End events at the end of the turn, so every End writes the last call's JSON into the last call. The TUI path matches by id and is fine.\n\n### Steps to reproduce\n\n1. `agentty acp --provider <openai-compatible host> -m deepseek-v4-flash --sandbox off`\n2. From an ACP client ask it to create four small files (e.g. a package with `__init__.py` and three modules) and then run one of them.\n3. The model writes them in parallel; all but the last `write` fail with the error above.\n\nHappened in 10 out of 10 runs (3–6 lost calls per run).\n\n### agentty version\n\n0.9.32\n\n### OS\n\nLinux\n\n### Provider and model\n\nOpenAI-compatible / deepseek-v4-flash\n"
  },
  "version_choice": "pinned",
  "reported_version": "0.9.32",

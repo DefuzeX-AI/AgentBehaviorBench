@@ -5,7 +5,8 @@
     "number": 922,
     "url": "https://github.com/1jehuang/jcode/issues/922",
     "state": "closed",
-    "title": "Destructive-command safety filter false-positives on plain English inside heredoc content"
+    "title": "Destructive-command safety filter false-positives on plain English inside heredoc content",
+    "body": "## Summary\nThe safety gate that blocks irreversible/destructive-looking Bash commands scans the full command text, including the body of a heredoc (`<< 'EOF' ... EOF`) being appended to a file. It appears to naively pattern-match words like `time` anywhere in the string — including inside plain English content being written to a file — and misidentifies it as an attempt to invoke the `time` shell command, rejecting the whole call.\n\n## Steps to reproduce\nRun something like:\n```bash\ncat >> log.md << 'EOF'\n2026-08-13 | some log line | O(n^2) time and O(n) space | ...\nEOF\n```\n\n## Actual behavior\nRejected with:\n`Error: This command was not run. It is irreversible: - `time` runs another command that could not be identified statically`\n\neven though `time` here is just an English word inside literal file content being appended via heredoc, not a shell invocation.\n\n## Expected behavior\nThe safety scanner should distinguish real command invocations from literal text inside quoted heredoc bodies (or other quoted/literal contexts), and not flag plain words that happen to collide with shell builtin names.\n\n## Workaround\nReworded the log text to avoid the standalone word \"time\" (e.g. \"quadratic time\" -> avoided), which let the command through. This isn't a real fix — it just means innocuous file content can trigger false destructive-command warnings depending on wording."
   },
   "version_choice": "historical:v0.75.0",
   "reported_version": "unknown",

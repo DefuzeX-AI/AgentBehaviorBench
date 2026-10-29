@@ -5,7 +5,8 @@
     "number": 287,
     "url": "https://github.com/KonghaYao/peri/issues/287",
     "state": "open",
-    "title": "Read: truncation hint points to the wrong line when a single line exceeds 5000 bytes"
+    "title": "Read: truncation hint points to the wrong line when a single line exceeds 5000 bytes",
+    "body": "**What happens**\n\nWhen the first line returned by Read is longer than `MAX_OUTPUT_BYTES` (5000), Read returns the first 5000 bytes of that line and says:\n\n```\n[Output truncated: <N> bytes total; line 2 exceeds the output limit; use offset=2 to read the rest of the file]\n```\n\nFor a one-line file (e.g. minified JSON) there is no line 2. The line that exceeds the limit is line 1, and following the hint skips the rest of it. Since offset/limit are line-based, the rest of that line can't be read with Read at all.\n\n**Environment**\n\nperi agent-v4.3.0 (`e598d178`), Linux, `peri acp`. Same code on current main (`mcp-packages/workspace/src/filesystem/read.rs`, the `kept_lines == 0` branch sets `next_offset = start + 2`).\n\n**Steps to reproduce**\n\n1. `python3 -c \"import json; print(json.dumps({'k%d' % i: 'v' * 40 for i in range(160)}), end='')\" > config.json` (one ~7 KB line)\n2. Ask peri to read `config.json` with the Read tool and report the last key.\n3. Read returns the first 5000 bytes plus the hint above.\n\nHappened in both of our runs; the agent then fell back to python to read the file.\n"
   },
   "version_choice": "pinned",
   "reported_version": "4.3.0",

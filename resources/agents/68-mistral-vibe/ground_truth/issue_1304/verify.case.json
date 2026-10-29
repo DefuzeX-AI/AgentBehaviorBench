@@ -5,7 +5,8 @@
     "number": 1304,
     "url": "https://github.com/mistralai/mistral-vibe/issues/1304",
     "state": "open",
-    "title": "bug: Subagent child slots are never released: idle children permanently consume the max_children budget, and no tool can close them"
+    "title": "bug: Subagent child slots are never released: idle children permanently consume the max_children budget, and no tool can close them",
+    "body": "### Component\n\nCLI\n\n### Summary\n\nOnce a session has spawned `max_children` (default 8) subagents, the slots are consumed **for the lifetime of the session**, even if every child is idle, finished, or its result has long been consumed. There is no way for the parent agent to close/release a child, and the limit is not configurable. In a long orchestrator session this bricks subagent delegation entirely: the only recovery is starting a new session and losing all context.\n\n\n### Reproduction steps\n\n1. Start a session and spawn 8 subagents sequentially (one task each, all complete normally, results consumed).\n2. Attempt a 9th spawn for an unrelated task.\n3. Result: spawn is refused — the child limit is reached. `agents.list` shows all 8 children idle/finished, none running.\n4. There is no `agents.close` / `agents.stop` / `agents.remove` tool exposed to the parent, so the slots can never be freed. The session is permanently at capacity.\n\n### Versions / environment\n\n- mistral-vibe 3.0.1 (uv tool install, python 3.14) - Linux, orchestrator session using subagents via the `agents.*` tool namespace\n\n### Logs & screenshots\n\n```shell\n\n```"
   },
   "version_choice": "pinned",
   "reported_version": "3.0.1",

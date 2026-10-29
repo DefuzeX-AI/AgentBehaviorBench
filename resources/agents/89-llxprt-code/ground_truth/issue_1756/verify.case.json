@@ -5,7 +5,8 @@
     "number": 1756,
     "url": "https://github.com/vybestack/llxprt-code/issues/1756",
     "state": "closed",
-    "title": "ast_edit silently replaces first occurrence on ambiguous matches"
+    "title": "ast_edit silently replaces first occurrence on ambiguous matches",
+    "body": "When old_string matches multiple locations in the file, ast_edit silently replaces only the first occurrence without any warning. This is inconsistent with the replace tool, which errors on ambiguous matches and asks the caller to provide more context.\n\n**Expected behavior:** ast_edit should either:\n1. Error when old_string matches multiple locations (consistent with replace tool behavior), OR\n2. At minimum, warn in the preview response that N occurrences were found and only the first will be replaced\n\n**Reproduction:**\n1. Have a TypeScript file where a string like \\`active: true,\\` appears in two locations (e.g., in a function body and in a const declaration)\n2. Call ast_edit with that string as old_string\n3. Preview shows no warning about multiple matches\n4. Force-apply replaces only the first occurrence silently\n\n**Impact:** Callers may unknowingly modify the wrong occurrence. The replace tool correctly guards against this; ast_edit should too."
   },
   "version_choice": "historical:v0.9.3",
   "reported_version": "v0.9.3",

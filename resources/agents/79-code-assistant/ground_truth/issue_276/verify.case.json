@@ -5,7 +5,8 @@
     "number": 276,
     "url": "https://github.com/stippi/code-assistant/issues/276",
     "state": "open",
-    "title": "edit strips trailing whitespace from new_text but reports success"
+    "title": "edit strips trailing whitespace from new_text but reports success",
+    "body": "**What happens**\n\nIf the file being edited has no trailing whitespace, `edit` also strips trailing whitespace from the replacement text, then reports success. So an edit that adds Markdown hard line breaks (two trailing spaces) silently loses them.\n\n**Environment**\n\ncode-assistant v0.2.16 (`b942737b`), Linux, ACP mode, DeepSeek `deepseek-v4-flash`. Same code on current main.\n\n**Steps to reproduce**\n\n1. Create a `README.md` with no trailing whitespace, ending with a few contact lines.\n2. Ask: add two trailing spaces to the first two contact lines as Markdown hard line breaks.\n3. The `edit` call has `new_text` like `Payments Team␠␠\\nBuilding 4, Floor 2␠␠\\n…` and returns success, but the written file has no trailing spaces on those lines.\n\nIn our run the agent checked with `cat -A`, said \"The `edit` tool stripped the trailing spaces\", and fell back to `perl -i`.\n\n**Cause**\n\n`apply_matches` in `crates/fs_explorer/src/file_updater.rs` runs `normalize(&replacement.replace, preserve_trailing_ws)` on the replacement too. `preserve_trailing_ws` comes from whether the original file already has trailing whitespace, so when it doesn't, `normalize_content` trims every line of the new text.\n"
   },
   "version_choice": "pinned",
   "reported_version": "v0.2.16",

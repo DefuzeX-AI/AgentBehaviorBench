@@ -5,7 +5,8 @@
     "number": 9487,
     "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9487",
     "state": "closed",
-    "title": "[Bug]: memory index functions silently discard read errors, causing MEMORY.md data loss"
+    "title": "[Bug]: memory index functions silently discard read errors, causing MEMORY.md data loss",
+    "body": "### Version line\n\nv2 — Go rewrite (1.x), main-v2 (active development)\n\n### Exact version\n\ndesktop-v1.31.4\n\n### What happened?\n\nindexLinesExceptIn and flushIndexIn silently discard ReadFileUTF8 errors using `_ =`. When the MEMORY.md file exists but is unreadable (permission error, file corruption), both functions return empty data, causing flushIndexIn to overwrite the file with empty content — deleting all managed index entries.\n\nExpected: read errors should be propagated so the write is aborted and data is preserved.\n\n### Steps to reproduce\n\n1. Ensure MEMORY.md has at least one managed entry (e.g. save a fact with `remember`)\n2. chmod 000 .reasonix/MEMORY.md\n3. Trigger a delete operation (e.g. use the `forget` tool)\n4. chmod 644 .reasonix/MEMORY.md\n5. cat .reasonix/MEMORY.md — all managed entries are gone\n\n### OS / platform\n\nmacOS 26.5 (arm64)\n\n### Relevant logs or output\n\n```shell\n\n```"
   },
   "version_choice": "historical:1.31.4",
   "reported_version": "desktop 1.31.4",

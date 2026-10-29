@@ -5,7 +5,8 @@
     "number": 3598,
     "url": "https://github.com/vybestack/llxprt-code/issues/3598",
     "state": "open",
-    "title": "search_file_content returns no matches in ignored log directory despite both ignore filters disabled"
+    "title": "search_file_content returns no matches in ignored log directory despite both ignore filters disabled",
+    "body": "## Observed behavior\n\nDuring PR #3591 CI remediation on macOS, `search_file_content` returned no matches for a directory containing two 454 KB text logs with many matching lines. Both ignore-filter options were explicitly false.\n\nInvocation:\n```json\n{\"path\":\"/Users/acoliver/projects/llxprt/branch-1/llxprt-code/tmp/pr3591-lint-completion\",\"pattern\":\"error|Error|FAIL|failed|EXIT|warning\",\"file_filtering_options\":{\"respect_git_ignore\":false,\"respect_llxprt_ignore\":false}}\n```\n\nResult: `No matches found`.\n\nThe directory contained `javascript-lint-job-101877140635.log` and `ci-lint-failed.log`. Reading the latter showed `##[warning]` lines, `ESLint found too many warnings (maximum: 0).`, `##[error]Process completed with exit code 1.`, and `EXIT_CODE=0`. The logs are captured from GitHub Actions run 34165998934, job 101877140635. A preceding directory listing also found the first log with the same ignore options.\n\n## Expected behavior\n\nSearch the explicitly supplied directory when both ignore filters are disabled, or report the reason files were excluded rather than claiming no matches.\n\n## Context\n\nCheckout head: `3d06a0960e357eaa6653002797f938dd3b9fbf80`. The directory is under the repository's ignored `tmp/` tree. Root cause has not been established. No product changes were made for this issue."
   },
   "version_choice": "pinned",
   "reported_version": "3d06a0960e357eaa6653002797f938dd3b9fbf80",

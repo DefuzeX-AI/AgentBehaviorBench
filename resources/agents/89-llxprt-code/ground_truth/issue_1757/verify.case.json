@@ -5,7 +5,8 @@
     "number": 1757,
     "url": "https://github.com/vybestack/llxprt-code/issues/1757",
     "state": "closed",
-    "title": "ast_edit preview succeeds for non-existent files then force fails"
+    "title": "ast_edit preview succeeds for non-existent files then force fails",
+    "body": "When ast_edit targets a file that does not exist, the preview phase (without force) succeeds and returns a response showing 0 declarations, AST validation: PASSED, and prompts to call again with force: true. When force: true is used, it errors with File not found.\n\n**Expected behavior:** The preview phase should detect that the target file does not exist and report an error immediately, rather than returning a misleading successful preview.\n\n**Reproduction:**\n1. Call ast_edit with a file path that does not exist and a non-empty old_string\n2. Observe: preview returns with AST validation: PASSED, 0 declarations, NEXT STEP: Call again with force: true\n3. Call again with force: true\n4. Observe: error - File not found\n\n**Impact:** Misleading preview wastes a round-trip and creates false confidence that the edit will succeed."
   },
   "version_choice": "historical:v0.9.3",
   "reported_version": "v0.9.3",

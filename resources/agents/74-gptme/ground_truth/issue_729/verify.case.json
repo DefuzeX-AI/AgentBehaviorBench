@@ -5,7 +5,8 @@
     "number": 729,
     "url": "https://github.com/gptme/gptme/issues/729",
     "state": "closed",
-    "title": "Issues with shell tool"
+    "title": "Issues with shell tool",
+    "body": "Some issues I discovered with the shell tool, likely after our improvements in #724 #725\n\nWe should create test cases for these examples, mark them XFAIL, verify the failures, then fix them.\n\nRelated to  #408\n\n---\n\nCase 1:\n\n```\nRan allowlisted command: `cd /home/bob/gptme-bob && grep -A 5 \"journal\" scripts/autonomous-run.sh | head -20`\n\n`bash: line 77: cd: too many arguments`\n```\n\nAssumed to be some issue with how compound statements including both `&&` and `|` are treated. Should add a test for this and address it,\n\n---\n\nCase 2:\n\n```\nRan allowlisted command: `grep -A 5 \"journal\" ~/gptme-bob/scripts/autonomous-run.sh | head -20`\n\n`grep: ~/gptme-bob/scripts/autonomous-run.sh: No such file or directory`\n```\n\nThe file `~/gptme-bob/scripts/autonomous-run.sh` definitely exists, suspected to be an issue with tilde expansion? (does path arg get quoted?)"
   },
   "version_choice": "pinned",
   "reported_version": "v0.28.3",

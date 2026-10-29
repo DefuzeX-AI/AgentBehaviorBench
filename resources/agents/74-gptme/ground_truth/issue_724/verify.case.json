@@ -5,7 +5,8 @@
     "number": 724,
     "url": "https://github.com/gptme/gptme/issues/724",
     "state": "closed",
-    "title": "Shell tool stalls on for loop"
+    "title": "Shell tool stalls on for loop",
+    "body": "Shell tool doesn't seem to handle for-loops well.\n\nExample output from autonomous run:\n\n````\nGood! I can see several open PRs. Let me check their CI status and any review feedback:\n```shell\ncd /home/bob/gptme\n# Check CI status for recent PRs\nfor pr in 723 722 721 720 719; do\n  echo \"=== PR #$pr ===\"\n  gh pr checks \"$pr\" --json name,conclusion,workflowName --jq '.[] | select(.conclusion != null) | \"\\(.workflowName): \\(.conclusion)\"' | head -5\ndone\n```\nPreview\ncd /home/bob/gptme\n# Check CI status for recent PRs\nfor pr in 723 722 721 720 719; do\n  echo \"=== PR #$pr ===\"\n  gh pr checks \"$pr\" --json name,conclusion,workflowName --jq '.[] | select(.con\ndone\nbash: line 73: syntax error near unexpected token `<'\nbash: line 73: `for pr in 723 722 721 720 719 ';' do echo '=== PR #$pr ===' gh pr checks '$pr' --json name , conclusion , workflowName --jq '.[] | select(.conclusion != null) | \"\\(.workflowName): \\(.conclusion)\"' < /dev/null | head -5 done'\n````\n\n(stuck there, eventually gets unstuck from shell timeout)"
   },
   "version_choice": "pinned",
   "reported_version": "v0.28.3",
