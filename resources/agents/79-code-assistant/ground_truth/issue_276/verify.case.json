@@ -42,12 +42,5 @@
       "explanation": "With preserve_trailing_ws=false this helper calls encoding::normalize_content, which strips trailing whitespace; it is meant for matching the search text but is reused for the replacement."
     }
   ],
-  "Root cause": "Confirmed at the selected historical commit by local regression tests and fresh ABB before/after runs. The original file has no trailing whitespace, so preserve_trailing_ws is false. apply_matches applies normalize() to replacement text as well as search/content; normalize_content trims every line of new_text. Consequently edit reports success but discards explicitly requested Markdown hard-break spaces. The local patch normalizes replacement line endings only, preserving requested trailing spaces while keeping existing search matching. Validation includes a controlled native-edit-only task and raw file bytes, because the original task can be completed by a shell workaround. This is a locally validated repair, not an upstream merged fix.",
-  "local_repair": {
-    "status": "reproduced_and_locally_fixed",
-    "evidence": "verification/local-repair-20261029/report.json",
-    "base_revision": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
-    "patch_sha256": "0d257e43bc7ce8b979bbe786c841f4fa11f52b79fef958234b6341a37a372f5c",
-    "upstream_merged": false
-  }
+  "Root cause": "Confirmed at the selected historical commit by local regression tests and fresh ABB before/after runs. The original file has no trailing whitespace, so preserve_trailing_ws is false. apply_matches applies normalize() to replacement text as well as search/content; normalize_content trims every line of new_text. Consequently edit reports success but discards explicitly requested Markdown hard-break spaces. The local patch normalizes replacement line endings only, preserving requested trailing spaces while keeping existing search matching. Validation includes a controlled native-edit-only task and raw file bytes, because the original task can be completed by a shell workaround. This is a locally validated repair, not an upstream merged fix."
 }

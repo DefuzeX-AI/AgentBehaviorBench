@@ -17,8 +17,8 @@
     "Now use the find_files tool with pattern: \"./package.json\" and tell me exactly what it returns.",
     "Next use the find_files tool with pattern: \"./source/**/*.ts\" and tell me exactly what it returns."
   ],
-  "expected": "find_files 在匹配前剥掉（或等价地忽略）pattern 的前导 './'，因此 pattern \"./package.json\" / \"./source/**/*.ts\" 应分别匹配到 package.json / source/cli.tsx、source/utils/file-search.ts（依据 issue 的 Expected Behavior：'find_files should match package.json or source files when prefixed with ./'；修复 PR #1393 即是在 pattern 进入 matchesGlob 前规范化掉前导 './'）。",
-  "defect": "find_files 对以 './' 开头的 pattern 返回 'No files or directories found matching pattern \"./package.json\"'：normalizePathForMatch 只把反斜杠换成 '/' 而保留前导 './'，tokenizeExpandedPattern 把 '.' 与 '/' 当字面 token，与形如 'package.json'、'source/cli.tsx' 的归一化相对路径永远匹配不上。",
+  "expected": "find_files should remove or ignore a leading './' before matching. The pattern './package.json' should find package.json, and './source/**/*.ts' should find source/utils/file-search.ts. This matches the issue's expected behavior and the normalization added by fix PR #1393 before the pattern reaches matchesGlob.",
+  "defect": "For a pattern beginning with './', find_files returns 'No files or directories found matching pattern \"./package.json\"'. normalizePathForMatch changes backslashes to forward slashes but keeps the leading './'. tokenizeExpandedPattern then treats '.' and '/' as literal tokens, so the pattern cannot match normalized relative paths such as 'package.json' or 'source/utils/file-search.ts'.",
   "fault location": [
     {
       "file": "source/utils/file-search.ts",

@@ -16,8 +16,8 @@
     "In the current workspace, create calculator.py with add(a, b) and subtract(a, b), and a short README.md describing their use. Run Python assertions verifying add(2, 3) == 5 and subtract(7, 4) == 3. Report the actual files and test results.",
     "Extend the existing calculator.py with multiply(a, b). Preserve add and subtract. Update README.md and run assertions for all three operations, including multiply(6, 7) == 42."
   ],
-  "expected": "同一 oh session 的后续请求应保留先前 assistant.tool_calls 与对应 tool 结果的配对（或不携带这些结果），从而能在保留 add/subtract 的基础上新增 multiply 并运行断言；依据 issue #140 的 Expected behavior 和 pin 下 packages/sdk/README.md:43–71 的多轮同进程示例。",
-  "defect": "工具执行后跨轮重建只保留 tool 结果而丢失 assistant.tool_calls，导致第二条用户消息携带无效历史；原报告表现为 HTTP 400 且 calculator.py 未新增 multiply。",
+  "expected": "A later request in the same oh session should preserve each prior assistant.tool_calls entry together with its corresponding tool result, or omit both. The agent should then add multiply to calculator.py while preserving add and subtract, and run the assertions. This follows the expected behavior in issue #140 and the same-process, multi-turn example in packages/sdk/README.md:43-71 at the pinned revision.",
+  "defect": "After tool execution, cross-turn history reconstruction retains tool results but drops the corresponding assistant.tool_calls entries. The second user message is therefore sent with invalid history; the original report describes an HTTP 400 response and no multiply function added to calculator.py.",
   "fault location": [
     {
       "file": "src/query/index.ts",
@@ -42,5 +42,5 @@
       "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
     }
   ],
-  "Root cause": "The reviewed query path consumes tool_call_complete internally without forwarding it to the session consumer that collects assistant tool calls. Appending tool results independently can create history containing tool results without their assistant calls. However both retained Wangyi turns complete successfully, including multiply assertions. This archive does not by itself confirm the reported second-turn failure or establish that the affected history path was exercised."
+  "Root cause": "The reviewed query path consumes tool_call_complete internally without forwarding it to the session consumer that collects assistant tool calls. Appending tool results independently can create history containing tool results without their assistant calls. In the retained historical native-session run, the first turn creates calculator.py and passes the add/subtract assertions. The second turn then fails with HTTP 400: a tool message has no preceding assistant tool_calls entry. The reported history-reconstruction failure is therefore observed in this retained run; multiply is not added."
 }

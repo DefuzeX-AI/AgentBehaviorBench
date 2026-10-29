@@ -17,8 +17,8 @@
     "Step 2: Create a file named release.cfg in the current directory whose entire content is the single line: version=1.4.2",
     "Step 3: Now run exactly the same shell command again, character for character and with nothing added: cat release.cfg\nShow me the real output of that run. Do not substitute or wrap it in a different command."
   ],
-  "expected": "Step 3 的 `cat release.cfg` 被 bash 工具真正执行并返回 `version=1.4.2`；因为成功的 write_file 和新的用户轮次已使先前失败记录失效（依据：issue 引用的 src/brain/tools/bash.rs:449-452 注释 'Stops the same-command-twice loop' 与 :1308-1311 承认 'the environment may have recovered'，且维护者确认应在新用户轮/成功变更型工具调用后清除记录）。",
-  "defect": "bash 工具在命令执行前被 recent-failure guard 短路，返回 'You already ran this exact command in the last 5 bash calls and it failed ... Previous error: cat: release.cfg: No such file or directory'，而 release.cfg 此时已存在，用户明确要求重跑的命令没有被执行。",
+  "expected": "In Step 3, the bash tool should actually execute `cat release.cfg` and return `version=1.4.2`. The successful write_file call and the new user turn should invalidate the earlier failure record. The issue cites comments in src/brain/tools/bash.rs:449-452 ('Stops the same-command-twice loop') and :1308-1311 ('the environment may have recovered'); the maintainer also confirmed that the record should be cleared after a new user turn or a successful state-changing tool call.",
+  "defect": "The recent-failure guard short-circuits the bash tool before the command executes and returns 'You already ran this exact command in the last 5 bash calls and it failed ... Previous error: cat: release.cfg: No such file or directory'. At that point release.cfg exists, but the command the user explicitly asked to retry is never run.",
   "fault location": [
     {
       "file": "src/brain/tools/bash.rs",

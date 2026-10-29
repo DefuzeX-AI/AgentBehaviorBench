@@ -16,8 +16,8 @@
     "Create a file named split_lines.sh in the current directory with exactly the following content (keep every character as given):\n\n#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone",
     "In split_lines.sh, change only the line `IFS=,` to `IFS=$'\\n'` so the fields are split on newlines instead of commas. Do not change any other line."
   ],
-  "expected": "Edit（或 MultiEdit）应把 new_string 原样写入被替换处，即第 3 行变成 IFS=$'\\n'、其余 6 行不变（依据：src/tools/fileEditTool.ts 的 Edit 描述 'Find a string in a file and replace it'、new_string = 'Replacement text'，multiEditTool.ts 同理，systemPrompt.ts:90 要求用 Edit 做精确修改）。",
-  "defect": "非 replace_all 的 Edit 走 String.prototype.replace(string, string)，new_string 里的 $' 被当作 JS 替换模式展开，落盘文件变成 'IFS=' + 原第 4 行起的整段内容 + 字面 \\n'，行数从 7 增到 12、bash 报 unexpected EOF，而工具结果 completed 且 diff preview 显示的是请求的正确文本。",
+  "expected": "Edit (or MultiEdit) should insert new_string literally: line 3 becomes IFS=$'\\n' and the other six lines remain unchanged. The Edit tool is documented as replacing a string in a file, new_string is documented as replacement text, and the system prompt calls for Edit to make precise changes.",
+  "defect": "In the non-replace_all path, Edit calls String.prototype.replace(string, string). JavaScript interprets $' in new_string as a replacement pattern, so the saved file contains 'IFS=' followed by the original content from line 4 onward and a literal \\n' instead of the requested line. The script grows from 7 to 12 lines and Bash reports unexpected EOF, even though the tool reports completion and its diff preview shows the requested text.",
   "fault location": [
     {
       "file": "src/tools/editCore.ts",

@@ -18,6 +18,9 @@ def load_issue(root, agent_id, issue_id):
         raise ValueError('Issue reference identity differs from Case folder')
     for field in ('expected', 'defect'):
         text_field(document, field)
+    aliases = document.get('reference_agent_aliases', [])
+    if not isinstance(aliases, list) or any(not isinstance(alias, str) or not alias for alias in aliases):
+        raise ValueError('Issue reference agent aliases must be a list of names')
     references = []
     for path in sorted((folder / 'runs').glob('*/trajectory/*/trajectory.json')):
         path = within(folder, path)
@@ -25,7 +28,12 @@ def load_issue(root, agent_id, issue_id):
         if value is None or value.get('status') == 'failed' or not value.get('steps'):
             raise ValueError(f'{issue_id}: unusable reference trajectory')
         if value.get('agent_id') != agent_id:
-            raise ValueError(f'{issue_id}: reference trajectory belongs to another Agent')
+            historical = value.get('metadata', {}).get('historical_import', {})
+            if (value.get('agent_id') not in aliases or
+                    not isinstance(historical, dict) or
+                    historical.get('role') != 'baseline' or
+                    historical.get('tested_base_commit') != document.get('commit_version')):
+                raise ValueError(f'{issue_id}: reference trajectory belongs to another Agent')
         references.append({**value, 'attempt': path.parent.relative_to(folder).as_posix()})
     if not references:
         raise ValueError(f'{issue_id}: no saved reference trajectory under runs/*/trajectory/*')

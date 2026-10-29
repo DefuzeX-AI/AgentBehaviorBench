@@ -30,12 +30,5 @@
       "explanation": "formatNormalOutput formats the merged filteredOutput under Stdout and always emits the literal Stderr: (empty). This contradicts the advertised separate-stream result contract."
     }
   ],
-  "Root cause": "Confirmed at the selected historical commit by a formatter regression and fresh ABB before/after runs. Shell execution supplies a combined output buffer. ShellToolInvocation.formatNormalOutput labels that buffer Stdout and unconditionally appends Stderr: (empty); the tool description also promises separate streams. The local patch labels the buffer Output (stdout and stderr combined) and documents that stream attribution is unavailable. The same two-stream command no longer produces a false empty-stderr claim. This repair makes the merged-output contract truthful; it does not reconstruct separate stdout and stderr streams and is not an upstream merged fix.",
-  "local_repair": {
-    "status": "reproduced_and_locally_fixed",
-    "evidence": "verification/local-repair-20261029/report.json",
-    "base_revision": "5400f65a6c7eef52844697c8f8c85390df29eea1",
-    "patch_sha256": "3f29ed5f8474a479f0d3670ec8accfc32e5d199dbd5e557d54e5c6fff0a6505d",
-    "upstream_merged": false
-  }
+  "Root cause": "Confirmed at the selected historical commit by a formatter regression and fresh ABB before/after runs. Shell execution supplies a combined output buffer. ShellToolInvocation.formatNormalOutput labels that buffer Stdout and unconditionally appends Stderr: (empty); the tool description also promises separate streams. The local patch labels the buffer Output (stdout and stderr combined) and documents that stream attribution is unavailable. The same two-stream command no longer produces a false empty-stderr claim. This repair makes the merged-output contract truthful; it does not reconstruct separate stdout and stderr streams and is not an upstream merged fix."
 }
