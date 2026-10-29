@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 from agentbench.adapter.base import AdapterInvocation
 from .invocation import InvocationObservation
-from .store import atomic_json, json_value, redact
+from .store import atomic_json, environment_secrets, json_value, redact
 from .result import sanitize_result
 
 
@@ -14,6 +14,7 @@ class HostObservation:
         self.directory.mkdir(parents=True, mode=0o700)
         self.agent, self.run = registration, sdk_run
         self.step = 0
+        self._secrets = environment_secrets()
         self.metadata = {'schema': 'abb.evaluate.run.v1', 'run_id': self.directory.name,
                          'agent_id': registration.agent_id, 'sdk_run_id': sdk_run.run_id, 'status': 'running',
                          'evidence_availability': {
@@ -23,8 +24,16 @@ class HostObservation:
         self._save()
 
     def _save(self):
-        from .store import environment_secrets
-        atomic_json(self.directory / 'run.json', redact(json_value(self.metadata), environment_secrets()))
+        atomic_json(self.directory / 'run.json', redact(json_value(self.metadata), self._secrets))
+
+    def add_secrets(self, secrets):
+        values = tuple(value for value in secrets if isinstance(value, str) and value)
+        if values:
+            self._secrets = tuple(dict.fromkeys((*self._secrets, *values)))
+
+    @property
+    def redaction_secrets(self):
+        return self._secrets
 
     async def invoke(self, running, test_input, config):
         self.step += 1
@@ -36,7 +45,9 @@ class HostObservation:
         store = observed.store
         observe_secrets = getattr(running.adapter, 'observation_secrets', None)
         if callable(observe_secrets):
-            observed.add_secrets(observe_secrets())
+            secrets = observe_secrets()
+            observed.add_secrets(secrets)
+            self.add_secrets(secrets)
         atomic_json(folder / 'input.json', redact(
             json_value({'input_id': test_input.input_id, 'payload': test_input.payload}),
             observed.redaction_secrets,

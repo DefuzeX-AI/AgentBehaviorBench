@@ -288,3 +288,92 @@ def test_mcp_environment_echo_is_redacted_from_host_observation(tmp_path):
     assert '[REDACTED]' in contents['steps/0001/acp-events.jsonl']
     assert not any(value in content for content in contents.values())
     assert any('[REDACTED]' in content for name, content in contents.items() if name.startswith('steps/0001/otel'))
+
+    observation.finish(result=SimpleNamespace(
+        run_id='host-issue-249', history_count=1,
+        report=SimpleNamespace(status='complete', confidence='high',
+                               issues=[f'Agent echoed {value}'], evidence_gaps=[]),
+    ))
+    run_data = (observation.directory / 'run.json').read_text()
+    assert value not in run_data
+    assert '[REDACTED]' in run_data
+
+
+def test_host_runner_redacts_mcp_values_from_failure_events_and_errors():
+    from agentbench.harness.errors import AgentInvocationError
+    from agentbench.harness.runner.benchmark_runner import BenchmarkRunner
+
+    value = '{{HOST_RUNNER_MCP_SECRET_0c52}}'
+
+    class SDKRun:
+        run_id = 'host-issue-249-runner'
+
+        def get_input(self, *, full):
+            assert full is True
+            return SimpleNamespace(input_id='input-1', payload={'prompt': 'echo'})
+
+        def submit(self, **_kwargs):
+            return None
+
+    class Observation:
+        redaction_secrets = (value,)
+
+        async def invoke(self, *_args):
+            raise RuntimeError(f'MCP server echoed {value}')
+
+    failures = []
+    with pytest.raises(AgentInvocationError) as raised:
+        asyncio.run(BenchmarkRunner(environ={})._drive_inputs(
+            SimpleNamespace(agent_id='host-fixture'), SDKRun(),
+            SimpleNamespace(adapter_name='acp'), observation=Observation(),
+            on_step_failure=lambda _agent, failure: failures.append(failure),
+        ))
+
+    assert value not in str(raised.value)
+    assert '[REDACTED]' in str(raised.value)
+    assert value not in failures[0].error_message
+    assert '[REDACTED]' in failures[0].error_message
+
+
+def test_mcp_values_are_written_to_interceptor_secret_files_not_json(tmp_path):
+    from agentbench.runtime.interception.service_config import prepare_service_config
+
+    value = '{{INTERCEPTOR_MCP_SECRET_3921}}'
+    interception = SimpleNamespace(
+        mode='observe', observation_headers={}, observation_tool_purposes={},
+        routes=(), tool_routes=(), token_counting={}, credentials=(),
+    )
+    data, environment = prepare_service_config(
+        interception, agent_id='host-fixture', max_trace_bytes=4096,
+        secret_dir=tmp_path, secret_resolver=None, environ={}, redaction_values=(value,),
+    )
+
+    assert environment == {}
+    assert value not in json.dumps(data)
+    assert len(data['redaction_secret_files']) == 1
+    secret_file = tmp_path / Path(data['redaction_secret_files'][0]).name
+    assert secret_file.read_text() == value
+
+
+def test_docker_runtime_uses_only_resolved_mcp_values_for_redaction(tmp_path):
+    from agentbench.runtime.docker.runtime import _prepare_mcp_redaction_values
+
+    value = '{{DOCKER_MCP_SECRET_b4e9}}'
+    root = _agent(tmp_path / 'agent', runtime_keys=('MCP_API_KEY',),
+                  server_entries=_entry(env_keys=('MCP_API_KEY',)))
+    environment = {'MCP_API_KEY': value, 'UNDECLARED_SECRET': 'must-not-be-forwarded'}
+    values = _prepare_mcp_redaction_values(
+        SimpleNamespace(framework='acp', path=root), environment,
+    )
+
+    assert values == (value,)
+    assert environment == {'MCP_API_KEY': value, 'UNDECLARED_SECRET': 'must-not-be-forwarded'}
+
+
+def test_docker_runtime_rejects_unresolved_mcp_values_before_start(tmp_path):
+    from agentbench.runtime.docker.runtime import DockerRuntimeError, _prepare_mcp_redaction_values
+
+    root = _agent(tmp_path / 'agent', runtime_keys=('MCP_API_KEY',),
+                  server_entries=_entry(env_keys=('MCP_API_KEY',)))
+    with pytest.raises(DockerRuntimeError, match='MCP_API_KEY'):
+        _prepare_mcp_redaction_values(SimpleNamespace(framework='acp', path=root), {})

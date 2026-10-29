@@ -158,6 +158,28 @@ class NativeObserveTest(unittest.TestCase):
             self.assertEqual(parsed.credentials,())
             self.assertEqual(parsed.mode,'observe')
 
+    def test_mcp_redaction_secret_file_protects_intercepted_network_evidence(self):
+        value = '{{INTERCEPTED_MCP_SECRET_126a}}'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            secret = root / 'redaction-0.secret'
+            secret.write_text(value)
+            config_path = root / 'config.json'
+            config_path.write_text(json.dumps({'agent_id': 'native', 'mode': 'observe',
+                'max_trace_bytes': 4096, 'redaction_secret_files': [str(secret)],
+                'routes': [{'id': 'native', 'host_patterns': ['native.example'], 'ports': [443],
+                    'methods': ['POST'], 'path_patterns': ['/v1/messages'],
+                    'protocol_plugin': 'anthropic-messages'}]}))
+            config = ServiceConfig.load(config_path)
+            addon = ModelInterceptorAddon(config)
+            body = json.dumps({'model': 'native', 'messages': [{'role': 'user', 'content': value}]})
+            request = flow('https://native.example/v1/messages', body.encode(),
+                            {'content-type': 'application/json'})
+            addon.request(request)
+
+        self.assertNotIn(value, json.dumps(self.events))
+        self.assertIn('[REDACTED]', json.dumps(self.events))
+
     def test_two_modes_do_not_share_mutations_or_event_sources(self):
         observe=ModelInterceptorAddon(native_config())
         replacement=ModelInterceptorAddon(config())

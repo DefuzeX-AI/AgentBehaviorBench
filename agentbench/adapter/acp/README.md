@@ -44,8 +44,14 @@ by the unit's runtime or adapter environment settings. ABB resolves the values
 when starting the session and sends ACP v1's `env` array of `{name, value}`
 objects. A declared but unset key fails before the ACP Agent starts. Secret values
 are registered with redactors before the Agent starts. ABB redacts matching values
-from observation artifacts and from the invocation output submitted to the
-evaluation SDK. Values are never stored in `agent.toml`.
+from observation artifacts, intercepted network evidence, host run reports, failure
+events, and the invocation output submitted to the evaluation SDK. Docker runs need
+each MCP environment value available through runtime environment settings so ABB can
+register it with the interceptor redactor. With interception enabled, an MCP key
+available only through adapter settings fails before the Agent container starts.
+Without interception, ACP session setup reads adapter environment keys inside the
+container and detects a missing value before the ACP Agent starts. Values are never
+stored in `agent.toml` or the interceptor JSON configuration.
 
 Do not set a `type` or `transport` field on an MCP entry: ACP v1 stdio server
 objects have no discriminator. HTTP and SSE MCP servers are rejected explicitly;

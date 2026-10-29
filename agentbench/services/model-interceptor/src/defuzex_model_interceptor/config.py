@@ -84,6 +84,7 @@ class ServiceConfig:
     egress_proxy: tuple[str, int] | None = None
     targets: Mapping[str, Target] = field(default_factory=dict)
     target_rules: tuple[TargetRule, ...] = ()
+    redaction_secrets: tuple[str, ...] = field(default=(), repr=False)
 
     @classmethod
     def load(cls, path: str | Path) -> "ServiceConfig":
@@ -118,6 +119,11 @@ class ServiceConfig:
         target = _target(raw.get('target')) if mode == 'replace' and not targets else None
         if target is not None and not target.secret and any(not c.secret for c in credentials):
             raise ServiceConfigurationError('Legacy target credentials require a secret file')
+        redaction_secret_files = raw.get('redaction_secret_files', [])
+        if (not isinstance(redaction_secret_files, list)
+                or not all(isinstance(path, str) and path.strip() for path in redaction_secret_files)):
+            raise ServiceConfigurationError('redaction_secret_files must be a string list')
+        redaction_secrets = tuple(_read_secret(path) for path in redaction_secret_files)
         return cls(
             mode=mode,
             observation_headers=_observation_headers(raw.get("observation_headers", {})),
@@ -131,6 +137,7 @@ class ServiceConfig:
             token_counting=_object(raw.get('token_counting', {}), 'token_counting') if mode == 'replace' else {},
             egress_proxy=_egress_proxy(raw.get('egress_proxy')),
             targets=MappingProxyType(targets), target_rules=rules,
+            redaction_secrets=redaction_secrets,
         )
 
 

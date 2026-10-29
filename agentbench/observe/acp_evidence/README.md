@@ -43,4 +43,4 @@ acceptance with the pinned ACP/KUMA dependencies installed, run
 `python -m tests.sdk_fixtures.acp_terminal_acceptance <output-directory>` with
 networking disabled. It runs a real ACP stdio peer and command, and retains Case,
 Agent output, SDK evidence and a custom Judge report that checks both terminal
-paths. No production model or Backend is called.
+paths plus a real stdio MCP tool call. No production model or Backend is called.

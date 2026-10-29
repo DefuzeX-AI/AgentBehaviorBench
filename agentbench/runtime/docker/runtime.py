@@ -261,6 +261,9 @@ class DockerRuntime:
 
         try:
             agent_environment = dict(config.environment)
+            mcp_redaction_values = _prepare_mcp_redaction_values(
+                agent, agent_environment,
+            ) if interception is not None else ()
             network_arguments: list[str]
             if interception is not None:
                 # The interception path records trace state and creates an isolated network.
@@ -285,6 +288,7 @@ class DockerRuntime:
                     network_name=network_name,
                     trace_state=trace_state,
                     deadline=preparation,
+                    redaction_values=mcp_redaction_values,
                     egress_proxy=(
                         (egress_observer.container_name, egress_observer.port)
                         if egress_observer is not None else None
@@ -430,6 +434,7 @@ class DockerRuntime:
         deadline: Deadline | None = None,
         egress_proxy: tuple[str, int] | None = None,
         model_provider: ModelTargetProvider | None = None,
+        redaction_values=(),
     ) -> tuple[RunningModelInterceptor, dict[str, str]]:
         if deadline is not None:
             deadline.check()
@@ -454,7 +459,8 @@ class DockerRuntime:
             service_data, token_environment = prepare_service_config(
                 interception, agent_id=agent_id, max_trace_bytes=self._trace_max_bytes,
                 secret_dir=secret_dir, secret_resolver=self._secret_resolver,
-                environ=self._environ, model_provider=model_provider or self._model_provider, egress_proxy=egress_proxy)
+                environ=self._environ, model_provider=model_provider or self._model_provider,
+                egress_proxy=egress_proxy, redaction_values=redaction_values)
             config_file.write_text(json.dumps(service_data, ensure_ascii=False), encoding='utf-8')
 
             command = [
@@ -843,6 +849,22 @@ class DockerRuntime:
 
 def _bind_mount(source: Path, target: str) -> str:
     return f"type=bind,source={source.resolve()},target={target},readonly"
+
+
+def _prepare_mcp_redaction_values(agent, agent_environment):
+    if getattr(agent, 'framework', None) != 'acp':
+        return ()
+    from agentbench.adapter.acp.config import ACPConfig
+
+    config = ACPConfig.from_agent_dir(agent.path)
+    keys = tuple(dict.fromkeys(key for server in config.mcp_servers for key in server.env_keys))
+    missing = [key for key in keys if key not in agent_environment]
+    if missing:
+        raise DockerRuntimeError(
+            'Docker ACP MCP server keys must be resolved through runtime environment settings: '
+            + ', '.join(missing)
+        )
+    return tuple(dict.fromkeys(agent_environment[key] for key in keys if agent_environment[key]))
 
 
 def _share_input_mount(directory: Path) -> None:
