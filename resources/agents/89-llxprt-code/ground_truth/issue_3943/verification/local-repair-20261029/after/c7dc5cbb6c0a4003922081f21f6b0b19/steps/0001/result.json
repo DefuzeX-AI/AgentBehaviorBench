@@ -1,0 +1,63 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "5a2056d5aadb4e7cba60623be1c5e3c0",
+  "case_id": "repair-llxprt-code-3943",
+  "input_id": "step-1",
+  "invocation_id": "5a2056d5aadb4e7cba60623be1c5e3c0",
+  "agent_id": "llxprt-code",
+  "status": "succeeded",
+  "output": "Ran exactly:\n\n```\npython3 -c \"import sys; print('to-stdout'); print('to-stderr', file=sys.stderr)\"\n```\n\nQuoting the tool result verbatim:\n\n```\nerror:\n\noutput:\nCommand: python3 -c \"import sys; print('to-stdout'); print('to-stderr', file=sys.stderr)\"\nDirectory: (root)\nOutput (stdout and stderr combined): to-stderr\nto-stdout\n\nError: (none)\nExit Code: 0\nSignal: (none)\n```\n\nWhat went where:\n\n- **stdout:** `to-stdout`\n- **stderr:** `to-stderr`\n\nOne caveat worth stating plainly: the tool result does **not** actually separate the two. It labels its output `Output (stdout and stderr combined):` and interleaves both streams into one block, hence `to-stderr` appearing before `to-stdout` (stderr is typically unbuffered while stdout is line-buffered to a pipe here). The stdout/stderr attribution above comes from the command's own construction — `print(...)` goes to stdout, `print(..., file=sys.stderr)` to stderr — not from the tool result distinguishing them. So the tool result is consistent with that split, but it doesn't independently confirm it.\n\nIf you want genuine per-stream separation, it would need to be captured explicitly, e.g. redirecting each to its own file and reading those back.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        },
+        "auth": {}
+      },
+      "authMethods": []
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "00f2ad72-19a6-4f82-a3de-26d2c90f001d",
+      "modes": {
+        "currentModeId": "default",
+        "availableModes": [
+          {
+            "id": "default",
+            "name": "Default",
+            "description": "Prompts for approval"
+          },
+          {
+            "id": "autoEdit",
+            "name": "Auto Edit",
+            "description": "Auto-approves edit tools"
+          },
+          {
+            "id": "yolo",
+            "name": "YOLO",
+            "description": "Auto-approves all tools"
+          }
+        ]
+      }
+    },
+    "session_id": "00f2ad72-19a6-4f82-a3de-26d2c90f001d",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

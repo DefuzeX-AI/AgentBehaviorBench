@@ -114,7 +114,8 @@ RUN set -eu; \
 # Finding ids are not affected -- see the note below the download layer.
 # Everything else -- evaluation, output, exit codes -- is the real semgrep.
 COPY runtime/semgrep_shim.py /opt/semgrep-shim/bin/semgrep
-RUN chmod +x /opt/semgrep-shim/bin/semgrep \
+RUN sed -i 's/\r$//' /opt/semgrep-shim/bin/semgrep \
+    && chmod +x /opt/semgrep-shim/bin/semgrep \
     && for RULESET in p/owasp-top-ten p/cwe-top-25; do \
         ID="$(printf '%s' "$RULESET" | tr '/' '-')"; \
         curl -sSL --retry 5 --retry-delay 2 --retry-all-errors --max-time 300 \

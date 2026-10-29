@@ -1,6 +1,6 @@
 # Shared evaluation service
 
-For Issue-level detection from an imported Case group, see
+For Issue-level detection from an imported Case directory, see
 [Experiment 1](Experiment1.md). Its `exp1` command reuses this execution service
 and assesses trajectories directly without a Judge report.
 
@@ -63,6 +63,39 @@ Agent information omits ground truth and credentials. GT is accessed only by
 the final evaluator, after the testing Agent has committed its findings.
 
 ## CLI workflow
+
+### Historical targets
+
+```python
+target = service.prepare("nanocoder", "59874391f939bdfe93c273a10d23a7a94009edd1")
+execution = service.execute("nanocoder", cases, target=target)
+```
+
+`prepare` verifies and exports the exact Git commit into an isolated unit under
+`cache/prepared-agents/`. It does not build an image or invoke the Agent; execution
+uses the existing Docker builder, native SDK and fresh Suite/session/workspace.
+Cache identity includes the revision and integration files. Cached units are
+verified before reuse; edits fail rather than silently changing the target.
+The default Agent directory and registry are not modified.
+
+Git units use their current Dockerfile and bindings. Install units must declare
+`[historical] strategy = "source"` and `dockerfile = "historical/Dockerfile"`.
+The historical recipe builds upstream source with its own dependency lock;
+current package-install inputs are excluded. Nanocoder supplies this recipe and
+launches the compiled native ACP CLI. There is no implicit npm/pip version mapping,
+fallback to latest, or automatic repair of incompatible historical interfaces.
+Other install units fail explicitly until a recipe is supplied. Existing Git
+acquisition restrictions (submodules, symlinks and LFS) still apply.
+
+```bash
+agentbench api prepare nanocoder --revision 59874391f939bdfe93c273a10d23a7a94009edd1
+agentbench api execute nanocoder --revision 59874391f939bdfe93c273a10d23a7a94009edd1 --case-file cases.json
+```
+
+`request/target.json` freezes configuration and source provenance from the actual
+execution unit before staging. Trajectory metadata uses this snapshot even if the
+default registry subsequently changes. A successful preparation confirms source
+identity, not successful compilation, execution or defect reproduction.
 
 ```bash
 agentbench api agent my-agent

@@ -51,26 +51,43 @@ def build_metadata(api, *, agent_id, framework, first_input, actors, project_roo
                      'system_prompt': _system_prompt(first_input),
                      'tools': (first_input or {}).get('tools') if isinstance(first_input, dict) else None}
     architecture = {'framework': framework}
-    unit = _unit(agent_id, project_root)
+    frozen = api.read('request/target.json')
     warnings = []
-    if unit is not None:
-        try:
-            from agentbench.harness.registry import tomllib
-            manifest = tomllib.loads((unit / 'agent.toml').read_text(encoding='utf-8'))
-            configuration['runtime'] = {key: manifest[key] for key in
-                                        ('framework', 'runtime', 'adapter', 'launch', 'evaluation') if key in manifest}
-            source = manifest.get('source') or {}
-            architecture['source_revision'] = source.get('revision') or source.get('sha256')
-            for key, name in (('profile', 'requirement.md'), ('manifest', 'agent.toml')):
-                if (unit / name).is_file():
-                    architecture[key] = {'path': name, 'sha256': _sha256(unit / name)}
-            binding = (manifest.get('adapter') or {}).get('binding')
-            if isinstance(binding, str) and (unit / 'bindings' / binding.split(':', 1)[0]).is_file():
-                path = 'bindings/' + binding.split(':', 1)[0]
-                architecture['binding'] = {'path': path, 'sha256': _sha256(unit / path)}
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            warnings.append(f'Agent unit metadata unavailable: {type(exc).__name__}')
-    else:
-        warnings.append('Agent unit not registered; architecture references omitted')
+    if frozen is None:
+        unit = _unit(agent_id, project_root)
+        if unit is not None:
+            try:
+                frozen = capture_target(unit)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                warnings.append(f'Agent unit metadata unavailable: {type(exc).__name__}')
+        else:
+            warnings.append('Agent unit not registered; architecture references omitted')
+    if frozen is not None:
+        configuration['runtime'] = frozen['runtime']
+        architecture.update(frozen['architecture'])
     return {'task_instruction': task, 'case_id': case.get('case_id') if isinstance(case, dict) else None,
             'agent_configuration': configuration, 'system_architecture': architecture}, warnings
+
+
+def capture_target(unit):
+    """Freeze the actual execution unit before staging; never consult the registry."""
+    from agentbench.harness.registry import tomllib
+    unit = Path(unit)
+    manifest = tomllib.loads((unit / 'agent.toml').read_text(encoding='utf-8'))
+    source = manifest.get('source') or {}
+    architecture = {'source_revision': source.get('revision') or source.get('sha256')}
+    for key, name in (('profile', 'requirement.md'), ('manifest', 'agent.toml')):
+        if (unit / name).is_file():
+            architecture[key] = {'path': name, 'sha256': _sha256(unit / name)}
+    binding = (manifest.get('adapter') or {}).get('binding')
+    if isinstance(binding, str):
+        name = 'bindings/' + binding.split(':', 1)[0]
+        path = unit / name
+        if path.resolve().is_relative_to(unit.resolve()) and path.is_file():
+            architecture['binding'] = {'path': name, 'sha256': _sha256(path)}
+    if (unit / 'provenance.json').is_file():
+        architecture['prepared_target'] = json.loads((unit / 'provenance.json').read_text(encoding='utf-8'))
+    return {'schema': 'abb.target.snapshot.v1',
+            'runtime': {key: manifest[key] for key in
+                        ('framework', 'runtime', 'adapter', 'launch', 'evaluation') if key in manifest},
+            'architecture': architecture}

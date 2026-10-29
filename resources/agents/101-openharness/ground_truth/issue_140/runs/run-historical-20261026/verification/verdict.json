@@ -1,0 +1,167 @@
+{
+  "issue": 140,
+  "repository": "zhijiewong/openharness",
+  "date": "2026-10-26",
+  "overall_verdict": "correct_core_fault_locations_and_root_cause",
+  "historical_provenance_verdict": "partially_supported; historical counts and archived prompt provenance not independently verified",
+  "tested_revision": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+  "version": "2.47.0",
+  "fresh_original_gt_prompt_before_after": true,
+  "trial_count": {
+    "before": 1,
+    "after": 1
+  },
+  "fault_locations": [
+    {
+      "original_index": 0,
+      "file": "src/query/index.ts",
+      "function_label_in_gt": "tool_call_complete event branch",
+      "actual_enclosing_function": "query",
+      "line_start": 265,
+      "line_end": 274,
+      "verdict": "correct",
+      "causal_role": "direct_fault",
+      "reason": "The branch consumes completion and updates internal arguments/executor but omits yield event. V8 records four executions in baseline. The one-line yield intervention restores cross-turn tool calls and second-prompt behavior.",
+      "evidence": [
+        "minimal.patch",
+        "before/runtime/src/query/index.ts",
+        "verification-summary.json"
+      ]
+    },
+    {
+      "original_index": 1,
+      "file": "src/main.tsx",
+      "function_label_in_gt": "oh session history reconstruction",
+      "actual_enclosing_function": "anonymous session command .action handler",
+      "line_start": 804,
+      "line_end": 811,
+      "verdict": "correct",
+      "causal_role": "propagation_location",
+      "reason": "It omits assistant toolCalls when the consumer collected none, then unconditionally appends all tool results. Baseline persisted state and outgoing second request contain four orphan results. This code remains unchanged in the successful repaired arm; it is not the primary missing-yield defect.",
+      "evidence": [
+        "before/state-1.json",
+        "before/request-005.json",
+        "after/state-1.json",
+        "after/request-005.json",
+        "verification-summary.json"
+      ]
+    }
+  ],
+  "additional_locations": [
+    {
+      "file": "src/main.tsx",
+      "line_start": 762,
+      "line_end": 767,
+      "causal_role": "propagation_location",
+      "verdict": "supported_missing_link",
+      "reason": "The event consumer is the essential link between the two listed locations. Coverage proves it is unreachable in baseline and reached after repair."
+    },
+    {
+      "file": "src/main.tsx",
+      "line_start": 740,
+      "line_end": 742,
+      "causal_role": "auxiliary_location",
+      "reason": "Per-prompt empty accumulator declarations; normal initialization, not independently defective."
+    },
+    {
+      "file": "src/providers/openai.ts",
+      "line_start": 35,
+      "line_end": 72,
+      "causal_role": "propagation_location",
+      "reason": "Serializes actual toolCalls/toolResults; baseline has no calls to serialize. It is not supported as a separate provider serialization fault."
+    }
+  ],
+  "root_cause_claims": [
+    {
+      "claim": "query handles tool_call_complete internally without yielding it",
+      "verdict": "supported_fact",
+      "evidence": "Pinned upstream source, actual query-branch coverage count 4, and one-line causal intervention."
+    },
+    {
+      "claim": "The session consumer only populates turnToolCalls from that missing event",
+      "verdict": "supported_fact",
+      "evidence": "src/main.tsx:762-767 is the only population site; coverage count changes from 0 to 10."
+    },
+    {
+      "claim": "then appends tool results regardless, creating invalid history",
+      "verdict": "supported_fact",
+      "evidence": "src/main.tsx:804-809, saved state, outgoing request-005, and real DeepSeek HTTP 400."
+    },
+    {
+      "claim": "Archived discussion reports ten reproductions and a native control outside ABB",
+      "verdict": "supported_as_reported_claim_only",
+      "evidence": "Live upstream issue body explicitly reports 10/10 plus one native stdin control. This experiment does not independently verify those eleven historical observations."
+    },
+    {
+      "claim": "this local collection contains no raw run traces or downloadable evidence archive",
+      "verdict": "supported_for_original_gt_directory_only",
+      "evidence": "Original issue-140 directory contains only case.verified.json; the issue contains snippets but no downloadable raw-run archive. No exhaustive absence claim is made about every possible location on the host."
+    },
+    {
+      "claim": "no run directories or independently checked reproduction count are fabricated",
+      "verdict": "historical_methodology_statement_not_runtime_evidence",
+      "evidence": "The original JSON invents no concrete raw-run directory. The new experiment records exactly one fresh before/after pair."
+    },
+    {
+      "claim": "Steps below are transcribed from the archived submission; case_id is an organizational identifier",
+      "verdict": "prompt_provenance_not_independently_established",
+      "evidence": "The archived original submission was not found. Live issue prompt 1 lacks the GT trailing tool-failure instruction; live issue prompt 2 lacks the GT trailing reporting instruction. New runs preserve the GT strings exactly. The case_id has no observed runtime semantics."
+    },
+    {
+      "claim": "No fresh runtime reproduction was performed during this organization",
+      "verdict": "historical_scope_statement",
+      "evidence": "It describes the previous collection activity and is not contradicted by this later experiment. This verification now supplies fresh runtime evidence separately."
+    },
+    {
+      "claim": "Exact first fixing commit has not been established",
+      "verdict": "still_not_established",
+      "evidence": "The local one-line repair is not identified as an upstream commit or release; no claim of upstream fix discovery is made."
+    },
+    {
+      "claim": "Root steps describe the selected original case; other run-local cases can differ",
+      "verdict": "not_independently_established_for_missing_archives",
+      "evidence": "No original archived run-local cases were available for comparison. This experiment uses only the supplied two GT steps."
+    },
+    {
+      "claim": "Retained observations are not automatically independent same-prompt trials",
+      "verdict": "valid_evidence_boundary",
+      "evidence": "One new pair is reported as one pair. Model trajectories differ despite identical first requests; no 10/10 rate is inferred."
+    }
+  ],
+  "execution": {
+    "mode": "native oh session over stdin, same launch.prepare provider mapping and trust policy as original ACP bridge",
+    "acp_client_file_or_terminal_callbacks": false,
+    "before_process_exit": {
+      "returncode": 0
+    },
+    "after_process_exit": {
+      "returncode": 0
+    },
+    "before_behavior": "prompt 1 succeeds; prompt 2 HTTP 400, no multiply, unchanged calculator bytes",
+    "after_behavior": "both prompts complete; no model HTTP errors; multiply and README updated; actual agent assertions and independent file checks pass",
+    "abb_suite_run": false,
+    "automated_judge_run": false,
+    "limitation": "Native Agent execution is established; no claim of ABB end-to-end suite or ACP transport acceptance is made."
+  },
+  "controls": {
+    "same_model": true,
+    "both_clean": true,
+    "same_first_request": true,
+    "same_main_source": true,
+    "same_lock": true,
+    "same_installed_dependencies": true,
+    "query_source_diff": [
+      "--- \n",
+      "+++ \n",
+      "@@ -271,6 +271,7 @@\n",
+      "               if (streamingExecutor) {",
+      "                 streamingExecutor.addTool({ id: event.callId, toolName: event.toolName, arguments: event.arguments });",
+      "               }",
+      "+              yield event;",
+      "               break;",
+      "             }",
+      "             case \"cost_update\":"
+    ]
+  },
+  "proposed_gt_purpose": "Evidence enrichment and explicit causal roles; no change to frozen prompts or official original GT."
+}

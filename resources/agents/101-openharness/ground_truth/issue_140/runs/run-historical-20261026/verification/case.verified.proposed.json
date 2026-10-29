@@ -1,0 +1,57 @@
+{
+  "case_id": "documented-openharness-140-two-turn-session",
+  "issue": {
+    "repository": "zhijiewong/openharness",
+    "number": 140,
+    "url": "https://github.com/zhijiewong/openharness/issues/140",
+    "state": "open",
+    "title": "oh session: second prompt fails with HTTP 400 because tool results are kept without their assistant tool_calls"
+  },
+  "version_choice": "historical:2.47.0",
+  "reported_version": "2.47.0",
+  "commit_version": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In the current workspace, create calculator.py with add(a, b) and subtract(a, b), and a short README.md describing their use. Run Python assertions verifying add(2, 3) == 5 and subtract(7, 4) == 3. Report the actual files and test results; if a tool fails, state the failure.",
+    "Extend the existing calculator.py with multiply(a, b). Preserve add and subtract. Update README.md and run assertions for all three operations, including multiply(6, 7) == 42. Report the actual changes and test results."
+  ],
+  "expected": "A second prompt in the same oh session should retain valid tool-call history.",
+  "defect": "The second prompt fails because tool results survive without their assistant tool_calls.",
+  "fault location": [
+    {
+      "file": "src/query/index.ts",
+      "function": "tool_call_complete event branch",
+      "line_start": 265,
+      "line_end": 274,
+      "commit": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+      "url": "https://github.com/zhijiewong/openharness/blob/2a7b7b8e1c0b132241d0eebb906dc86863ca19d8/src/query/index.ts#L265-L274",
+      "role": "direct_fault",
+      "verification": "fresh_original_gt_prompt_before_after_and_v8_coverage",
+      "explanation": "The branch consumes completion and updates internal arguments/executor but omits yield event. V8 records four executions in baseline. The one-line yield intervention restores cross-turn tool calls and second-prompt behavior."
+    },
+    {
+      "file": "src/main.tsx",
+      "function": "tool_call_complete consumer in session command",
+      "line_start": 762,
+      "line_end": 767,
+      "commit": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+      "url": "https://github.com/zhijiewong/openharness/blob/2a7b7b8e1c0b132241d0eebb906dc86863ca19d8/src/main.tsx#L762-L767",
+      "role": "propagation_location",
+      "verification": "fresh_original_gt_prompt_before_after_and_v8_coverage",
+      "explanation": "The only turnToolCalls population site. Its V8 branch count is 0 before and 10 after the one-line query repair. This is a propagation link, not a separately repaired source defect."
+    },
+    {
+      "file": "src/main.tsx",
+      "function": "oh session history reconstruction",
+      "line_start": 804,
+      "line_end": 811,
+      "commit": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+      "url": "https://github.com/zhijiewong/openharness/blob/2a7b7b8e1c0b132241d0eebb906dc86863ca19d8/src/main.tsx#L804-L811",
+      "role": "propagation_location",
+      "verification": "fresh_original_gt_prompt_before_after_and_v8_coverage",
+      "explanation": "It omits assistant toolCalls when the consumer collected none, then unconditionally appends all tool results. Baseline persisted state and outgoing second request contain four orphan results. This code remains unchanged in the successful repaired arm; it is not the primary missing-yield defect."
+    }
+  ],
+  "Root cause": "At commit 2a7b7b8e1c0b132241d0eebb906dc86863ca19d8, query() consumes tool_call_complete without yielding it. The native session command collects turnToolCalls only in its completion-event consumer (src/main.tsx:762-767), so its cross-turn rebuild (804-809) appends tool results without matching assistant toolCalls. One fresh before/after pair with the exact two supplied GT prompts, deepseek-chat, locked dependencies, identical first request bytes, and separate empty workspaces confirms the mechanism: baseline prompt 1 leaves four results and zero calls; prompt 2 receives DeepSeek HTTP 400 and leaves calculator.py unchanged. Adding only yield event in query restores four matching calls/results after prompt 1; prompt 2 adds multiply, updates README and passes real three-operation assertions. V8 coverage records query completion / session completion-consumer counts of 4/0 before and 10/10 after. Both experiments use the real native oh session path underlying the ACP bridge; no ABB suite or automated Judge was run. Upstream reports 10/10 prior reproductions and one native control, which remain reported historical claims rather than independently verified counts. The supplied GT prompts differ slightly from the live issue prompts; their original archived-submission provenance is not established. The first upstream fixing commit remains unknown."
+}

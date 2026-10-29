@@ -39,6 +39,26 @@ def run_one(service):
         {'input_id': 'a', 'payload': 'hello'}]}], concurrency=ConcurrencySettings(1))
 
 
+def test_execution_uses_prepared_unit_and_freezes_its_revision(project):
+    from dataclasses import replace
+    import shutil
+    from agentbench.harness.session.plan import source_digest
+    from agentbench.evaluation.targets import PreparedTarget
+    service, _, _ = project
+    original = service._registration('example')
+    path = service.root / 'prepared'
+    shutil.copytree(original.path, path)
+    manifest = path / 'agent.toml'
+    manifest.write_text(manifest.read_text() + '\n[source]\nrevision="' + 'a' * 40 + '"\n')
+    prepared = PreparedTarget(replace(original, path=path, requirement_path=path / 'requirement.md'),
+                              'a' * 40, 'fingerprint', source_digest(path))
+    result = service.execute('example', [{'case_id': 'one', 'inputs': [
+        {'input_id': 'a', 'payload': 'hello'}]}], target=prepared, concurrency=ConcurrencySettings(1))
+    assert result['suite']['summary']['execution_status'] == 'completed'
+    evidence = service.evidence(result['directory'], result['runs'][0]['id'])
+    assert evidence['trajectory']['metadata']['system_architecture']['source_revision'] == 'a' * 40
+
+
 def report(request, status='pass'):
     return {'schema': 'abb.judge.result.v1', 'request_id': request['request_id'],
             'status': status, 'confidence': 'high', 'issues': [], 'evidence_gaps': []}

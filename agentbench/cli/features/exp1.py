@@ -1,4 +1,4 @@
-"""Run behavioural failure detection from one Case group against every Issue of an Agent."""
+"""Run Issue-level behavioural failure detection from an existing Case directory."""
 import contextlib
 import json
 from pathlib import Path
@@ -10,12 +10,11 @@ from .base import CommandFeature
 def configure(parser):
     from agentbench.project import project_root
     commands = parser.add_subparsers(dest='operation', required=True)
-    run = commands.add_parser('run', help='Run every imported Case for N rounds, then match every Issue GT')
+    run = commands.add_parser('run', help='Run all supplied Cases for N independent rounds, then match Issue GT')
     run.add_argument('agent_id')
-    run.add_argument('--case-dir', type=Path, required=True,
-                     help='Case group directory holding numbered Case files or cases.json')
-    run.add_argument('--tests', type=int, default=50, help='Independent rounds over all supplied Cases (1-50; default 50)')
-    run.add_argument('--workers', type=int, default=1, help='Concurrent Cases (default 1)')
+    run.add_argument('--case-dir', type=Path, required=True)
+    run.add_argument('--tests', type=int, default=50, help='Rounds over all supplied Cases per Issue (1-50; default 50)')
+    run.add_argument('--workers', type=int, default=1, help='Concurrent Issues (one Case worker per Issue)')
     run.add_argument('--results-dir', type=Path)
     run.add_argument('--prompt-template', type=Path, help='Record the shared testing prompt template')
     run.add_argument('--scenario-file', type=Path, help='Record this Agent\'s shared scenario')

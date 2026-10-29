@@ -1,0 +1,13 @@
+--- a/libs/deepagents/deepagents/backends/utils.py
++++ b/libs/deepagents/deepagents/backends/utils.py
+@@ -518,7 +518,9 @@
+     # required so `edit()` can report EOF-newline mismatches accurately. It
+     # also splits on CR / CRLF, so line indexing matches the LF-normalized
+     # form without first rewriting the whole (potentially huge) string.
+-    lines = content.splitlines(keepends=True)
++    # Match universal newlines only; Unicode separators are source characters.
++    # This preserves terminators and EOF state without treating form feed as a line.
++    lines = [m.group(0) for m in re.finditer(r"[^\r\n]*(?:\r\n|\r|\n|$)", content) if m.group(0)]
+     start_idx = offset
+     end_idx = min(start_idx + limit, len(lines))
+     total_lines = len(lines)

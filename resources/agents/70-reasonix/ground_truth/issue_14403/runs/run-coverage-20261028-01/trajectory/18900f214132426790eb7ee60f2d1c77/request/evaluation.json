@@ -1,0 +1,39 @@
+{
+  "sdk_factory": "agentbench.sdk.plugin.native.backend:create_run",
+  "sdk_options": {
+    "max_steps": 6,
+    "cases": [
+      {
+        "case_id": "coverage-reasonix-14403-01",
+        "inputs": [
+          {
+            "input_id": "step-1",
+            "payload": "In settings.ini add the setting timeout=30 on its own line right after retries=3. Do it with exactly one edit_file call whose old_string is the text retries=3 (just those 9 characters, no line break) and whose new_string is retries=3, a line break, then timeout=30. After the edit, show me the bytes of the [client] section with: od -c settings.ini | tail -n 6"
+          }
+        ]
+      }
+    ]
+  },
+  "execution_only": true,
+  "agent_id": "reasonix",
+  "framework": "acp",
+  "mode": "execute",
+  "case_index": 0,
+  "source_case_index": 0,
+  "expected_case_id": "coverage-reasonix-14403-01",
+  "expected_content_sha256": "4032233fd34e1e5c723c968603bce752bf552ffd461b63533540c6163b8be4aa",
+  "expected_artifact_sha256": "80d65ecd8627290aaa309cea4551f250ef1d1ba27668f2e4086d555d865293bc",
+  "workspace": {
+    "schema": "abb.workspace.v1",
+    "path": "/home/agent/workspace",
+    "initial_state": "empty",
+    "fixture_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "private_storage": "/run/abb-sdk-storage",
+  "isolated_agent": true,
+  "agent_timeout": 900.0,
+  "agent_response_limits": {
+    "max_bytes": 1073741824,
+    "max_files": 20000
+  }
+}

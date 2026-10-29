@@ -1,0 +1,77 @@
+{
+  "review_type": "Static localization and upstream fix review correlated with existing run; no new agent execution.",
+  "trajectory": "runs\\run-01\\trajectory\\e5b9a33a5f84415db813de4ca03f7fbf\\trajectory.json",
+  "trajectory_status": "partial",
+  "trajectory_warnings": [
+    "2/12 model requests have no confirmed Input; Case identity and HTTP pairing are reported separately.",
+    "model call 34b170e09715bcbd09dd79e7 could not be assigned to an Input",
+    "model call b5faa1669fae1fe43ee28cbd could not be assigned to an Input"
+  ],
+  "process_source": {
+    "method": "install",
+    "repository": "https://github.com/codewhale-hq/Codewhale",
+    "revision": "369868d23e593acd71da51db30058b512175e08d",
+    "downloaded_on": "2026-10-23"
+  },
+  "native_version": {
+    "file": "runs\\run-01\\trajectory\\e5b9a33a5f84415db813de4ca03f7fbf\\steps\\0001\\acp-events.jsonl",
+    "line": 2,
+    "version": "0.9.10"
+  },
+  "native_tool_result": {
+    "file": "runs\\run-01\\trajectory\\e5b9a33a5f84415db813de4ca03f7fbf\\steps\\0001\\acp-events.jsonl",
+    "line": 64,
+    "tool_call_id": "call_815783ad7600491f97ae1c55",
+    "event": {
+      "schema": "abb.observe.event.v1",
+      "run_id": "run_d25472639e874d6c860de308f744aaae",
+      "source": "acp",
+      "event": "session_update",
+      "timestamp": "2026-10-25T07:31:54.981401+00:00",
+      "data": {
+        "session_id": "codewhale-15550340-683d-425e-9b11-3b19e738e697",
+        "update": {
+          "toolCallId": "call_815783ad7600491f97ae1c55",
+          "status": "completed",
+          "content": [
+            {
+              "content": {
+                "text": "{\n  \"name\": \"demo\",\n  \"dependencies\": {\n    \"jsonwebtoken\": \"^9.0.2\",\n    \"password-validator\": \"^5.3.0\"\n  }\n}\n",
+                "type": "text"
+              },
+              "type": "content"
+            }
+          ],
+          "sessionUpdate": "tool_call_update"
+        },
+        "case_id": "ir-codewhale-5546-v1",
+        "input_id": "step-1",
+        "invocation_id": "eec97cdade794bc29f50f733508f7c2e",
+        "agent_id": "codewhale"
+      }
+    }
+  },
+  "model_tool_result": {
+    "step_id": 3,
+    "input_ordinal": "0001",
+    "message_index": 5,
+    "evidence": {
+      "interaction_id": "3bdd812c907023ec34686cc2",
+      "call_id": "call_5b45084ad30a4eb78b1af0aa66216d97",
+      "framework_span_id": null,
+      "request_sha256": "d22b495b035da831313cf680f4de17ad35889074861e44f74c2df5f0d610332e",
+      "response_sha256": "7c5d8ca76b959f2324e2862f7cefc6f68d004798a07e0d2b3e67d546364e41ea"
+    },
+    "message": {
+      "role": "tool",
+      "tool_call_id": "call_815783ad7600491f97ae1c55",
+      "content": "{\n  \"name\": \"demo\",\n  \"dependencies\": {\n    \"jsonwebtoken\": \"[redacted]\"\n    \"password-validator\": \"[redacted]\"\n  }\n}\n"
+    }
+  },
+  "limitations": [
+    "The trajectory is partial because 2 of 12 model calls lack confirmed Input attribution. The selected defect-bearing call has confirmed Input 0001 and an exact native/model tool-call-ID match.",
+    "The process records the historical source revision and the native ACP handshake reports 0.9.10; this review did not rebuild or attest the binary.",
+    "The retained run ultimately edited the file using a workaround. This establishes visibility corruption, not an inevitable final edit failure.",
+    "Upstream regression tests were inspected, not run."
+  ]
+}

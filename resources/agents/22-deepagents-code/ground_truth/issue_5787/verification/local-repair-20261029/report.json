@@ -1,0 +1,70 @@
+{
+  "schema": "abb.local-repair-evidence.v1",
+  "agent_id": "deepagents-code",
+  "issue": 5787,
+  "date": "2026-10-29T05:20:08.473641+00:00",
+  "base_revision": "a764619aa8c850bc75e2e916cf53a587637d8c81",
+  "status": "reproduced_and_locally_fixed",
+  "upstream_fix_claimed": false,
+  "root_cause": "Confirmed at the selected historical commit by local regression tests and a fresh ABB before/after run. slice_read_response uses str.splitlines(keepends=True), which recognizes form feed and other Unicode line separators. grep_matches_from_files and the displayed gutter count LF boundaries. Therefore grep reports SECRET_TARGET at line 6 while read_file(offset=5, limit=1) returns def beta(). The local patch splits only universal newline sequences (LF, CRLF, CR), preserving terminators and EOF state. With the same file bytes, the patched native tool returns SECRET_TARGET at line 6. This is a locally validated repair, not an upstream merged fix.",
+  "patch_sha256": "8e25d2c5577923a012b05762adec65361e704d24be6ece65274db7b3b61c551b",
+  "runs": [
+    {
+      "variant": "before",
+      "case_id": "repair-deepagents-code-5787",
+      "run_id": "3577e9e7711b4a228d3746c1ed38f4ed",
+      "trajectory": "before/3577e9e7711b4a228d3746c1ed38f4ed/trajectory.json",
+      "trajectory_sha256": "e096899896de63e0d7fba72e54fd019798c4bf87f7773d1a2ef51433bab1863f",
+      "original_attempt": "C:\\Song_startup\\benchmark\\r8\\o\\d0-flash\\agents\\deepagents-code\\cases\\3044cd430b815b5fb70706529832c44e\\attempts\\3577e9e7711b4a228d3746c1ed38f4ed",
+      "model": "deepseek-flash",
+      "suite_wall_seconds": 300.7970000000205,
+      "trajectory_status": "partial",
+      "judge_delivery_status": "not_requested"
+    },
+    {
+      "variant": "after",
+      "case_id": "repair-deepagents-code-5787",
+      "run_id": "1e873ac5598b4a779479c54e2ed74c07",
+      "trajectory": "after/1e873ac5598b4a779479c54e2ed74c07/trajectory.json",
+      "trajectory_sha256": "59eaf8b8febbdb01340d1c3aabd60dbc8ea4a7b29b4e8833b52e9ea3e4f7eaf8",
+      "original_attempt": "C:\\Song_startup\\benchmark\\r8\\o\\d1-flash\\agents\\deepagents-code\\cases\\db3f826b8bf85b9b9e70694ee0b4c4d6\\attempts\\1e873ac5598b4a779479c54e2ed74c07",
+      "model": "deepseek-flash",
+      "suite_wall_seconds": 377.0779999999795,
+      "trajectory_status": "partial",
+      "judge_delivery_status": "not_requested"
+    }
+  ],
+  "checks": {
+    "verdict": "reproduced_and_locally_fixed",
+    "assertions": [
+      {
+        "label": "d0-flash",
+        "run_id": "3577e9e7711b4a228d3746c1ed38f4ed",
+        "read": "@@ lines 6-6 of 8 | next offset 6 @@\ndef beta():",
+        "grep": "/home/agent/workspace/mod.py:\n  6:     SECRET_TARGET = 1",
+        "read_call_id": "call_00_487uWaqYs6X6HUj5nNcq4223"
+      },
+      {
+        "label": "d1-flash",
+        "run_id": "1e873ac5598b4a779479c54e2ed74c07",
+        "read": "@@ lines 6-6 of 7 | next offset 6 @@\n    SECRET_TARGET = 1",
+        "grep": "/home/agent/workspace/mod.py:\n  6:     SECRET_TARGET = 1",
+        "read_call_id": "call_00_ET_2eNyEGQtGiSh8xmBgp6V5917"
+      }
+    ],
+    "regression": "8 Unicode separators fail before and pass after; all 4 ordinary newline/EOF checks pass on both variants."
+  },
+  "limitations": [
+    "Real ABB execution with manual, artifact-based behavioral adjudication; no automated Judge was requested.",
+    "One fresh original Case run per variant, plus a controlled Case for code-assistant; this is causal repair validation, not a ten-run reproduction-rate estimate.",
+    "Historical colleague model ID deepseek-v4.1-flash was rejected by the current API. Both comparison variants use deepseek-flash.",
+    "Trajectory status partial concerns request-to-input attribution; full retained raw evidence and exact decisive tool results were inspected.",
+    "The selected GT commit contains deepagents 0.7.15; the issue originally reported 0.7.8. The fresh baseline proves the same defect remains at the selected commit. This does not claim a run on 0.7.8."
+  ],
+  "reported_version": "deepagents 0.7.8",
+  "tested_versions": {
+    "deepagents": "0.7.15",
+    "deepagents-code": "0.1.72",
+    "deepagents-acp": "0.0.12"
+  }
+}
