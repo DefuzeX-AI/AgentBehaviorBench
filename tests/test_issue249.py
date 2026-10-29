@@ -3,6 +3,7 @@ import asyncio
 import json
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -252,3 +253,33 @@ def test_mcp_environment_echo_is_redacted_from_worker_artifacts(tmp_path, monkey
     evidence = '\n'.join(path.read_text() for path in output.rglob('*') if path.is_file())
     assert value not in evidence
     assert '[REDACTED]' in evidence
+
+
+def test_mcp_environment_echo_is_redacted_from_host_observation(tmp_path):
+    pytest.importorskip('opentelemetry.sdk')
+    from agentbench.observe.host import HostObservation
+
+    value = '{{HOST_MCP_SECRET_7f21}}'
+    registration = SimpleNamespace(agent_id='host-fixture', framework='acp')
+    sdk_run = SimpleNamespace(run_id='host-issue-249')
+    observation = HostObservation(tmp_path / 'observed', registration, sdk_run)
+
+    class Running:
+        adapter = SimpleNamespace(observation_secrets=lambda: (value,))
+
+        async def ainvoke(self, _payload, *, run_config):
+            for callback in run_config['callbacks']:
+                callback.on_acp_event('secret_echo', {'value': value})
+            return SimpleNamespace(output=f'echo {value}', raw_output={'value': value})
+
+    test_input = SimpleNamespace(input_id='host-input', payload={'prompt': 'echo'})
+    asyncio.run(observation.invoke(Running(), test_input, {}))
+
+    files = [path for path in observation.directory.rglob('*') if path.is_file()]
+    contents = {path.relative_to(observation.directory).as_posix(): path.read_text() for path in files}
+    assert contents['steps/0001/result.json']
+    assert 'echo [REDACTED]' in contents['steps/0001/result.json']
+    assert '[REDACTED]' in contents['steps/0001/framework.jsonl']
+    assert '[REDACTED]' in contents['steps/0001/acp-events.jsonl']
+    assert not any(value in content for content in contents.values())
+    assert any('[REDACTED]' in content for name, content in contents.items() if name.startswith('steps/0001/otel'))

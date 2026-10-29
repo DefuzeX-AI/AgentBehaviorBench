@@ -32,8 +32,13 @@ class HostObservation:
                    'invocation_id': invocation_id, 'sdk_run_id': self.run.run_id}
         observed = InvocationObservation(folder, invocation_id, self.run.run_id, self.agent.framework, context=context)
         store = observed.store
-        secrets = getattr(getattr(store, 'store', store), '_secrets', ())
-        atomic_json(folder / 'input.json', redact(json_value({'input_id': test_input.input_id, 'payload': test_input.payload}), secrets))
+        observe_secrets = getattr(running.adapter, 'observation_secrets', None)
+        if callable(observe_secrets):
+            observed.add_secrets(observe_secrets())
+        atomic_json(folder / 'input.json', redact(
+            json_value({'input_id': test_input.input_id, 'payload': test_input.payload}),
+            observed.redaction_secrets,
+        ))
         result = {'schema': 'abb.result.v1', 'run_id': invocation_id, **context}
         try:
             store.record('execution_start', input=test_input.payload)
@@ -46,7 +51,7 @@ class HostObservation:
             store.record('execution_error', error_type=type(exc).__name__, error=str(exc))
             raise
         finally:
-            atomic_json(folder / 'result.json', redact(json_value(result), secrets))
+            atomic_json(folder / 'result.json', redact(json_value(result), observed.redaction_secrets))
             observed.close()
             import json
             otel = json.loads((folder / 'otel-status.json').read_text())
