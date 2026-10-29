@@ -273,12 +273,17 @@ def test_mcp_environment_echo_is_redacted_from_host_observation(tmp_path):
             return SimpleNamespace(output=f'echo {value}', raw_output={'value': value})
 
     test_input = SimpleNamespace(input_id='host-input', payload={'prompt': 'echo'})
-    asyncio.run(observation.invoke(Running(), test_input, {}))
+    invocation = asyncio.run(observation.invoke(Running(), test_input, {}))
+    assert invocation.output == 'echo [REDACTED]'
+    assert invocation.raw_output == {'value': '[REDACTED]'}
 
     files = [path for path in observation.directory.rglob('*') if path.is_file()]
     contents = {path.relative_to(observation.directory).as_posix(): path.read_text() for path in files}
     assert contents['steps/0001/result.json']
     assert 'echo [REDACTED]' in contents['steps/0001/result.json']
+    receipt = json.loads(contents['steps/0001/result-redaction.json'])
+    assert receipt['status'] == 'applied'
+    assert set(receipt['fields']) == {'output', 'raw_output'}
     assert '[REDACTED]' in contents['steps/0001/framework.jsonl']
     assert '[REDACTED]' in contents['steps/0001/acp-events.jsonl']
     assert not any(value in content for content in contents.values())

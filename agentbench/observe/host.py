@@ -2,8 +2,10 @@
 import asyncio
 from pathlib import Path
 from uuid import uuid4
+from agentbench.adapter.base import AdapterInvocation
 from .invocation import InvocationObservation
 from .store import atomic_json, json_value, redact
+from .result import sanitize_result
 
 
 class HostObservation:
@@ -43,15 +45,29 @@ class HostObservation:
         try:
             store.record('execution_start', input=test_input.payload)
             invocation = await running.ainvoke(test_input.payload, run_config=observed.config(config))
-            result.update(status='succeeded', output=invocation.output, raw_output=invocation.raw_output)
-            store.record('execution_end', output=invocation.output)
+            original_output, original_raw_output = invocation.output, invocation.raw_output
+            safe, _ = sanitize_result(
+                {'output': original_output, 'raw_output': original_raw_output},
+                observed.redaction_secrets,
+            )
+            output = safe['output'] if safe['output'] != json_value(original_output) else original_output
+            raw_output = (
+                safe['raw_output']
+                if safe['raw_output'] != json_value(original_raw_output)
+                else original_raw_output
+            )
+            invocation = AdapterInvocation(output, raw_output)
+            result.update(status='succeeded', output=original_output, raw_output=original_raw_output)
+            store.record('execution_end', output=original_output)
             return invocation
         except BaseException as exc:
             result.update(status='cancelled' if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)) else 'failed', error_type=type(exc).__name__, error=str(exc))
             store.record('execution_error', error_type=type(exc).__name__, error=str(exc))
             raise
         finally:
-            atomic_json(folder / 'result.json', redact(json_value(result), observed.redaction_secrets))
+            safe_result, receipt = sanitize_result(result, observed.redaction_secrets)
+            atomic_json(folder / 'result-redaction.json', receipt)
+            atomic_json(folder / 'result.json', safe_result)
             observed.close()
             import json
             otel = json.loads((folder / 'otel-status.json').read_text())
