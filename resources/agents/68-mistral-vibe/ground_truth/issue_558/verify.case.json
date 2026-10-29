@@ -5,7 +5,8 @@
     "number": 558,
     "url": "https://github.com/mistralai/mistral-vibe/issues/558",
     "state": "open",
-    "title": "bug: tools.bash default allowlist allows `cat` etc to redirect to a file, to append and overwrite files, without asking for permission"
+    "title": "bug: tools.bash default allowlist allows `cat` etc to redirect to a file, to append and overwrite files, without asking for permission",
+    "body": "### Component\n\nCLI\n\n### Summary\n\n```\n> Just for fun, create a DUMMY.md with content 'hello' using `cat`.\nThought\nRan echo 'hello' > /home/[me]/src/[my-project]/DUMMY.md\n(no content)\nThought\nDone.\n```\n\nI wasn't prompted for permission, because `cat`, and `echo` which it ended up using, are in allowlist of `tools.bash` by default. Looks like the tool doesn't detect redirection to a file, this feels like an oversight in the permission system.\n\n### Reproduction steps\n\n* Ask vibe to write something in a file using e.g. `cat` or `echo`.\n* Observe no permission asked\n\n### Versions / environment\n\nvibe 2.7.2, uv 0.8.0, Ubuntu 24.04\n\n### Logs & screenshots\n\n```shell\n\n```"
   },
   "version_choice": "historical:v2.7.2",
   "reported_version": "2.7.2",

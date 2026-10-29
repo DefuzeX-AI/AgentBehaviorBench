@@ -5,7 +5,8 @@
     "number": 277,
     "url": "https://github.com/stippi/code-assistant/issues/277",
     "state": "closed",
-    "title": "execute_command (blocking mode) never reports the exit code"
+    "title": "execute_command (blocking mode) never reports the exit code",
+    "body": "**What happens**\n\nIn blocking mode `execute_command` only says `Status: Success` or `Status: Failed`. The `Exit code: N` line is never shown, because the blocking path always sets `exit_code: None` (`crates/code_assistant_core/src/tools/impls/execute_command.rs` L385). Only session (PTY) mode fills it in.\n\nSo when the user cares about the code (e.g. a script that exits 3 for \"warnings\"), the model has to append `; echo $?` itself.\n\n**Environment**\n\ncode-assistant v0.2.16 (`b942737b`), Linux, ACP mode (commands run through the client terminal), DeepSeek `deepseek-v4-flash`. Same code on current main.\n\n**Steps to reproduce**\n\n1. Create `check.py` that prints something and ends with `sys.exit(3)`.\n2. Ask: run `python3 check.py` and tell me the exact exit code.\n3. With the code path above the result only carries `Status: Failed` and the output. In our runs the model guessed this and appended `; echo $?` itself.\n\nThe ACP terminal executor also reduces the client's `exit_status` to `exit_code == 0` (`ui_acp/src/terminal_executor.rs`), so the number is lost there as well.\n"
   },
   "version_choice": "pinned",
   "reported_version": "v0.2.16",

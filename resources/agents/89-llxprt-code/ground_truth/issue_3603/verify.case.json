@@ -5,7 +5,8 @@
     "number": 3603,
     "url": "https://github.com/vybestack/llxprt-code/issues/3603",
     "state": "open",
-    "title": "replace tool normalizes literal backslash-n into a newline in Rust source"
+    "title": "replace tool normalizes literal backslash-n into a newline in Rust source",
+    "body": "Observed while implementing UQM S4 evidence validation with LLxprt Code on macOS.\n\nThe `replace` tool changed a replacement containing a Rust byte literal for newline into a physical newline inside the literal. A follow-up call supplying two different strings, one containing the physical newline and one containing the literal backslash followed by `n`, returned `No changes to apply. The new content is identical to the current content`.\n\nExpected: exact text replacement should distinguish a physical newline from a literal backslash plus `n`. JSON transport escaping should not cause an additional unescape pass in the replacement text.\n\nObserved source after replacement:\n```rust\nassert_eq!(bytes.pop(), Some(b'\n'));\n```\nIntended source:\n```rust\nassert_eq!(bytes.pop(), Some(b'\\n'));\n```\n\nThis caused a Rust compiler error: `byte constant must be escaped: \\n` at `rust/xtask/src/ci/evidence.rs:14203`. The subsequent unified-diff tool preserved the intended literal. No LLxprt source changes were made.\n\nLocal evidence in the UQM checkout: `tmp/issue34-astra-s4-v2/session-20260907-s4-5163/red-trace-newline.log`. The corrected behavioral RED run is separately retained in `red-trace-newline-corrected.log`; the first log records the tool-induced source error, not the intended regression failure."
   },
   "version_choice": "pinned",
   "reported_version": "unknown",

@@ -5,7 +5,8 @@
     "number": 830,
     "url": "https://github.com/1jehuang/jcode/issues/830",
     "state": "closed",
-    "title": "Destructive-command gate false-positives on /dev/null, /dev/stdout, /dev/stderr redirects"
+    "title": "Destructive-command gate false-positives on /dev/null, /dev/stdout, /dev/stderr redirects",
+    "body": "## Bug\n\nThe destructive-command gate's `/dev` protection (added for the catastrophic-path guard around #604) matches by path prefix, so it also catches `/dev/null`, `/dev/stdout`, `/dev/stderr`, and `/dev/fd/*`.\n\nThis means completely routine, harmless redirects get hard-blocked as if they were destructive writes to a device node:\n\n```\ncat file.txt 2>/dev/null\ngrep foo file.txt >/dev/null\nmake 2>&1\n```\n\nThese sinks only discard data — they can never damage a filesystem — but the gate can't currently tell them apart from something like `dd if=x of=/dev/sda`.\n\n## Fix\n\nI have a fix + regression test ready on a fork (couldn't open a PR directly — repo's PR creation is collaborators-only):\n\nhttps://github.com/yesvus/jcode/tree/fix/dev-null-gate-false-positive\nDiff: https://github.com/yesvus/jcode/compare/1jehuang:jcode:master...yesvus:jcode:fix/dev-null-gate-false-positive\n\nAdds an explicit exemption for `/dev/null`, `/dev/stdout`, `/dev/stderr`, `/dev/fd/*` in `crates/jcode-command-risk/src/paths.rs`, checked before the catastrophic-path check runs, plus a regression test (`stderr_suppression_to_dev_null_is_safe`) in `assess_tests.rs`.\n\n`cargo test -p jcode-command-risk --lib` — 61 passed, 0 failed, including the new test.\n\nHappy to have someone with write access cherry-pick the commit, or grant PR access if that's easier."
   },
   "version_choice": "historical:v0.71.1",
   "reported_version": "unknown",

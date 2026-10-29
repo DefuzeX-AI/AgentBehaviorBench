@@ -5,7 +5,8 @@
     "number": 6,
     "url": "https://github.com/gptme/gptme/issues/6",
     "state": "closed",
-    "title": "Stalling on `cat > file << EOF ...`"
+    "title": "Stalling on `cat > file << EOF ...`",
+    "body": "This got stuck:\r\n\r\n```\r\nPreview\r\n$ cat > .github/workflows/publish.yml << EOF\r\nname: Upload Python Package\r\n\r\non:\r\n  release:\r\n    types: [created]\r\n\r\njobs:\r\n  deploy:\r\n\r\n    runs-on: ubuntu-latest\r\n\r\n    steps:\r\n    - uses: actions/checkout@v2\r\n    - name: Set up Python\r\n      uses: actions/setup-python@v2\r\n      with:\r\n        python-version: '3.x'\r\n    - name: Install dependencies\r\n      run: |\r\n        python -m pip install --upgrade pip\r\n        pip install poetry\r\n    - name: Build and publish\r\n      env:\r\n        PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}\r\n      run: |\r\n        poetry publish --build\r\nEOF\r\n\r\n ⚠️ Execute code? (Y/n)\r\n```"
   },
   "version_choice": "pinned",
   "reported_version": "v0.3.0",

@@ -5,7 +5,8 @@
     "number": 1753,
     "url": "https://github.com/vybestack/llxprt-code/issues/1753",
     "state": "closed",
-    "title": "read_line_range tool reports line count off-by-one vs wc -l"
+    "title": "read_line_range tool reports line count off-by-one vs wc -l",
+    "body": "## Bug\n\nThe read_line_range tool (and read_file with line ranges) reports total line counts that are off-by-one compared to wc -l.\n\n## Reproduction\n\nFor a file where wc -l reports 2,237 lines:\n\n    wc -l packages/core/src/config/config.ts\n    2237 packages/core/src/config/config.ts\n\nThe read_line_range tool reports:\n\n    Status: Showing lines 1-200 of 2238 total lines.\n\nSimilarly for a 1,386-line file (wc -l), the tool reports 1387.\n\n## Impact\n\nThis caused a code review agent (deepthinker) to repeatedly flag accurate line counts in plan documents as wrong because it trusted the tool output over the documented counts. Multiple review iterations were wasted chasing phantom off-by-one errors.\n\n## Likely Cause\n\nThe tool probably counts a trailing newline as an extra line, or uses a 1-based-inclusive range calculation that adds 1 to the total. wc -l counts newline characters, so a file ending with a newline has N newlines = N lines. The tool may be counting N+1 by treating the position after the last newline as an additional line.\n\n## Expected Behavior\n\nread_line_range total line count should match wc -l for the same file."
   },
   "version_choice": "historical:v0.9.3",
   "reported_version": "v0.9.3",

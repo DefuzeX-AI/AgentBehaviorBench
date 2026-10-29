@@ -5,7 +5,8 @@
     "number": 448,
     "url": "https://github.com/Kuberwastaken/claurst/issues/448",
     "state": "closed",
-    "title": "apply_patch: support the Codex *** Begin Patch envelope, expose it to the codex provider, and fix unified-diff corruption bugs"
+    "title": "apply_patch: support the Codex *** Begin Patch envelope, expose it to the codex provider, and fix unified-diff corruption bugs",
+    "body": "From the 2026-10-14 codex-vs-claurst audit (refs/audit, gitignored).\n\nclaurst parses unified diffs only; gpt-5-codex models emit the `*** Begin Patch` envelope, so claurst's own codex provider cannot apply its model's patches. The unified-diff path also has corruption bugs: a `-- comment` removal line ends the file early, a `++ ` content line is treated as a header, blank context lines are skipped, and `/dev/null` is written literally.\n\nSpec:\n- Port codex's envelope parser and 4-pass `seek_sequence` matching (refs/openai-codex/codex-rs/apply-patch, Apache-2.0: attribute in a comment) into `crates/tools/src/apply_patch.rs` behind format detection (envelope vs unified diff).\n- Expose apply_patch to the codex provider the way the official client does (freeform/custom tool with the Lark grammar if the Responses API expects it; check refs/openai-codex/codex-rs/core for the tool definition and whether the model id decides it), and intercept `apply_patch <<'EOF'` heredocs in Bash calls, routing them to the tool.\n- Fix the four unified-diff bugs with regression tests; write via the #433 atomic bound write path and respect the per-path lock from #443.\nTests: envelope fixtures from the codex repo, each corruption case, heredoc interception."
   },
   "version_choice": "pinned",
   "reported_version": "0.1.7",

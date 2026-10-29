@@ -5,7 +5,8 @@
     "number": 1005,
     "url": "https://github.com/gptme/gptme/issues/1005",
     "state": "closed",
-    "title": "feat: Support quad+ backticks for nested markdown codeblocks"
+    "title": "feat: Support quad+ backticks for nested markdown codeblocks",
+    "body": "## Problem\n\nWhen trying to save files that contain markdown codeblocks (like documentation with code examples), the inner triple backticks close the outer save block prematurely.\n\n## Example\n\nTrying to save a markdown file with embedded code blocks:\n\n````save /path/to/file.md\n# Example Doc\n\n```python\nprint('hello')\n```\n````\n\nThe inner ```python``` closes the outer save block.\n\n## Current Behavior\n\nThe codeblock parser in `gptme/codeblock.py` uses:\n```python\nre_triple_tick_start = re.compile(r\"^```.*\\n\")\nre_triple_tick_end = re.compile(r\"^```$\")\n```\n\nThis only matches exactly triple backticks.\n\n## Expected Behavior\n\nSupport quad (or more) backticks as outer delimiters, where inner triple backticks are preserved. This is standard CommonMark behavior.\n\n## Workaround\n\nUse language tags on inner \"lang-less\" codeblocks (e.g., ```tree instead of just ```) so they aren't detected as closing the outer block.\n\n## References\n\n- CommonMark spec allows 3+ backticks, with outer fence needing more than inner\n- GitHub Flavored Markdown supports this\n"
   },
   "version_choice": "pinned",
   "reported_version": "v0.31.0",

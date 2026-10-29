@@ -5,7 +5,8 @@
     "number": 186,
     "url": "https://github.com/mistralai/mistral-vibe/issues/186",
     "state": "closed",
-    "title": "The bash() tool call uses sh instead of bash"
+    "title": "The bash() tool call uses sh instead of bash",
+    "body": "As part of its task, my vibe called bash:\n\n```\nbash(command='cd /home/tyl/llm/index-benchmark && source .venv/bin/activate && python retriever/luxical/index.py dataset/documents > test_luxical_index.jsonl 2>&1 | head -20', timeout=None)\nError: bash failed: Command failed: 'cd /home/tyl/llm/index-benchmark && source .venv/bin/activate && python retriever/luxical/index.py dataset/documents > test_luxical_index.jsonl 2>&1 | head -20'\nReturn code: 127\nStderr: /bin/sh: 1: source: not found\n```\n\n`source`, of course, is [part of bash's built-ins](https://man7.org/linux/man-pages/man1/bash.1.html#SHELL_BUILTIN_COMMANDS) to load shell code from a file. Shouldn't the bash tool support it?\n\nSadly, [vibe's bash tool call runs](https://github.com/mistralai/mistral-vibe/blob/402e898f391f65c447cfe061a5fee47a0b50cce7/vibe/core/tools/builtins/bash.py#L240-L248) `asyncio.create_subprocess_shell()` which [uses](https://github.com/python/cpython/blob/4ea3c1a04747978361b497798428423cbb6a7146/Lib/asyncio/unix_events.py#L844-L846) `subprocess.Popen()` [which runs](https://github.com/python/cpython/blob/4ea3c1a04747978361b497798428423cbb6a7146/Lib/subprocess.py#L1845-L1851) `/bin/sh`, not bash.\n\nI can certainly understand why my dear devstral model would confuse the bash tool for running bash rather than sh.\nShall we have it run bash?\n\nI believe the trick is to pass `executable=\"/bin/bash\"` as kwargs to `asyncio.create_subprocess_shell()`."
   },
   "version_choice": "historical:1.3.5",
   "reported_version": "1.2.1",

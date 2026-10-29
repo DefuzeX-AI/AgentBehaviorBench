@@ -5,7 +5,8 @@
     "number": 1450,
     "url": "https://github.com/vercel-labs/fx/issues/1450",
     "state": "open",
-    "title": "Bug: grep_files / glob_files silently skip any directory named build, dist or coverage"
+    "title": "Bug: grep_files / glob_files silently skip any directory named build, dist or coverage",
+    "body": "### Issue details\n\n`grep_files` and `glob_files` skip every directory named `.git`, `.zig-cache`, `zig-out`, `node_modules`, `.next`, `dist`, `build` or `coverage` (`ignored_list_entries` in `src/main.zig`). The result doesn't say anything was skipped, so it looks complete. Neither tool description mentions it.\n\nThat's fine for build output, but a source directory called `build/` (e.g. a Python subpackage `app/build/`) just disappears from searches.\n\n**Environment:** fx v0.0.14 (list unchanged on current main), Linux, `fx ask` and `fx acp`.\n\n**Steps to reproduce**\n\n```\nmkdir -p src build dist\nprintf 'from build.config import MAX_RETRIES\\n' > src/app.py\nprintf 'MAX_RETRIES = 7\\n' > build/config.py\nprintf 'MAX_RETRIES = 3\\n' > dist/old.py\nfx ask \"Use the grep_files tool (not shell) to find every file that contains MAX_RETRIES. Paste the raw tool output.\"\n```\n\nOutput:\n\n```\n[grep] 1 files with matches for MAX_RETRIES\n - src/app.py\n```\n\n`build/config.py` and `dist/old.py` are missing with no note. `glob_files` skips them the same way (in another project `app/**/*.py` didn't list anything under `app/build/`). Searching with an explicit `path: build` does find them.\n\nExpected: either search them, or at least say which directories were excluded.\n\n### Trace\n\nNot attached.\n\n### Sensitive information\n\n- [x] I reviewed the information above and removed secrets and other sensitive data.\n"
   },
   "version_choice": "historical:0.0.14",
   "reported_version": "0.0.14",
