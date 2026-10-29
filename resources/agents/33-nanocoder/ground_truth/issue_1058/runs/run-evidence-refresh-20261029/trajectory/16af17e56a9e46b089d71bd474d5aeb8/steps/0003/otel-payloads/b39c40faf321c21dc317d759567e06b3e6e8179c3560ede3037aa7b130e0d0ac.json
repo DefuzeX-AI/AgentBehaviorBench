@@ -1,0 +1,3 @@
+{
+  "command": "python3 -c \"from pathlib import Path; import zipfile; p=Path('spec.docx'); b=p.read_bytes(); print('FILE_SIZE',len(b)); print('FIRST_64_BYTES',repr(b[:64])); print('IS_ZIP',zipfile.is_zipfile(p)); z=zipfile.ZipFile(p) if zipfile.is_zipfile(p) else None; print('DOCX_XML',z.read('word/document.xml').decode() if z else 'INVALID_ZIP'); print('ZIP_TEST',z.testzip() if z else 'NOT_RUN')\""
+}

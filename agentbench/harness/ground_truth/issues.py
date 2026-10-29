@@ -4,7 +4,8 @@ from .files import read_json, text_field, within
 from .manifests import registered_units
 
 
-def load_issue(root, agent_id, issue_id):
+def read_issue(root, agent_id, issue_id):
+    """Read the canonical Issue definition without requiring runtime evidence."""
     units, invalid, _ = registered_units(root)
     if agent_id not in units or invalid is None or agent_id in invalid:
         raise ValueError('Agent has no valid registration')
@@ -16,6 +17,11 @@ def load_issue(root, agent_id, issue_id):
         raise ValueError('Issue reference requires issue.number')
     if issue_id != f"issue_{issue['number']}":
         raise ValueError('Issue reference identity differs from Case folder')
+    return unit, folder, document
+
+
+def load_issue(root, agent_id, issue_id):
+    unit, folder, document = read_issue(root, agent_id, issue_id)
     for field in ('expected', 'defect'):
         text_field(document, field)
     aliases = document.get('reference_agent_aliases', [])

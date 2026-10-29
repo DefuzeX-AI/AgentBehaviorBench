@@ -14,7 +14,8 @@
   "pinned_contains_fix": true,
   "steps": [
     "Create a file named example.txt in the current workspace whose content is exactly two lines: `before TOKEN after` and `TOKEN`, each ending with a newline.",
-    "In example.txt, replace all occurrences of TOKEN with the literal text $$ using the edit tool with replace_all."
+    "In example.txt, replace all occurrences of TOKEN with the literal text $$ using the edit tool with replace_all. Pass old_string=TOKEN, new_string=$$, and replace_all=true literally. Do not repair the result or use a different editing tool.",
+    "Do not modify example.txt. Use a read-only shell command to show the actual bytes: python3 -c \"from pathlib import Path; b=Path('example.txt').read_bytes(); print('BYTES',repr(b)); print('SIZE',len(b)); print('DOLLAR_COUNT',b.count(bytes([36])))\". Quote the output, even if it differs from the requested replacement."
   ],
   "expected": "Every TOKEN is replaced by the literal text `$$`, so example.txt becomes `before $$ after\\n$$\\n`.",
   "defect": "The edit tool reports success but the file becomes `before $ after\\n$\\n`, because `$$` in new_string is interpreted as a JavaScript replacement pattern.",
@@ -42,5 +43,13 @@
       "explanation": "Builds the full-file replace_all edit by calling rawStringReplaceAll(rawContent, oldString, newString), feeding the unescaped new_string into the faulty replacement; this call site is unchanged by the fix but is the path the replace_all edit takes."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/MiniMax-AI/minimax-code/pull/165 (commit f3160cdb224a126576e4403d022b5d17c7558770). When the edit tool is called with replace_all: true, LocalEditTool delegates to buildReplaceAllEdit, which counts occurrences and then rewrites the whole file with rawStringReplaceAll(rawContent, oldString, newString). That helper uses String.prototype.replaceAll with new_string as a replacement string, and JavaScript expands `$$` to `$`, `$&` to the match, and `$'`/`$`` to the text after/before the match, so the written file differs from what the model asked for while the tool still reports success (and `$&` yields a false 'No changes made'). The fix passes a replacer callback `() => replacement`, which makes the replacement literal. The fix (2026-09-19) is first contained in release v0.5.0; the ABB-pinned revision a5639bcc (also package version 0.4.12) already contains it, so the case is tested at the issue's stated source commit 17b8ded9 (0.4.12), where the faulty line 96 is present."
+  "Root cause": "FIXED UPSTREAM IN https://github.com/MiniMax-AI/minimax-code/pull/165 (commit f3160cdb224a126576e4403d022b5d17c7558770). When the edit tool is called with replace_all: true, LocalEditTool delegates to buildReplaceAllEdit, which counts occurrences and then rewrites the whole file with rawStringReplaceAll(rawContent, oldString, newString). That helper uses String.prototype.replaceAll with new_string as a replacement string, and JavaScript expands `$$` to `$`, `$&` to the match, and `$'`/`$`` to the text after/before the match, so the written file differs from what the model asked for while the tool still reports success (and `$&` yields a false 'No changes made'). The fix passes a replacer callback `() => replacement`, which makes the replacement literal. The fix (2026-09-19) is first contained in release v0.5.0; the ABB-pinned revision a5639bcc (also package version 0.4.12) already contains it, so the case is tested at the issue's stated source commit 17b8ded9 (0.4.12), where the faulty line 96 is present.",
+  "reference_refresh": {
+    "date": "2026-10-29",
+    "role": "supplemental evidence capture",
+    "selected_attempt": "84c1d3dbbfba40408c2bfa42518da7c9",
+    "prior_validation": "Existing ten-run validation is retained as reported by the authors. This refresh replaces the representative evidence only.",
+    "archive": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\archived-references\\minimax-code-155",
+    "source_run": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\minimax-code-155\\execution\\agents\\minimax-code\\cases\\0a6b5d48cfbd590ca48589d5074bd289\\attempts\\84c1d3dbbfba40408c2bfa42518da7c9"
+  }
 }

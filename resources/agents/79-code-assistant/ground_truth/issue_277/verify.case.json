@@ -1,57 +1,65 @@
 {
- "case_id": "ir-code-assistant-277-v1",
- "issue": {
-  "repository": "stippi/code-assistant",
-  "number": 277,
-  "url": "https://github.com/stippi/code-assistant/issues/277",
-  "state": "closed",
-  "title": "execute_command (blocking mode) never reports the exit code"
- },
- "version_choice": "pinned",
- "reported_version": "v0.2.16",
- "commit_version": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
- "fixed_in": "v0.2.17",
- "pinned_contains_fix": false,
- "steps": [
-  "Create a file check.py in the current directory with exactly this content:\n\nimport sys\nprint(\"2 warnings found\")\nsys.exit(3)\n",
-  "Run `python3 check.py` and tell me the exact exit code."
- ],
- "expected": "The execute_command result includes the process exit code (`Exit code: 3`) so the agent can report the exact exit code 3.",
- "defect": "In blocking mode execute_command only reports `Status: Failed` and the output; the `Exit code: N` line is never shown because the blocking path always sets `exit_code: None`, so the model has to guess or append `; echo $?` itself.",
- "fault location": [
-  {
-   "file": "crates/ui_acp/src/terminal_executor.rs",
-   "function": "ACPTerminalCommandExecutor::stream_terminal_output / wait_for_terminal_completion",
-   "line_start": 159,
-   "line_end": 224,
-   "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
-   "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/ui_acp/src/terminal_executor.rs#L159-L224",
-   "role": "upstream_fix",
-   "verification": "fix_diff_mapped_to_tested_revision",
-   "explanation": "The ACP terminal executor collapses the client's exit_status into a boolean `code == 0` and builds CommandOutput without the numeric code; PR #278 keeps the code via CommandOutput::exited(exit_code, output)."
+  "case_id": "ir-code-assistant-277-v1",
+  "issue": {
+    "repository": "stippi/code-assistant",
+    "number": 277,
+    "url": "https://github.com/stippi/code-assistant/issues/277",
+    "state": "closed",
+    "title": "execute_command (blocking mode) never reports the exit code"
   },
-  {
-   "file": "crates/command_executor/src/lib.rs",
-   "function": "CommandOutput",
-   "line_start": 11,
-   "line_end": 15,
-   "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
-   "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/command_executor/src/lib.rs#L11-L15",
-   "role": "upstream_fix",
-   "verification": "fix_diff_mapped_to_tested_revision",
-   "explanation": "CommandOutput only carries `success` and `output`, so no executor can pass an exit code upward; PR #278 adds `exit_code: Option<i32>` and the `exited`/`success` constructors."
-  },
-  {
-   "file": "crates/code_assistant_core/src/tools/impls/execute_command.rs",
-   "function": "ExecuteCommandTool::execute",
-   "line_start": 378,
-   "line_end": 387,
-   "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
-   "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/code_assistant_core/src/tools/impls/execute_command.rs#L378-L387",
-   "role": "upstream_fix",
-   "verification": "fix_diff_mapped_to_tested_revision",
-   "explanation": "The blocking-mode result hard-codes `exit_code: None`, so the rendered tool result never contains `Exit code: N`; PR #278 sets `exit_code: result.exit_code`."
+  "version_choice": "pinned",
+  "reported_version": "v0.2.16",
+  "commit_version": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+  "fixed_in": "v0.2.17",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a file check.py in the current directory with exactly this content:\n\nimport sys\nprint(\"2 warnings found\")\nsys.exit(3)\n\nOnly create the file in this turn. Do not run it yet.",
+    "Use execute_command in blocking mode to run exactly `python3 check.py` once. Do not append echo, printf, shell operators, or any exit-code wrapper. Quote the complete tool response verbatim and state whether that response explicitly contains the numeric process exit code. Do not infer the code from the source, and do not rerun the command."
+  ],
+  "expected": "The execute_command result includes the process exit code (`Exit code: 3`) so the agent can report the exact exit code 3.",
+  "defect": "In blocking mode execute_command only reports `Status: Failed` and the output; the `Exit code: N` line is never shown because the blocking path always sets `exit_code: None`, so the model has to guess or append `; echo $?` itself.",
+  "fault location": [
+    {
+      "file": "crates/ui_acp/src/terminal_executor.rs",
+      "function": "ACPTerminalCommandExecutor::stream_terminal_output / wait_for_terminal_completion",
+      "line_start": 159,
+      "line_end": 224,
+      "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+      "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/ui_acp/src/terminal_executor.rs#L159-L224",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The ACP terminal executor collapses the client's exit_status into a boolean `code == 0` and builds CommandOutput without the numeric code; PR #278 keeps the code via CommandOutput::exited(exit_code, output)."
+    },
+    {
+      "file": "crates/command_executor/src/lib.rs",
+      "function": "CommandOutput",
+      "line_start": 11,
+      "line_end": 15,
+      "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+      "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/command_executor/src/lib.rs#L11-L15",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "CommandOutput only carries `success` and `output`, so no executor can pass an exit code upward; PR #278 adds `exit_code: Option<i32>` and the `exited`/`success` constructors."
+    },
+    {
+      "file": "crates/code_assistant_core/src/tools/impls/execute_command.rs",
+      "function": "ExecuteCommandTool::execute",
+      "line_start": 378,
+      "line_end": 387,
+      "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+      "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/code_assistant_core/src/tools/impls/execute_command.rs#L378-L387",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The blocking-mode result hard-codes `exit_code: None`, so the rendered tool result never contains `Exit code: N`; PR #278 sets `exit_code: result.exit_code`."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/stippi/code-assistant/pull/278. In blocking mode (the path used in ACP mode, where commands run through the client terminal), the exit status is lost at every layer: ACPTerminalCommandExecutor reduces the ACP terminal exit_status to `success = exit_code == 0`, the shared CommandOutput struct has no field for the numeric code, and ExecuteCommandTool::execute builds ExecuteCommandOutput with `exit_code: None`. The renderer only prints `Exit code: N` when exit_code is Some, so a script exiting with 3 is reported as just `Status: Failed` plus its output, and the model cannot state the exact code without re-running with `; echo $?`. PR #278 (merge commit f5b3b36, 2026-10-24) adds `exit_code: Option<i32>` to CommandOutput with `exited()`/`success()` constructors, propagates the client's exit code in the ACP terminal executor (and the default/PTY/sandboxed executors), and passes `result.exit_code` into the blocking-mode output. The fix first ships in v0.2.17; the pinned revision b942737 (v0.2.16, the version named in the issue) does not contain it.",
+  "reference_refresh": {
+    "date": "2026-10-29",
+    "role": "supplemental evidence capture",
+    "selected_attempt": "b2649ebd18d441d391e851678bec792b",
+    "prior_validation": "Existing ten-run validation is retained as reported by the authors. This refresh replaces the representative evidence only.",
+    "archive": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\archived-references\\code-assistant-277",
+    "source_run": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\code-assistant-277\\execution\\agents\\code-assistant\\cases\\77f6d2ac83755d2e9f80f56fd2758b7f\\attempts\\b2649ebd18d441d391e851678bec792b"
   }
- ],
- "Root cause": "FIXED UPSTREAM IN https://github.com/stippi/code-assistant/pull/278. In blocking mode (the path used in ACP mode, where commands run through the client terminal), the exit status is lost at every layer: ACPTerminalCommandExecutor reduces the ACP terminal exit_status to `success = exit_code == 0`, the shared CommandOutput struct has no field for the numeric code, and ExecuteCommandTool::execute builds ExecuteCommandOutput with `exit_code: None`. The renderer only prints `Exit code: N` when exit_code is Some, so a script exiting with 3 is reported as just `Status: Failed` plus its output, and the model cannot state the exact code without re-running with `; echo $?`. PR #278 (merge commit f5b3b36, 2026-10-24) adds `exit_code: Option<i32>` to CommandOutput with `exited()`/`success()` constructors, propagates the client's exit code in the ACP terminal executor (and the default/PTY/sandboxed executors), and passes `result.exit_code` into the blocking-mode output. The fix first ships in v0.2.17; the pinned revision b942737 (v0.2.16, the version named in the issue) does not contain it."
 }

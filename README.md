@@ -55,6 +55,10 @@ accepts an Issue number and the absolute path to a JSON collection of 1-50 Cases
 It executes each Case once at the Issue's commit, stops at the first confirmed hit,
 and reports Detection@1/5/10/20/50 by execution count using an independent trajectory oracle.
 
+For Issue repair, [`agentbench exp3`](docs/Experiment3.md) exports pinned source
+with `genProject` and validates an edited source directory against the original
+reproduction Case with `run` (three independent repair executions by default).
+
 ![AgentBehaviorBench architecture](docs/figures/abb-suite-sdk-roles.png)
 
 The Agent registry records which source revision is under test and how ABB can
