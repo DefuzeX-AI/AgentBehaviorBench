@@ -40,3 +40,5 @@ observer seam; callback objects never cross the ACP wire.
 Terminal references and the advertised `terminal_output` metadata extension are
 resolved into tool evidence. See [ACP terminal evidence](../../observe/acp_evidence/README.md)
 for the source Protocol, extension registry, limits and offline acceptance.
+The same document describes how permission requests, which ABB answers by
+`permission_policy` without user review, reach the Judge as bounded tool spans.
