@@ -2,6 +2,7 @@
 import errno
 import hashlib
 import os
+import tempfile
 from pathlib import Path
 from .artifact_paths import _safe
 
@@ -32,13 +33,25 @@ def publish_payload(temporary, target, step):
     except FileExistsError:
         if hashlib.sha256(blob.read_bytes()).hexdigest() != digest:
             raise ValueError('Stored payload digest mismatch')
+        # Keep the complete incoming file until a replacement link is ready.
+        # A shared mount may lose visibility of the blob between operations.
+        with tempfile.TemporaryDirectory(prefix='.payload-link-', dir=target.parent) as directory:
+            linked = Path(directory) / 'payload'
+            try:
+                os.link(blob, linked)
+            except OSError as exc:
+                if exc.errno not in (errno.ENOENT, errno.EXDEV, errno.EPERM, errno.ENOTSUP, errno.EACCES):
+                    raise
+                temporary.replace(target)
+            else:
+                linked.replace(target)
+                temporary.unlink()
+        return
     except OSError as exc:
         if exc.errno not in (errno.EXDEV, errno.EPERM, errno.ENOTSUP, errno.EACCES):
             raise
         temporary.replace(target)
         return
-    # The transport path is already complete. Swap its directory entry to the
-    # shared inode, then publish atomically over a previous local reference.
-    temporary.unlink()
-    os.link(blob, temporary)
+    # A newly created blob already shares this inode. Do not unlink the only
+    # transport copy and reopen the blob merely to recreate the same link.
     temporary.replace(target)
