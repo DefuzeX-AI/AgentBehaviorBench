@@ -144,20 +144,29 @@ def build(directory, *, environ=None, project_root=None):
             entries.append({'wire': None, 'framework': row, 'records': index.groups.get(row['id'], []),
                             'folder': row.get('_context'), 'order': order_key(row)})
 
+    # Duplicate emissions make the relationship ambiguous even with one tool.
+    prepared = [(entry, *_model_step(index, entry, agent_id, limit)) for entry in entries]
     used, ambiguous, steps = set(), 0, []
-    for entry in entries:
-        step, emitted = _model_step(index, entry, agent_id, limit)
+    for entry, step, emitted in prepared:
         folder = entry['folder'] or only_folder
         logs = []
         for call_id in emitted:
             candidates = [t for t in tools_by_call.get(call_id, [])
                           if not folder or not t.get('_context') or t['_context'] == folder]
-            if len(candidates) == 1:
+            emitters = sum(other_emitted.count(call_id) for other, _, other_emitted in prepared
+                           if not folder or not (other['folder'] or only_folder)
+                           or (other['folder'] or only_folder) == folder)
+            if len(candidates) == 1 and emitters == 1:
                 log = tool_log(index, candidates[0]); log['link'] = 'exact'; used.add(candidates[0]['id'])
-            elif candidates:
-                log = tool_log(index, candidates[0]); log['link'] = 'ambiguous'; ambiguous += 1
-                log['evidence']['candidates'] = [t['id'] for t in candidates]
-                used.update(t['id'] for t in candidates)
+            elif candidates and (len(candidates) > 1 or emitters > 1):
+                # Keep the recorded executions as separate tool_only steps rather
+                # than attributing one candidate's output to multiple emitters.
+                call = next((c for c in step['output'].get('tool_calls') or [] if c.get('id') == call_id), {})
+                log = {'tool_call_id': call_id, 'tool_name': call.get('name') or 'unknown',
+                       'input_arguments': call.get('arguments'), 'outputs': None,
+                       'execution_status': 'not_observed', 'exit_status': None, 'link': 'ambiguous',
+                       'evidence': {'candidates': [t['id'] for t in candidates]}}
+                ambiguous += 1
             else:
                 log = {'tool_call_id': call_id, 'tool_name': next((c.get('name') for c in step['output'].get('tool_calls') or []
                        if c.get('id') == call_id), None) or 'unknown', 'input_arguments': next((c.get('arguments') for c in
@@ -220,7 +229,7 @@ def build(directory, *, environ=None, project_root=None):
     unlinked = sum(s['kind'] == 'tool_only' for s in steps)
     not_observed = sum(log['execution_status'] == 'not_observed' for s in steps for log in s['tool_logs'])
     value = {'schema': SCHEMA, 'builder_version': BUILDER_VERSION,
-             'status': 'partial' if warnings or not_observed or not steps else 'complete',
+             'status': 'partial' if warnings or not_observed or ambiguous or not steps else 'complete',
              'run_id': run.get('run_id') or root.name, 'agent_id': agent_id,
              'case_id': identity['case_id'], 'framework': identity['framework'],
              'metadata': bounded(metadata, limit), 'steps': steps, 'inputs': inputs,
