@@ -17,7 +17,7 @@ def configure(parser):
     run.add_argument('--results-dir', type=Path)
     run.add_argument('--prompt-template', type=Path, help='Record the shared testing prompt template')
     run.add_argument('--scenario-file', type=Path, help='Record this Agent\'s shared scenario')
-    run.add_argument('--model', help='Target model override; oracle uses OPENROUTER_MODEL')
+    run.add_argument('--model', help='Target model override; oracle uses the shared provider default model')
     run.add_argument('--timeout', type=float, default=2400)
     match = commands.add_parser('match', help='Assess saved trajectories without executing Cases')
     match.add_argument('--experiment', type=Path, required=True)

@@ -11,8 +11,7 @@ from agentbench.harness.concurrency import ConcurrencySettings
 from agentbench.harness.ground_truth.detection import oracle_model
 from agentbench.harness.ground_truth.files import EVIDENCE_LIMIT, read_json
 from agentbench.harness.ground_truth.issues import load_issue
-from agentbench.harness.ground_truth.repair import assess_defect, assess_expected, summarize, trial_verdict
-from agentbench.harness.ground_truth.repair_requirements import prepare_requirements
+from agentbench.harness.ground_truth.repair import assess_repair, summarize, repair_trial_verdict
 from agentbench.harness.scheduling.retry import RetryPolicy
 from agentbench.sdk.common.artifacts import Artifacts
 from .exp1 import fingerprint, token_usage
@@ -26,9 +25,9 @@ class Experiment3:
         self.environ = self.engine.environ
         self.ask, self.output = ask, output
 
-    def gen_project(self, agent_id, *, issue, output, records_dir=None):
+    def gen_project(self, agent_id, *, issue, output, records_dir=None, no_run=False):
         return export_project(self.engine, self.root, agent_id, issue, output,
-                              records_dir=records_dir, output_fn=self.output)
+                              records_dir=records_dir, output_fn=self.output, no_run=no_run)
 
     def run(self, agent_id, *, issue, source, runs=3, results_dir=None, model=None, timeout=2400):
         if type(runs) is not int or runs < 1:
@@ -74,15 +73,6 @@ class Experiment3:
             files.save('plan.json', deepcopy(value))
             files.save('result.json', value)
             self.output(f'Exp3: {agent_id} issue_{issue}; base {base.revision}; {runs} repair validations')
-            requirements = None
-            try:
-                requirements = prepare_requirements(document['expected'], case,
-                    directory=directory / 'oracle', environ=self.environ, model=selected_oracle, ask=self.ask)
-                value['expected_requirements'] = requirements
-            except Exception as exc:
-                value['expected_requirements_error'] = str(exc)
-                self.output('Exp3: expected-behavior requirements unavailable; PASS cannot be established')
-            files.save('result.json', value)
             # A fresh baseline proves this Case can expose the issue in the same
             # environment. It is additional to, not one of, the requested runs.
             value['baseline'] = self._trial(agent_id, case, reference, base,
@@ -92,8 +82,7 @@ class Experiment3:
             for index in range(runs):
                 self.output(f'Exp3: [{index + 1}/{runs}] starting independent repair execution')
                 row = self._trial(agent_id, case, reference, candidate,
-                    directory / 'trials' / f'{index + 1:04d}', selected_oracle, model, timeout,
-                    requirements=requirements)
+                    directory / 'trials' / f'{index + 1:04d}', selected_oracle, model, timeout)
                 row['run_index'] = index + 1
                 value['trials'].append(row)
                 value['verdict'] = summarize(value['baseline'], value['trials'], runs)
@@ -107,7 +96,7 @@ class Experiment3:
             value['verdict'] = summarize(value['baseline'], value['trials'], runs)
             value['wall_seconds'] = time.monotonic() - started
             value['completed_runs'] = len(value['trials'])
-            value['failure_reproduced_runs'] = sum(row['hit'] is True for row in value['trials'])
+            value['failure_reproduced_runs'] = sum(row['label'] == 'bug_exist' for row in value['trials'])
             value['reason'] = ('At least one repair run failed the original Case.' if value['verdict'] == 'FAIL'
                 else 'All runs achieved the original Case expectation without the reported failure.'
                 if value['verdict'] == 'PASS' else 'Baseline reproduction or repair evidence is unresolved.')
@@ -115,10 +104,9 @@ class Experiment3:
         self.output(f'Exp3: {value["verdict"]}; results: {directory}')
         return self.result(directory)
 
-    def _trial(self, agent_id, case, reference, target, directory, oracle, model, timeout, *,
-               baseline=False, requirements=None):
+    def _trial(self, agent_id, case, reference, target, directory, oracle, model, timeout, *, baseline=False):
         files = Artifacts(directory, environ=self.environ)
-        row = {'hit': None, 'expected_met': None, 'verdict': 'UNKNOWN', 'suite': None,
+        row = {'hit': None, 'label': 'unknown', 'verdict': 'UNKNOWN', 'suite': None,
                'reason': 'Execution has not finished', 'state': 'running'}
         files.save('trial.json', row)
         started = time.monotonic()
@@ -134,26 +122,17 @@ class Experiment3:
                        target_usage=token_usage(trajectory))
             files.save('trajectory.json', trajectory)
             kwargs = {'environ': self.environ, 'model': oracle, 'ask': self.ask}
-            detected = assess_defect(reference, trajectory, directory=directory / 'oracle/defect', **kwargs)
-            row.update(hit=detected['hit'], defect_assessment=detected, reason=detected['reason'])
+            judged = assess_repair(reference, trajectory, directory=directory / 'oracle/repair', **kwargs)
+            label = judged['match']['label']
+            row.update(hit=judged['hit'], label=label, repair_assessment=judged, reason=judged['reason'])
             files.save('trial.json', row)
-            if not baseline and row['hit'] is False:
-                if requirements is None:
-                    row['reason'] = 'Expected-behavior requirements unavailable; repair cannot be confirmed'
-                elif row['execution_status'] == 'completed':
-                    expected = assess_expected(reference, trajectory,
-                        requirements=requirements, directory=directory / 'oracle/expected', **kwargs)
-                    row.update(expected_met=expected['hit'], expected_assessment=expected,
-                               reason=expected['reason'])
-                else:
-                    row['reason'] = 'Execution did not complete; defect absence cannot prove repair'
-            row.update(state='finished', verdict=trial_verdict(row['hit'], row['expected_met']))
+            row.update(state='finished', verdict=repair_trial_verdict(label, row['execution_status']))
             if baseline:
-                row['verdict'] = ('REPRODUCED' if row['hit'] is True else
-                                  'NOT_REPRODUCED' if row['hit'] is False else 'UNKNOWN')
+                row['verdict'] = ('REPRODUCED' if label == 'bug_exist' else
+                                  'NOT_REPRODUCED' if label == 'bug_fixed' else 'UNKNOWN')
         except BaseException as exc:
             row.update(state='failed' if isinstance(exc, Exception) else 'interrupted', reason=str(exc),
-                       verdict=trial_verdict(row['hit'], row['expected_met']))
+                       verdict=repair_trial_verdict(row['label'], row.get('execution_status')))
             if not isinstance(exc, Exception):
                 raise
         finally:

@@ -270,15 +270,32 @@ def test_context_request_preserves_diagnostics_and_unknown(project, oracle, tmp_
 
 
 
-def test_openrouter_default_is_independent_of_judge_and_target(monkeypatch):
+def test_shared_provider_default_is_independent_of_judge_and_target(monkeypatch):
     seen = {}
     monkeypatch.setattr(detection, 'model_config', lambda env: seen.update(env))
     detection.oracle_model({'ABB_MODEL_PROVIDER': 'deepseek', 'ABB_MODEL': 'target',
                             'ABB_LOCAL_JUDGE_MODEL': 'legacy', 'ABB_GT_MODEL': 'legacy-gt',
                             'OPENROUTER_MODEL': 'default', 'OPENROUTER_API_KEY': 'test'})
-    assert seen['ABB_MODEL_PROVIDER'] == 'openrouter'
+    assert seen['ABB_MODEL_PROVIDER'] == 'deepseek'
     assert seen['OPENROUTER_MODEL'] == 'default'
     assert not {'ABB_MODEL', 'ABB_GT_MODEL', 'ABB_LOCAL_JUDGE_MODEL'} & seen.keys()
+
+
+@pytest.mark.parametrize('provider,model,endpoint', [
+    ('deepseek', 'deepseek-flash', 'https://api.deepseek.com'),
+    ('openrouter', 'openai/gpt-4.1-mini', 'https://openrouter.ai/api/v1'),
+])
+def test_oracle_resolves_selected_provider_without_target_or_legacy_overrides(provider, model, endpoint):
+    selected = detection.oracle_model({
+        'ABB_MODEL_PROVIDER': provider, 'ABB_MODEL': 'target-only',
+        'DEEPSEEK_MODEL': 'deepseek-flash', 'DEEPSEEK_API_KEY': 'test-ds-key',
+        'OPENROUTER_MODEL': 'openai/gpt-4.1-mini', 'OPENROUTER_API_KEY': 'test-router-key',
+        'ABB_GT_MODEL': 'legacy', 'ABB_GT_BASE_URL': 'https://legacy.invalid',
+        'ABB_GT_API_KEY': 'test-legacy-key', 'ABB_LOCAL_JUDGE_MODEL': 'local-only',
+    })
+    assert selected.model == model
+    assert selected.base_url == endpoint
+    assert selected.api_key == ('test-ds-key' if provider == 'deepseek' else 'test-router-key')
 
 
 

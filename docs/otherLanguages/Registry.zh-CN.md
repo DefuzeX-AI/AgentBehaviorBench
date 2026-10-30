@@ -16,12 +16,12 @@
 schema_version = "defuzex-bench.registry.v1"
 
 [[agents]]
-agent_id = "folder-mover-agent"
-path = "resources/agents/01-folder-mover-agent"
+agent_id = "deer-flow"
+path = "resources/agents/01-deer-flow"
 enabled = false
 status = "ready"
 framework = "langgraph"
-source = "C:\\Song_startup\\benchmark\\04-folder-mover-agent\\folder-mover-agent"
+source = "https://github.com/bytedance/deer-flow"
 case = 1
 step = 3
 ```
@@ -44,7 +44,7 @@ step = 3
 | `step` | SDK 对每个 Case 的对话轮数上限，填写时必须是正整数；省略时使用 SDK 的默认值。实际 Case 可以少于该轮数。 |
 
 `agent_id`、`path` 和 `framework` 为必填的非空字符串。在 TOML 双引号字符串中，
-Windows 路径的反斜杠需要写成 `\\`，如上面的示例。
+Windows 路径的反斜杠需要写成 `\\`。
 
 ## 区分 `case` 和 `step`
 
@@ -70,7 +70,7 @@ agentbench evaluate react-agent --cases 2 --max-steps 3 --no-view
 Agent，请先完成[接入配置](How%20To%20Add%20Agent.zh-CN.md)，在启用状态下进行认证：
 
 ```bash
-agentbench certify folder-mover-agent --no-view
+agentbench certify deer-flow --no-view
 ```
 
 认证通过后，ABB 将成功接入的 Agent 标记为 `ready`。该状态说明接入就绪，不保证 Judge

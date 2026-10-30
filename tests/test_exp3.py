@@ -9,15 +9,17 @@ import pytest
 
 from agentbench.experiments.exp3 import Experiment3
 from agentbench.harness.ground_truth.repair import (
-    summarize, trial_verdict, EXPECTED_SYSTEM, expected_payload, defect_payload, validate_expected_observation)
-from agentbench.harness.ground_truth.repair_requirements import (
-    SYSTEM as REQUIREMENTS_SYSTEM, prepare_requirements)
+    summarize, REPAIR_SYSTEM, adapt_repair_reply, repair_trial_verdict)
 from tests.test_exp1 import install_issue, answer, prepared, project, oracle
 from tests.test_sdk_defaults import inprocess_worker_permissions
 
 
-def requirements():
-    return {'requirements': [{'id': 'r1', 'description': 'Echo the input.', 'evidence_kind': 'model_response'}]}
+def repair_answer(label):
+    return {'label': label, 'reason': 'Observed candidate execution evidence.',
+            'reference_step_ids': ['runs/run-01/trajectory/reference/1'] if label == 'bug_exist' else [],
+            'candidate_step_ids': [2] if label != 'unknown' else [],
+            'candidate_decisive_step': 2 if label != 'unknown' else None,
+            'candidate_observation': 'The file says hello.' if label != 'unknown' else None}
 
 
 @pytest.fixture
@@ -58,17 +60,11 @@ def test_three_runs_use_one_snapshot_and_same_case(repair_project, monkeypatch, 
     defect_count = 0
     def ask(model, *, system, payload):
         nonlocal defect_count
-        if system == REQUIREMENTS_SYSTEM:
-            assert not calls  # Requirements are frozen before either execution.
-            assert set(payload) == {'expected', 'case'}
-            return requirements()
-        if system == EXPECTED_SYSTEM:
-            assert 'reference_trajectories' not in payload
-            assert set(payload['issue']) == {'expected', 'requirements'}
-            return {**answer(True), 'reference_step_ids': [], 'witnesses': [
-                {'requirement_id': 'r1', 'step_id': 2, 'observation': 'The file says hello.'}]}
+        assert system == REPAIR_SYSTEM
+        assert set(payload['issue']) == {'defect', 'Root cause', 'expected'}
+        assert payload['reference_trajectories']
         defect_count += 1
-        return answer(defect_count == 1)
+        return repair_answer('bug_exist' if defect_count == 1 else 'bug_fixed')
     result = Experiment3(f.service.root, execution_service=f.service, ask=ask, output=lambda _: None).run(
         'example', issue=1, source=source, results_dir=f.results)
     assert result['verdict'] == 'PASS'
@@ -78,7 +74,7 @@ def test_three_runs_use_one_snapshot_and_same_case(repair_project, monkeypatch, 
     assert len({str(call[1].registration.path) for call in calls[1:]}) == 1
     assert all(call[0] == calls[0][0] for call in calls)
     assert all(call[2]['retry_policy'].max_retries == 0 for call in calls)
-    assert all(row['expected_met'] is True for row in result['trials'])
+    assert all(row['label'] == 'bug_fixed' for row in result['trials'])
     assert f.target.registration.path != Path(result['candidate_target']['path'])
     f.target.validate()
 
@@ -86,7 +82,7 @@ def test_three_runs_use_one_snapshot_and_same_case(repair_project, monkeypatch, 
 def test_failure_does_not_stop_remaining_runs(repair_project, tmp_path):
     f, source = repair_project
     result = Experiment3(f.service.root, execution_service=f.service,
-        ask=lambda *a, **k: answer(True), output=lambda _: None).run(
+        ask=lambda *a, **k: repair_answer('bug_exist'), output=lambda _: None).run(
         'example', issue=1, source=source, runs=2, results_dir=f.results)
     assert result['verdict'] == 'FAIL'
     assert result['completed_runs'] == result['failure_reproduced_runs'] == 2
@@ -97,18 +93,12 @@ def test_absent_defect_without_expected_evidence_is_unknown(repair_project, tmp_
     calls = 0
     def ask(model, *, system, payload):
         nonlocal calls
-        if system == REQUIREMENTS_SYSTEM:
-            return requirements()
-        if system == EXPECTED_SYSTEM:
-            return {'match': None, 'reason': 'Required output missing', 'reference_step_ids': [],
-                    'candidate_step_ids': [], 'candidate_decisive_step': None}
         calls += 1
-        return answer(calls == 1)
+        return repair_answer('bug_exist' if calls == 1 else 'unknown')
     result = Experiment3(f.service.root, execution_service=f.service, ask=ask, output=lambda _: None).run(
         'example', issue=1, source=source, runs=1, results_dir=f.results)
     assert result['verdict'] == 'UNKNOWN'
-    assert result['trials'][0]['hit'] is False
-    assert result['trials'][0]['expected_met'] is None
+    assert result['trials'][0]['label'] == 'unknown'
 
 
 def test_transport_failures_stay_unknown_and_all_runs_are_attempted(repair_project, tmp_path):
@@ -121,92 +111,38 @@ def test_transport_failures_stay_unknown_and_all_runs_are_attempted(repair_proje
         'example', issue=1, source=source, results_dir=f.results)
     assert result['verdict'] == 'UNKNOWN' and result['completed_runs'] == 3
     assert all(row['state'] == 'failed' for row in result['trials'])
-    assert len(calls) == 5  # One requirements call, one baseline, three candidate oracles.
+    assert len(calls) == 4  # One baseline and three candidate oracles.
 
 
-def test_expected_context_never_contains_reference_actions(repair_project):
-    f, _ = repair_project
-    reference = {'definition': {'expected': 'Required outcome', 'defect': 'secret old failure'},
-                 'trajectories': [{**f.candidate, 'attempt': 'reference'}]}
-    for full in (False, True):
-        value = expected_payload(reference, f.candidate, full_context=full)
-        assert 'reference_trajectories' not in value
-        assert value['issue'] == {'expected': 'Required outcome'}
-        defect = defect_payload(reference, f.candidate, full_context=full)
-        assert defect['issue'] == {'defect': 'secret old failure'}
-        assert defect['reference_trajectories']
-
-
-def test_expected_tool_claim_requires_real_result_and_required_arguments():
-    plan = {'requirements': [{'id': 'r1', 'description': 'Read the required file.',
-                             'evidence_kind': 'tool_result', 'tool_name': 'read',
-                             'required_tool_arguments': {'path': 'original'}}]}
-    candidate = {'steps': [{'step_id': 1, 'output': {'text': 'Summary claims a tool succeeded'},
-                            'tool_logs': []}, {'step_id': 2, 'output': {}, 'tool_logs': [
-        {'tool_name': 'read', 'input_arguments': {'path': 'changed'}, 'outputs': 'Actual result'}]}]}
-    witness = {'requirement_id': 'r1', 'step_id': 1, 'tool_log_index': 0, 'observation': 'Actual result'}
-    reply = {'match': True, 'candidate_decisive_step': 1, 'candidate_step_ids': [1, 2],
-             'candidate_observation': 'Actual result', 'witnesses': [witness]}
-    with pytest.raises(ValueError, match='actual tool log'):
-        validate_expected_observation(reply, candidate, plan)
-    # The judge cannot change the frozen source kind to make a model claim pass.
-    witness['evidence_kind'] = 'model_response'
-    with pytest.raises(ValueError, match='actual tool log'):
-        validate_expected_observation(reply, candidate, plan)
-    reply['candidate_decisive_step'] = 2
-    witness['step_id'] = 2
-    with pytest.raises(ValueError, match='arguments differ'):
-        validate_expected_observation(reply, candidate, plan)
-    # Even supplying weaker constraints in the verdict cannot change the plan.
-    witness['required_tool_arguments'] = {}
-    with pytest.raises(ValueError, match='arguments differ'):
-        validate_expected_observation(reply, candidate, plan)
-    candidate['steps'][1]['tool_logs'][0]['input_arguments']['path'] = 'original'
-    validate_expected_observation(reply, candidate, plan)
-    witness['observation'] = 'Summary claims a tool succeeded'
-    with pytest.raises(ValueError, match='absent'):
-        validate_expected_observation(reply, candidate, plan)
-    reply['witnesses'] = []
-    with pytest.raises(ValueError, match='every frozen requirement'):
-        validate_expected_observation(reply, candidate, plan)
-
-
-def test_requirements_failure_retains_reply_without_executions(tmp_path):
-    model = SimpleNamespace(model='fixture', base_url='https://example.test')
-    with pytest.raises(ValueError, match='unavailable'):
-        prepare_requirements('Needs evidence not in a model reply', {'inputs': []},
-            directory=tmp_path, environ={}, model=model,
-            ask=lambda *a, **k: {'requirements': None, 'reason': 'Unsupported observation'})
-    record = json.loads((tmp_path / 'requirements-call.json').read_text(encoding='utf-8'))
-    assert record['state'] == 'failed'
-    assert record['reply']['reason'] == 'Unsupported observation'
-
-
-def test_model_claim_cannot_pass_a_frozen_tool_requirement(repair_project):
+def test_invalid_repair_observation_stays_unknown_with_journal(repair_project):
     f, source = repair_project
-    defects, expected_calls = 0, 0
+    calls = 0
     def ask(model, *, system, payload):
-        nonlocal defects, expected_calls
-        if system == REQUIREMENTS_SYSTEM:
-            return {'requirements': [{'id': 'r1', 'description': 'Read the specified path.',
-                'evidence_kind': 'tool_result', 'tool_name': 'read',
-                'required_tool_arguments': {'path': 'required.txt'}}]}
-        if system.startswith(EXPECTED_SYSTEM):
-            expected_calls += 1
-            # The synthetic trajectory contains this response, but no tool call.
-            return {**answer(True), 'reference_step_ids': [], 'witnesses': [
-                {'requirement_id': 'r1', 'step_id': 2, 'tool_log_index': 0,
-                 'observation': 'The file says hello.'}]}
-        defects += 1
-        return answer(defects == 1)
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return repair_answer('bug_exist')
+        return {**repair_answer('bug_fixed'), 'candidate_observation': 'Fabricated successful tool result'}
     result = Experiment3(f.service.root, execution_service=f.service, ask=ask,
         output=lambda _: None).run('example', issue=1, source=source, runs=1, results_dir=f.results)
     assert result['verdict'] == 'UNKNOWN'
-    assert expected_calls == 2  # One bounded correction, then retain invalid evidence.
+    assert calls == 3  # One baseline, one invalid reply, one bounded correction.
     trial = result['trials'][0]
-    assert trial['hit'] is False and trial['expected_met'] is None
-    assert 'actual tool log' in trial['reason']
-    assert any((Path(result['directory']) / 'trials/0001/oracle/expected').rglob('*.json'))
+    assert trial['label'] == 'unknown'
+    assert 'observation is absent' in trial['reason']
+    assert any((Path(result['directory']) / 'trials/0001/oracle/repair').rglob('*.json'))
+
+
+def test_repair_labels_and_completion_gate():
+    assert adapt_repair_reply(repair_answer('bug_exist'))['match'] is True
+    assert adapt_repair_reply(repair_answer('bug_fixed'))['match'] is False
+    assert adapt_repair_reply(repair_answer('unknown'))['match'] is None
+    with pytest.raises(ValueError, match='bug_exist, bug_fixed or unknown'):
+        adapt_repair_reply(answer(True))
+    assert repair_trial_verdict('bug_exist', 'failed') == 'FAIL'
+    assert repair_trial_verdict('bug_fixed', 'completed') == 'PASS'
+    assert repair_trial_verdict('bug_fixed', 'partial') == 'UNKNOWN'
+    assert repair_trial_verdict('unknown', 'completed') == 'UNKNOWN'
 
 
 def test_score_requires_confirmed_baseline_and_full_budget():
@@ -215,8 +151,6 @@ def test_score_requires_confirmed_baseline_and_full_budget():
     assert summarize({'hit': True}, [passed] * 2, 3) == 'UNKNOWN'
     assert summarize({'hit': True}, [passed] * 3, 3) == 'PASS'
     assert summarize({'hit': None}, [passed, {'verdict': 'FAIL'}], 3) == 'FAIL'
-    assert trial_verdict(False, False) == 'FAIL'
-    assert trial_verdict(False, None) == 'UNKNOWN'
 
 
 def test_cli_default_runs_and_saved_result(tmp_path, capsys):

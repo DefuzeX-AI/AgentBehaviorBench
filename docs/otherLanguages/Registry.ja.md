@@ -16,12 +16,12 @@
 schema_version = "defuzex-bench.registry.v1"
 
 [[agents]]
-agent_id = "folder-mover-agent"
-path = "resources/agents/01-folder-mover-agent"
+agent_id = "deer-flow"
+path = "resources/agents/01-deer-flow"
 enabled = false
 status = "ready"
 framework = "langgraph"
-source = "C:\\Song_startup\\benchmark\\04-folder-mover-agent\\folder-mover-agent"
+source = "https://github.com/bytedance/deer-flow"
 case = 1
 step = 3
 ```
@@ -72,7 +72,7 @@ agentbench evaluate react-agent --cases 2 --max-steps 3 --no-view
 では、[接続設定](How%20To%20Add%20Agent.ja.md)を完了し、有効な状態で認証します。
 
 ```bash
-agentbench certify folder-mover-agent --no-view
+agentbench certify deer-flow --no-view
 ```
 
 認証に成功すると `ready` になります。この状態は接続の準備完了を示し、Judge が振る舞い
