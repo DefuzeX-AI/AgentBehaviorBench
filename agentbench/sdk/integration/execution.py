@@ -52,7 +52,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                    generation_indices=None, expected_environment_sha256=None,
                    require_workspace_identity=False,
                    safe_case_replay=False, validate_failed_execution=None,
-                   collect_artifacts=None, excluded_agent_environment=(),
+                   collect_artifacts=None, excluded_agent_environment=(), capture_workspace=None,
                    repository_target='/opt/abb-sdk-repo'):
     """Run an SDK worker using the host facilities supplied to its runner.
 
@@ -115,6 +115,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
         agent_process = None
         agent_checkpoint = None
         workspace_temp = None
+        policy = repository = None
         primary_error = None
         try:
             if on_artifacts_ready is not None:
@@ -296,6 +297,21 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                         status['trajectory'] = {'status': 'failed', 'path': 'trajectory.json',
                                                 'error_type': type(exc).__name__, 'error': str(exc)}
                 try:
+                    # The selected SDK may request independent host-side evidence
+                    # after both containers stop, while its private workspace exists.
+                    # Never recast a capture error as a successful file snapshot.
+                    if (capture_workspace is not None and execute_agent and workspace_temp is not None
+                            and policy is not None and policy.track_files
+                            and status.get('status') == 'succeeded' and status.get('cleanup_status') == 'succeeded'):
+                        try:
+                            snapshot = capture_workspace(Path(repository), Path(directory), policy, environ=environ)
+                            status['workspace_evidence'] = snapshot.get('status', 'failed')
+                        except Exception as exc:
+                            status['workspace_evidence'] = 'failed'
+                            files.save('local-workspace-evidence.json', {
+                                'schema': 'abb.local.workspace-evidence.v1', 'status': 'failed',
+                                'capture_point': 'after_agent_cleanup_before_workspace_deletion',
+                                'workspace': policy.path, 'error_type': type(exc).__name__})
                     status['artifacts'] = (collect_artifacts(directory, status, environ=environ)
                                            if collect_artifacts is not None else {'directory': str(directory)})
                     if primary_error is not None:

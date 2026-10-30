@@ -10,6 +10,8 @@ from .process import child_environment, terminate_group
 from agentbench.observe.acp_evidence import terminal_capabilities
 
 
+
+
 class ACPSession:
     def __init__(self, config):
         self.config = config
@@ -87,7 +89,7 @@ class ACPSession:
             if self.drain_task.done() and self.drain_task.exception():
                 raise self.drain_task.exception()
             await self.client.terminals.snapshot_all()
-            self.read_native_evidence()
+            current_native_calls = self.read_native_evidence()
             self.emit('prompt_completed', plain(response))
             stop = response.stop_reason
             if stop == 'cancelled':
@@ -95,8 +97,21 @@ class ACPSession:
                                                  'stop_reason': stop, 'prompt_response': plain(response)})
             if stop not in ('end_turn', 'refusal'):
                 raise ACPError(f'ACP stopped before completion: {stop}', code=stop)
-            return ''.join(self.client.parts), {**self.info, 'session_id': self.client.session_id,
-                    'stop_reason': stop, 'prompt_response': plain(response)}
+            output = ''.join(self.client.parts)
+            result_info = {**self.info, 'session_id': self.client.session_id,
+                           'stop_reason': stop, 'prompt_response': plain(response)}
+            recovery_hook = getattr(self.evidence_reader, 'recover_final', None)
+            if callable(recovery_hook):
+                output, recovery = recovery_hook(output, self.client.parts, current_native_calls,
+                    self.client.session_id, stop, self.config.max_output_bytes)
+                if not isinstance(output, str) or len(output.encode('utf-8')) > self.config.max_output_bytes:
+                    raise ACPError('Native evidence recovery exceeds configured output limit', code='output_limit')
+                if recovery is not None:
+                    if not isinstance(recovery, dict):
+                        raise ACPError('Invalid native evidence recovery metadata', code='invalid_evidence')
+                    self.emit('native_output_recovered', recovery)
+                    result_info['output_recovery'] = recovery
+            return output, result_info
         except BaseException as exc:
             try:
                 try:
@@ -114,12 +129,13 @@ class ACPSession:
 
     def read_native_evidence(self):
         if self.evidence_reader is None:
-            return
+            return []
         try:
             calls = self.evidence_reader(self.client.session_id)
             if not isinstance(calls, list) or len(calls) > 10000:
                 raise ValueError('Invalid native evidence collection')
             current = 0
+            new_calls = []
             for call in calls:
                 key = (call['native_session_id'], call['native_call_id'])
                 if key in self.native_calls:
@@ -128,11 +144,14 @@ class ACPSession:
                     raise ValueError('Native evidence belongs to another session')
                 self.emit('native_model_call', call)
                 self.native_calls.add(key)
+                new_calls.append(call)
                 current += 1
             self.emit('native_evidence_status', {'status': 'captured' if current else 'no_new_calls',
                                                'new_calls': current})
+            return new_calls
         except Exception as exc:
             self.emit('native_evidence_status', {'status': 'failed', 'error_type': type(exc).__name__})
+            return []
 
     async def close(self):
         async with self._close_lock:
