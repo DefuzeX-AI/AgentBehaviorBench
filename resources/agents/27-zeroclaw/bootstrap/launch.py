@@ -70,8 +70,11 @@ def config_toml(base_url: str, model: str, search_provider: str = "duckduckgo") 
         # their traffic goes to declared tool routes or ABB's egress observer.
         # The browser uses the agent-browser backend, attached to the Chromium main()
         # starts on 127.0.0.1:9222 (AGENT_BROWSER_CDP); allowed_domains keeps its default ["*"].
+        # Since v0.8.6 `enabled` gates only browser_open; the `browser` automation tool
+        # needs its own opt-in and goes through the normal approval gate.
         "[browser]",
         "enabled = true",
+        "automation_enabled = true",
         'backend = "agent_browser"',
         "",
         # Tavily when TAVILY_API_KEY is supplied, else upstream default DuckDuckGo.

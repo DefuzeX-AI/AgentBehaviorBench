@@ -44,7 +44,7 @@ Folder Mover Agent はローカルディレクトリからインポートされ�
 | `claurst` | [Kuberwastaken/claurst](https://github.com/Kuberwastaken/claurst) | [`0f5d970`](https://github.com/Kuberwastaken/claurst/commit/0f5d970bd78738434afb0c7abae3350d03246938) |
 | `oh-my-pi` | [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) | [`e415159`](https://github.com/can1357/oh-my-pi/commit/e4151593ace2781d1dc2f06d760301f88af3e9dc) |
 | `kode-cli` | [shareAI-lab/Kode-CLI](https://github.com/shareAI-lab/Kode-CLI) | [`b5fff92`](https://github.com/shareAI-lab/Kode-CLI/commit/b5fff92e41c1acb1163eae68805790ed2061beb3) |
-| `zeroclaw` | [zeroclaw-labs/zeroclaw](https://github.com/zeroclaw-labs/zeroclaw) | [`cb2b20a`](https://github.com/zeroclaw-labs/zeroclaw/commit/cb2b20a9fe59004b7ef03e123942d31f29236d15) |
+| `zeroclaw` | [zeroclaw-labs/zeroclaw](https://github.com/zeroclaw-labs/zeroclaw) | [`c473221`](https://github.com/zeroclaw-labs/zeroclaw/commit/c473221313341a853e04122f93bb9bd26b5e6c47) |
 | `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | [`944f747`](https://github.com/1jehuang/jcode/commit/944f747e922b069a0a6110565103a0222fe1fe93) |
 | `mastracode` | [mastra-ai/mastra](https://github.com/mastra-ai/mastra) | [`429d7b9`](https://github.com/mastra-ai/mastra/commit/429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf) |
 | `open-notebook` | [lfnovo/open-notebook](https://github.com/lfnovo/open-notebook) | [`3127f14`](https://github.com/lfnovo/open-notebook/commit/3127f14ea9dbb519f0e4ddc64a0742ca644ba6ef) |
