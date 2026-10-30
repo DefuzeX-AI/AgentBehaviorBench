@@ -1,0 +1,20 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "octop",
+  "id": "tool-call-never-completes",
+  "summary": "In a turn with several tool calls, at least one call never leaves in_progress and another receives the completed status twice",
+  "explanation": "A turn that issues more than one tool call ends with at least one call still marked `in_progress`, and the completion update for another call is delivered twice, so an ACP client cannot map tool results to tool calls.\n\nMechanism: Octop's ACP server converts each `tool_result` chunk into a `tool_call_update` whose target id is chosen by buffer position instead of by the result it belongs to — `tool_id = next(iter(tool_id_buf.values()), uuid4().hex[:8])` in `octop_harness/acp/server.py` (`_chunk_to_updates`, octop-harness 1.0.4). The buffer is keyed by tool-call index for the current turn, so once a turn contains more than one call the terminal update always lands on the same entry: that entry receives `completed` several times, and the remaining calls never leave `in_progress`.\n\nEvidence: in the reference attempt, `steps/0001/acp-events.jsonl` contains three `tool_call` notifications with distinct `toolCallId`s, exactly one of those ids has no `completed`/`failed` status after the stream ends, and another id carries the `completed` status twice. The Case requires two files to be written and one command to be run, so a multi-call turn is forced by the task rather than by model sampling. The Agent's final answer is still correct and the files still exist, and ABB records the missing completion as an evidence gap (`acp_outcome_not_observed`): this is a protocol bookkeeping defect, not a task failure.\n\nExclusions: a turn that issues exactly one tool call is unaffected, because the single buffered id is the right one, so a single-call run is a control rather than this defect. A wrong final answer or a missing file is a different defect. A client that ignores ACP statuses and reads tool payloads from the transcript does not observe it.",
+  "reference_attempts": [
+    "d53f0e15be4b4d06814127d696948e62"
+  ],
+  "provenance": {
+    "source_repository": "https://github.com/TencentCloud/Octop",
+    "source_commit": "dd9dce470844c25d59effb50615bb3c667ea25cd",
+    "source_version": "1.0.2 (release tag v1.0.2, PyPI octop==1.0.2)",
+    "component": "octop-harness 1.0.4, octop_harness/acp/server.py (_chunk_to_updates)",
+    "observed_on": "2026-10-25",
+    "abb_unit": "resources/agents/111-octop",
+    "discovery": "trace audit of earlier local runs plus source reading; no upstream issue existed for it",
+    "reproduction": "10 independent runs of one frozen Case, a new Suite and container per run"
+  }
+}
