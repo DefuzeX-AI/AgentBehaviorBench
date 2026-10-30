@@ -8,10 +8,8 @@ from uuid import uuid4
 from agentbench.evaluation import EvaluationService
 from agentbench.evaluation.modified_targets import prepare_modified_target
 from agentbench.harness.concurrency import ConcurrencySettings
-from agentbench.harness.ground_truth.detection import oracle_model
 from agentbench.harness.ground_truth.files import EVIDENCE_LIMIT, read_json
 from agentbench.harness.ground_truth.issues import load_issue
-from agentbench.harness.ground_truth.repair import assess_repair, summarize, repair_trial_verdict
 from agentbench.harness.scheduling.retry import RetryPolicy
 from agentbench.sdk.common.artifacts import Artifacts
 from .exp1 import fingerprint, token_usage
@@ -43,7 +41,6 @@ class Experiment3:
         if any(document.get(key) != item for key, item in reference['definition'].items()):
             raise ValueError('GT definition changed while preparing the run; retry with stable GT')
         case = reproduction_case(document)
-        selected_oracle = oracle_model(self.environ)
         parent = Path(results_dir).resolve() if results_dir else self.root.parent / 'r/exp3'
         if parent.is_relative_to(source) or parent.is_relative_to(self.root):
             raise ValueError('Save Exp3 results outside the submitted source and ABB repository')
@@ -53,9 +50,8 @@ class Experiment3:
         value = {'schema': 'abb.exp3.v1', 'agent_id': agent_id, 'issue_number': issue,
                  'directory': str(directory), 'created_at': datetime.now(timezone.utc).isoformat(),
                  'requested_runs': runs, 'source': str(source), 'status': 'preparing',
-                 'verdict': 'UNKNOWN', 'scope': 'original_reproduction_case',
+                 'verdict': 'NOT_JUDGED', 'scope': 'original_reproduction_case',
                  'baseline': None, 'trials': [], 'target_model_override': model,
-                 'oracle': {'model': selected_oracle.model, 'endpoint': selected_oracle.base_url},
                  'case_sha256': fingerprint(case), 'max_target_retries': 0}
         files.save('case.json', case)
         files.save('reference.json', reference)
@@ -75,17 +71,16 @@ class Experiment3:
             self.output(f'Exp3: {agent_id} issue_{issue}; base {base.revision}; {runs} repair validations')
             # A fresh baseline proves this Case can expose the issue in the same
             # environment. It is additional to, not one of, the requested runs.
-            value['baseline'] = self._trial(agent_id, case, reference, base,
-                directory / 'baseline', selected_oracle, model, timeout, baseline=True)
+            value['baseline'] = self._trial(agent_id, case, base,
+                directory / 'baseline', model, timeout)
             self.output(f'Exp3: baseline: {value["baseline"]["verdict"]}')
             files.save('result.json', value)
             for index in range(runs):
                 self.output(f'Exp3: [{index + 1}/{runs}] starting independent repair execution')
-                row = self._trial(agent_id, case, reference, candidate,
-                    directory / 'trials' / f'{index + 1:04d}', selected_oracle, model, timeout)
+                row = self._trial(agent_id, case, candidate,
+                    directory / 'trials' / f'{index + 1:04d}', model, timeout)
                 row['run_index'] = index + 1
                 value['trials'].append(row)
-                value['verdict'] = summarize(value['baseline'], value['trials'], runs)
                 files.save('result.json', value)
                 self.output(f'Exp3: [{index + 1}/{runs}] {row["verdict"]}; {row["reason"]}')
             value['status'] = 'completed'
@@ -93,20 +88,16 @@ class Experiment3:
             value.update(status='failed' if isinstance(exc, Exception) else 'interrupted', error=str(exc))
             raise
         finally:
-            value['verdict'] = summarize(value['baseline'], value['trials'], runs)
             value['wall_seconds'] = time.monotonic() - started
             value['completed_runs'] = len(value['trials'])
-            value['failure_reproduced_runs'] = sum(row['label'] == 'bug_exist' for row in value['trials'])
-            value['reason'] = ('At least one repair run failed the original Case.' if value['verdict'] == 'FAIL'
-                else 'All runs achieved the original Case expectation without the reported failure.'
-                if value['verdict'] == 'PASS' else 'Baseline reproduction or repair evidence is unresolved.')
+            value['reason'] = 'Execution evidence saved; run exp3 judge to assess the repair.'
             files.save('result.json', value)
         self.output(f'Exp3: {value["verdict"]}; results: {directory}')
         return self.result(directory)
 
-    def _trial(self, agent_id, case, reference, target, directory, oracle, model, timeout, *, baseline=False):
+    def _trial(self, agent_id, case, target, directory, model, timeout):
         files = Artifacts(directory, environ=self.environ)
-        row = {'hit': None, 'label': 'unknown', 'verdict': 'UNKNOWN', 'suite': None,
+        row = {'hit': None, 'label': None, 'verdict': 'NOT_JUDGED', 'suite': None,
                'reason': 'Execution has not finished', 'state': 'running'}
         files.save('trial.json', row)
         started = time.monotonic()
@@ -121,18 +112,9 @@ class Experiment3:
             row.update(run_id=run_id, trajectory_sha256=fingerprint(trajectory),
                        target_usage=token_usage(trajectory))
             files.save('trajectory.json', trajectory)
-            kwargs = {'environ': self.environ, 'model': oracle, 'ask': self.ask}
-            judged = assess_repair(reference, trajectory, directory=directory / 'oracle/repair', **kwargs)
-            label = judged['match']['label']
-            row.update(hit=judged['hit'], label=label, repair_assessment=judged, reason=judged['reason'])
-            files.save('trial.json', row)
-            row.update(state='finished', verdict=repair_trial_verdict(label, row['execution_status']))
-            if baseline:
-                row['verdict'] = ('REPRODUCED' if label == 'bug_exist' else
-                                  'NOT_REPRODUCED' if label == 'bug_fixed' else 'UNKNOWN')
+            row.update(state='finished', reason='Execution evidence saved; not judged.')
         except BaseException as exc:
-            row.update(state='failed' if isinstance(exc, Exception) else 'interrupted', reason=str(exc),
-                       verdict=repair_trial_verdict(row['label'], row.get('execution_status')))
+            row.update(state='failed' if isinstance(exc, Exception) else 'interrupted', reason=str(exc))
             if not isinstance(exc, Exception):
                 raise
         finally:
@@ -165,4 +147,6 @@ class Experiment3:
         value = read_json(Path(directory) / 'result.json', limit=EVIDENCE_LIMIT)
         if value.get('schema') != 'abb.exp3.v1':
             raise ValueError('Not an Exp3 result')
+        value['judgments'] = [read_json(path, limit=EVIDENCE_LIMIT)
+                              for path in sorted((Path(directory) / 'judgments').glob('*/result.json'))]
         return value

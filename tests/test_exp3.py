@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from agentbench.experiments.exp3 import Experiment3
+from agentbench.experiments.exp3_judging import RepairJudging
 from agentbench.harness.ground_truth.repair import (
     summarize, REPAIR_SYSTEM, adapt_repair_reply, repair_trial_verdict)
 from tests.test_exp1 import install_issue, answer, prepared, project, oracle
@@ -34,13 +35,15 @@ def repair_project(prepared, monkeypatch, tmp_path, tmp_path_factory):
     shutil.copytree(f.target.registration.path / 'agent', source)
     (source / 'marker.txt').write_text('submitted version', encoding='utf-8')
     model = SimpleNamespace(model='fixture', base_url='https://example.test')
-    monkeypatch.setattr('agentbench.experiments.exp3.oracle_model', lambda _: model)
+    monkeypatch.setattr('agentbench.experiments.exp3_judging.oracle_model', lambda _: model)
     # Keep the real Suite/evidence/identity checks, then provide the explicitly
     # synthetic trace fixture to isolate oracle orchestration from model calls.
     original = f.service.evidence
     def evidence(*args):
         value = original(*args)
-        return {**value, 'trajectory': deepcopy(f.candidate)}
+        candidate = deepcopy(f.candidate)
+        candidate['case_id'] = value['trajectory']['case_id']
+        return {**value, 'trajectory': candidate}
     monkeypatch.setattr(f.service, 'evidence', evidence)
     return f, source
 
@@ -67,14 +70,17 @@ def test_three_runs_use_one_snapshot_and_same_case(repair_project, monkeypatch, 
         return repair_answer('bug_exist' if defect_count == 1 else 'bug_fixed')
     result = Experiment3(f.service.root, execution_service=f.service, ask=ask, output=lambda _: None).run(
         'example', issue=1, source=source, results_dir=f.results)
-    assert result['verdict'] == 'PASS'
+    assert result['verdict'] == 'NOT_JUDGED'
+    assert defect_count == 0
+    judged = RepairJudging(result['directory']).auto(environ={}, ask=ask)
+    assert judged['verdict'] == 'PASS'
     assert result['scope'] == 'original_reproduction_case'
     assert result['completed_runs'] == 3 and len(calls) == 4
     assert len({row['suite'] for row in result['trials']}) == 3
     assert len({str(call[1].registration.path) for call in calls[1:]}) == 1
     assert all(call[0] == calls[0][0] for call in calls)
     assert all(call[2]['retry_policy'].max_retries == 0 for call in calls)
-    assert all(row['label'] == 'bug_fixed' for row in result['trials'])
+    assert all(row['label'] is None for row in result['trials'])
     assert f.target.registration.path != Path(result['candidate_target']['path'])
     f.target.validate()
 
@@ -84,8 +90,9 @@ def test_failure_does_not_stop_remaining_runs(repair_project, tmp_path):
     result = Experiment3(f.service.root, execution_service=f.service,
         ask=lambda *a, **k: repair_answer('bug_exist'), output=lambda _: None).run(
         'example', issue=1, source=source, runs=2, results_dir=f.results)
-    assert result['verdict'] == 'FAIL'
-    assert result['completed_runs'] == result['failure_reproduced_runs'] == 2
+    judged = RepairJudging(result['directory']).auto(environ={}, ask=lambda *a, **k: repair_answer('bug_exist'))
+    assert judged['verdict'] == 'FAIL'
+    assert result['completed_runs'] == 2
 
 
 def test_absent_defect_without_expected_evidence_is_unknown(repair_project, tmp_path):
@@ -97,8 +104,9 @@ def test_absent_defect_without_expected_evidence_is_unknown(repair_project, tmp_
         return repair_answer('bug_exist' if calls == 1 else 'unknown')
     result = Experiment3(f.service.root, execution_service=f.service, ask=ask, output=lambda _: None).run(
         'example', issue=1, source=source, runs=1, results_dir=f.results)
-    assert result['verdict'] == 'UNKNOWN'
-    assert result['trials'][0]['label'] == 'unknown'
+    judged = RepairJudging(result['directory']).auto(environ={}, ask=ask)
+    assert judged['verdict'] == 'UNKNOWN'
+    assert judged['decisions']['trials/0001']['label'] == 'unknown'
 
 
 def test_transport_failures_stay_unknown_and_all_runs_are_attempted(repair_project, tmp_path):
@@ -109,8 +117,9 @@ def test_transport_failures_stay_unknown_and_all_runs_are_attempted(repair_proje
         raise RuntimeError('Provider unavailable')
     result = Experiment3(f.service.root, execution_service=f.service, ask=unavailable, output=lambda _: None).run(
         'example', issue=1, source=source, results_dir=f.results)
-    assert result['verdict'] == 'UNKNOWN' and result['completed_runs'] == 3
-    assert all(row['state'] == 'failed' for row in result['trials'])
+    judged = RepairJudging(result['directory']).auto(environ={}, ask=unavailable)
+    assert judged['verdict'] == 'UNKNOWN' and result['completed_runs'] == 3
+    assert all('error' in row for row in judged['decisions'].values())
     assert len(calls) == 4  # One baseline and three candidate oracles.
 
 
@@ -125,12 +134,13 @@ def test_invalid_repair_observation_stays_unknown_with_journal(repair_project):
         return {**repair_answer('bug_fixed'), 'candidate_observation': 'Fabricated successful tool result'}
     result = Experiment3(f.service.root, execution_service=f.service, ask=ask,
         output=lambda _: None).run('example', issue=1, source=source, runs=1, results_dir=f.results)
-    assert result['verdict'] == 'UNKNOWN'
+    judged = RepairJudging(result['directory']).auto(environ={}, ask=ask)
+    assert judged['verdict'] == 'UNKNOWN'
     assert calls == 3  # One baseline, one invalid reply, one bounded correction.
-    trial = result['trials'][0]
+    trial = judged['decisions']['trials/0001']
     assert trial['label'] == 'unknown'
     assert 'observation is absent' in trial['reason']
-    assert any((Path(result['directory']) / 'trials/0001/oracle/repair').rglob('*.json'))
+    assert any((Path(judged['directory']) / 'trials/0001/oracle').rglob('*.json'))
 
 
 def test_repair_labels_and_completion_gate():

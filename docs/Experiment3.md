@@ -69,10 +69,7 @@ python -m agentbench exp3 run nanocoder --issue 1343 --source "C:\experiments\na
 `--runs` defaults to 3 and accepts a positive integer. It counts repeated
 executions of the same submitted repair, not repair attempts. Change the code and
 invoke `run` again for another repair submission. `--model` selects the target
-model through the existing provider rules; the oracle uses the shared provider
-from `ABB_MODEL_PROVIDER` and its provider-specific model setting, such as
-`DEEPSEEK_MODEL`. It ignores target-model overrides and Agent provider pins.
-The example environment selects `deepseek` and `deepseek-flash`.
+model through the existing provider rules. `run` does not call a Judge.
 `--timeout` applies to each Case execution. Use `--env-file`
 for an explicit host environment file.
 
@@ -104,7 +101,32 @@ the same Docker daemon, as existing image coordination is scoped to one Suite.
 
 ## Results and evidence
 
-Each execution uses the repair-specific Judge protocol. It receives the canonical
+Execution finishes with `NOT_JUDGED`, which is distinct from a Judge's `unknown`.
+Run the third phase separately using saved evidence only:
+
+```powershell
+python -m agentbench exp3 judge auto --experiment "C:\experiments\exp3_run" --model openai/gpt-4.1-mini
+python -m agentbench exp3 judge export --experiment "C:\experiments\exp3_run" --output "C:\experiments\review-new"
+# Fill reviewer and decisions in review.json, preserving the manifest.
+python -m agentbench exp3 judge import --experiment "C:\experiments\exp3_run" --input "C:\experiments\review-new\review.json"
+```
+
+All paths above must be absolute. `auto` accepts `--env-file`; `--model` overrides
+only the Judge model on the configured provider. Without it, the shared provider's
+model is used. Neither manual command needs credentials. Export includes complete
+trajectories, frozen references and readable Judge inputs; it requires a new output
+directory. Import requires all decisions, reviewer identity, unchanged evidence
+hashes, valid step IDs and exact candidate quotes. Citation validation cannot
+prove a human's interpretation is correct.
+
+Each automatic or manual judgment is appended under `judgments/<id>/`, with its
+own verdict, source, timestamp and provenance. Automatic journals retain prompts
+and responses. Existing execution results and previous judgments are unchanged.
+`result` returns the execution record plus all judgments; it never silently selects
+one as authoritative. Legacy complete Exp3 artifacts can be judged the same way.
+Missing evidence yields `unknown`; changed evidence hashes are rejected.
+
+The separate automatic assessment uses the repair-specific Judge protocol. It receives the canonical
 `defect`, `Root cause`, `expected`, historical reference trajectories, and the
 candidate trajectory. It does not receive the submitted source tree or patch.
 Historical and candidate steps have distinct citation IDs. The Judge examines
@@ -142,7 +164,7 @@ Progress is printed to stderr; stdout is JSON. Results default to the short path
 `<ABB-parent>/r/exp3/exp3_<id>/` to reduce Windows path-length problems. Override it
 with `--results-dir` outside ABB and the submitted source. The directory contains
 the frozen Case/definition/reference, target snapshot and provenance, baseline
-and per-run Suites, raw traces, trajectories, oracle journals, and `result.json`.
+and per-run Suites, raw traces, trajectories and `result.json`. Separate judgments contain oracle journals.
 Each run records execution and total time. A failure still preserves available
 artifacts, including unresolved outcomes.
 
