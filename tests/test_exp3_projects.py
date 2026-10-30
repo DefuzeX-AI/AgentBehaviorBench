@@ -1,5 +1,6 @@
 """Repair exports preserve commit identity without exporting private GT answers."""
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -124,3 +125,58 @@ def test_unsafe_destinations_rejected_before_export(unit, tmp_path):
     with pytest.raises(ValueError, match='Host records'):
         export_project(engine, root, 'test', 1, output, records_dir=output / 'private')
     assert not output.exists()
+
+
+@pytest.mark.parametrize('method', ['git', 'install', 'bundled'])
+def test_source_only_export_needs_no_runtime_or_build_recipe(unit, tmp_path, method):
+    root, _, document = setup_project(unit, tmp_path)
+    path, revision, fetched = unit
+    # No runtime, launch, Dockerfile or historical recipe is available.
+    (path / 'agent.toml').write_text(
+        f'[source]\nmethod="{method}"\nrepository="https://example.com/agent.git"\n', encoding='utf-8')
+    (path / 'Dockerfile').unlink()
+    def forbidden(*args, **kwargs):
+        pytest.fail('Source-only export must not prepare a runnable target')
+    output = tmp_path / 'source-only'
+    result = export_project(SimpleNamespace(prepare=forbidden), root, 'test', 1, output, no_run=True)
+    assert fetched == [revision]
+    assert (output / 'source/app.py').read_text() == 'version = 1\n'
+    assert json.loads((output / 'issue.json').read_text(encoding='utf-8')) == document['issue']
+    assert result['base_target'] is None and result['no_run'] is True
+    assert result['revision'] == revision
+    assert not (root / 'cache/prepared-agents').exists()
+
+
+def test_no_run_cli_is_forwarded(tmp_path, monkeypatch, capsys):
+    import argparse
+    from agentbench.cli.features.exp3 import configure, execute
+    from agentbench.experiments.exp3 import Experiment3
+    seen = {}
+    def generate(self, agent_id, **kwargs):
+        seen.update(agent_id=agent_id, **kwargs)
+        return {'exported': True}
+    monkeypatch.setattr(Experiment3, 'gen_project', generate)
+    parser = argparse.ArgumentParser()
+    configure(parser)
+    args = parser.parse_args(['genProject', 'test', '--issue', '1', '--output', str(tmp_path / 'out'), '--noRun'])
+    assert execute(args) == 0
+    assert seen['no_run'] is True
+    assert json.loads(capsys.readouterr().out) == {'exported': True}
+
+
+def test_source_export_preserves_long_paths(unit, tmp_path, monkeypatch):
+    import zipfile
+    from agentbench.experiments import exp3_projects
+    root, engine, _ = setup_project(unit, tmp_path)
+    archive = tmp_path / 'long-path.zip'
+    relative = '/'.join(['segment' * 7] * 6 + ['app.py'])
+    with zipfile.ZipFile(archive, 'w') as stream:
+        stream.writestr(relative, 'historical source\n')
+    monkeypatch.setattr(exp3_projects, 'export_archive', lambda *a, **k: (archive, []))
+    output = tmp_path / 'long-export'
+    result = export_project(engine, root, 'test', 1, output, no_run=True)
+    source = output / 'source'
+    if os.name == 'nt':
+        source = Path('\\\\?\\' + str(source))
+    assert (source / relative).read_text() == 'historical source\n'
+    assert len(result['source_sha256']) == 64

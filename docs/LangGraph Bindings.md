@@ -354,24 +354,23 @@ These links identify useful implementation patterns. Review the source and manif
 
 | Unit | Useful pattern or review point |
 | --- | --- |
-| [01 Folder Mover](../resources/agents/01-folder-mover-agent/bindings/bridge.py) | Direct native factory; actual input validation is in `agent/folder_mover.py`. |
-| [02 Company Research](../resources/agents/56-company-research-agent/bindings/company_research_agent.py) | Constructor business inputs, async stream consumption and final report. |
-| [03 ReAct](../resources/agents/57-react-agent/bindings/bridge.py) | Text/messages conversion, native context and config forwarding. |
-| [04 Crypto Hedge Fund](../resources/agents/02-ai-hedge-fund-crypto/bindings/bridge.py) | Configured portfolio and market state; review missing config forwarding. |
-| [05 LabScript](../resources/agents/03-labscript-ai/bindings/bridge.py) | Hardware state and async-only graph; review config replacement. |
-| [06 Multi Agent CAD](../resources/agents/04-multi-agent-cad/bindings/bridge.py) | Native default state and merged recursion configuration. |
-| [07 Autoresearch](../resources/agents/05-autoresearch-agents/bindings/bridge.py) | Calculator/converter Agent; currently discards incoming config. |
-| [08 Streamlit Template](../resources/agents/06-langchain-streamlit-template/bindings/bridge.py) | Extract the native factory without starting UI; review private thread config. |
-| [09 Curiosity](../resources/agents/58-curiosity/bindings/bridge.py) | SQLite path and native thread; review private thread config. |
-| [10 Readwren](../resources/agents/07-readwren/bindings/bridge.py) | Start interview before sending input; public method has no config parameter. |
-| [11 TableGPT](../resources/agents/08-tablegpt-agent/bindings/bridge.py) | Sandbox, date and parent ID; current text boundary does not translate attachments. |
-| [33 Open Notebook](../resources/agents/30-open-notebook/bindings/bridge.py) | Async service/session bootstrap and owned process cleanup. |
-| [34 AI Data Science Team](../resources/agents/31-ai-data-science-team/bindings/bridge.py) | Fixed CSV, public `invoke_agent` and response retrieval. |
-| [35 Local Deep Research](../resources/agents/32-local-deep-research/bindings/ldr_bridge.py) | Settings snapshot and main-thread native API restriction. |
-| [37 Article Explainer](../resources/agents/34-article-explainer/bindings/bridge.py) | Strict current-message input; implementation enables a checkpoint although its descriptive text says otherwise. |
-| [38 GPT Researcher](../resources/agents/59-gpt-researcher/bindings/gpt_researcher_bridge.py) | Complete task with `publish_formats` and async research graph. |
-| [39 TradingAgents](../resources/agents/35-tradingagents/bindings/tradingagents_bridge.py) | Explicit ticker/date parsing and config context around a public lifecycle. |
-| [40 EvoScientist](../resources/agents/36-evoscientist/bindings/bridge.py) | Workspace setup and explicit unattended deployment configuration. |
+| [Company Research](../resources/agents/56-company-research-agent/bindings/company_research_agent.py) | Constructor business inputs, async stream consumption and final report. |
+| [ReAct](../resources/agents/57-react-agent/bindings/bridge.py) | Text/messages conversion, native context and config forwarding. |
+| [Crypto Hedge Fund](../resources/agents/02-ai-hedge-fund-crypto/bindings/bridge.py) | Configured portfolio and market state; review missing config forwarding. |
+| [LabScript](../resources/agents/03-labscript-ai/bindings/bridge.py) | Hardware state and async-only graph; review config replacement. |
+| [Multi Agent CAD](../resources/agents/04-multi-agent-cad/bindings/bridge.py) | Native default state and merged recursion configuration. |
+| [Autoresearch](../resources/agents/05-autoresearch-agents/bindings/bridge.py) | Calculator/converter Agent; currently discards incoming config. |
+| [Streamlit Template](../resources/agents/06-langchain-streamlit-template/bindings/bridge.py) | Extract the native factory without starting UI; review private thread config. |
+| [Curiosity](../resources/agents/58-curiosity/bindings/bridge.py) | SQLite path and native thread; review private thread config. |
+| [Readwren](../resources/agents/07-readwren/bindings/bridge.py) | Start interview before sending input; public method has no config parameter. |
+| [TableGPT](../resources/agents/08-tablegpt-agent/bindings/bridge.py) | Sandbox, date and parent ID; current text boundary does not translate attachments. |
+| [Open Notebook](../resources/agents/30-open-notebook/bindings/bridge.py) | Async service/session bootstrap and owned process cleanup. |
+| [AI Data Science Team](../resources/agents/31-ai-data-science-team/bindings/bridge.py) | Fixed CSV, public `invoke_agent` and response retrieval. |
+| [Local Deep Research](../resources/agents/32-local-deep-research/bindings/ldr_bridge.py) | Settings snapshot and main-thread native API restriction. |
+| [Article Explainer](../resources/agents/34-article-explainer/bindings/bridge.py) | Strict current-message input; implementation enables a checkpoint although its descriptive text says otherwise. |
+| [GPT Researcher](../resources/agents/59-gpt-researcher/bindings/gpt_researcher_bridge.py) | Complete task with `publish_formats` and async research graph. |
+| [TradingAgents](../resources/agents/35-tradingagents/bindings/tradingagents_bridge.py) | Explicit ticker/date parsing and config context around a public lifecycle. |
+| [EvoScientist](../resources/agents/36-evoscientist/bindings/bridge.py) | Workspace setup and explicit unattended deployment configuration. |
 
 ## Review and validate
 

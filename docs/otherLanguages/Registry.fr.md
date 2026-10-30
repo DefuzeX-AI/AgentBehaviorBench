@@ -17,12 +17,12 @@ Le fichier commence par la version du format. Chaque bloc `[[agents]]` inscrit u
 schema_version = "defuzex-bench.registry.v1"
 
 [[agents]]
-agent_id = "folder-mover-agent"
-path = "resources/agents/01-folder-mover-agent"
+agent_id = "deer-flow"
+path = "resources/agents/01-deer-flow"
 enabled = false
 status = "ready"
 framework = "langgraph"
-source = "C:\\Song_startup\\benchmark\\04-folder-mover-agent\\folder-mover-agent"
+source = "https://github.com/bytedance/deer-flow"
 case = 1
 step = 3
 ```
@@ -76,7 +76,7 @@ nouvelle intégration `adapting`, terminer la [configuration](How%20To%20Add%20A
 et certifier l’Agent lorsqu’il est activé :
 
 ```bash
-agentbench certify folder-mover-agent --no-view
+agentbench certify deer-flow --no-view
 ```
 
 Une certification réussie fait passer l’Agent à `ready`. Ce statut atteste de

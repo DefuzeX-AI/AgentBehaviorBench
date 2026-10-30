@@ -92,8 +92,13 @@ stderr; stdout contains the final machine-readable JSON.
   Retain the reason and continue. Without a confirmed hit, unresolved executions
   keep the final score null; they never become automatic negatives.
 
-The oracle uses the default OpenRouter model and endpoint, independently of the
-target-model override. It must cite valid execution steps. Predicting a defect,
+The oracle uses the shared provider selected by `ABB_MODEL_PROVIDER` and its
+provider-specific model setting from `.env` (or `--env-file`), independently of
+`--model`, `ABB_MODEL`, Agent provider pins, and legacy Judge/GT overrides.
+Without an explicit provider, the shared credential-priority resolver applies.
+The example environment selects DeepSeek with `DEEPSEEK_MODEL=deepseek-flash`.
+The oracle must cite valid execution steps or explicitly identified candidate
+Input results. Predicting a defect,
 producing an unrelated failure, or describing a reproduction is not a hit.
 Subsequent recovery does not erase a demonstrated trigger. Oversized evidence
 stays inconclusive instead of being truncated.
@@ -104,7 +109,14 @@ and tool logs. It can request full context once when the defect depends on
 request content, file changes or other omitted fields.
 Repeated context is represented with lossless references; stored trajectories
 remain complete. A positive verdict must quote actual output from its decisive
-candidate step. An invalid citation or observation permits one recorded correction
+candidate step or Input result. For final outputs produced outside a model/tool
+step (including LangGraph framework nodes), the oracle cites the exact recorded
+Input ordinal in `candidate_input_ordinals` and `candidate_decisive_input`, with
+`candidate_decisive_step: null`. Validation checks only that Input's
+`result.output`, not prompts, error metadata, another Input or a guessed last
+model step. Stored trajectories are unchanged; cited Input results are retained
+in the assessment's `evidence.candidate_inputs`. A final reply does not prove
+unobserved internal tool execution. An invalid citation or observation permits one recorded correction
 using candidate evidence. Transport failures are never automatically retried.
 Initial, context and correction requests and their usage are retained separately.
 
@@ -117,6 +129,11 @@ missing. The oracle must explain relevant gaps, and no code maps warning text,
 Agent names, Issue numbers or prompt similarity to a verdict. Stored trajectory
 status and associations are preserved. Oracle protocol v4 separates this policy
 from cached decisions made under the earlier blanket partial-negative rule.
+Protocol v5 adds explicit candidate Input-output citations and separates these
+assessments from earlier step-only decisions. To reassess saved runs, use
+`agentbench exp1 match --experiment /absolute/path/to/exp1_run`; this makes new
+oracle calls for the new protocol without executing the target again. Existing
+invalid verdicts are not automatically promoted to hits.
 
 The current oracle remains experimental. Expanded validation with
 `openai/gpt-4.1-mini` covered 13 targeted scenarios with three judgments each:

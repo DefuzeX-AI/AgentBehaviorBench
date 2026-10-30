@@ -12,6 +12,8 @@ def configure(parser):
     commands = parser.add_subparsers(dest='operation', required=True)
     generate = commands.add_parser('genProject', help='Export pinned source/ and only the Issue object')
     generate.add_argument('agent_id')
+    generate.add_argument('--noRun', dest='no_run', action='store_true',
+                          help='Export source and Issue without preparing a runnable Agent')
     generate.add_argument('--issue', type=int, required=True)
     generate.add_argument('--output', type=Path, required=True, help='New absolute directory outside ABB')
     generate.add_argument('--records-dir', type=Path, help='Host provenance directory outside the exported project')
@@ -21,7 +23,7 @@ def configure(parser):
     run.add_argument('--source', type=Path, required=True, help='Absolute path to the modified source/ directory')
     run.add_argument('--runs', type=int, default=3, help='Independent repair executions (default: 3)')
     run.add_argument('--results-dir', type=Path)
-    run.add_argument('--model', help='Target model override; oracle uses OPENROUTER_MODEL')
+    run.add_argument('--model', help='Target model override; oracle uses the shared provider default model')
     run.add_argument('--timeout', type=float, default=2400, help='Timeout per Case execution in seconds')
     run.add_argument('--env-file', type=Path)
     result = commands.add_parser('result', help='Read a saved repair result without executing anything')
@@ -41,7 +43,7 @@ def execute(args):
                 value = Experiment3.result(args.experiment)
             elif args.operation == 'genProject':
                 value = Experiment3(args.root, environ={}).gen_project(args.agent_id, issue=args.issue,
-                    output=args.output, records_dir=args.records_dir)
+                    output=args.output, records_dir=args.records_dir, no_run=args.no_run)
             else:
                 environ = load_execution_environment(args.env_file).environ
                 value = Experiment3(args.root, environ=environ).run(args.agent_id, issue=args.issue,

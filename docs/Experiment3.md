@@ -7,6 +7,33 @@ repairs itself.
 
 ## Export a project
 
+For source-only exports, add `--noRun`:
+
+```powershell
+python -m agentbench exp3 genProject nanocoder --issue 1343 --output "C:\experiments\nanocoder-1343" --noRun
+```
+
+This mode fetches the exact GT commit from the Agent's `source.repository` and
+exports `source/` plus `issue.json` without preparing a runnable Agent. It requires
+no Dockerfile, historical build recipe, runtime or launch configuration, including
+for install and bundled Agents. Provenance records the repository and commit;
+`base_target` is null because no executable target was prepared. A valid full GT
+commit and repository URL are still required. This mode recursively exports
+submodules at the gitlink commits recorded in each historical tree; submodule
+branch settings do not select versions. Relative repository URLs and GitHub-style
+`git@host:path` URLs are resolved to HTTPS. Internal relative symbolic links are
+preserved, including dangling links; escaping or cyclic links are rejected.
+Windows needs symbolic-link support (Developer Mode or appropriate privileges).
+Git LFS pointers remain unsupported. Without the flag, the
+existing historical target preparation remains in effect. Neither export mode
+runs an Agent, builds an image, or calls a model.
+
+Source-only provenance records each submodule's path, repository and full commit.
+Its `abb.export-tree.v1` digest hashes all exported file bytes, directory paths
+and symbolic-link targets without dereferencing links. Source-only archives use
+a separate cache for recursive trees; runtime preparation keeps its existing
+source restrictions.
+
 ```powershell
 $env:PYTHONUTF8 = '1'
 $env:PYTHONIOENCODING = 'utf-8'
@@ -42,8 +69,11 @@ python -m agentbench exp3 run nanocoder --issue 1343 --source "C:\experiments\na
 `--runs` defaults to 3 and accepts a positive integer. It counts repeated
 executions of the same submitted repair, not repair attempts. Change the code and
 invoke `run` again for another repair submission. `--model` selects the target
-model through the existing provider rules; the oracle uses the configured
-OpenRouter model. `--timeout` applies to each Case execution. Use `--env-file`
+model through the existing provider rules; the oracle uses the shared provider
+from `ABB_MODEL_PROVIDER` and its provider-specific model setting, such as
+`DEEPSEEK_MODEL`. It ignores target-model overrides and Agent provider pins.
+The example environment selects `deepseek` and `deepseek-flash`.
+`--timeout` applies to each Case execution. Use `--env-file`
 for an explicit host environment file.
 
 At invocation, ABB freezes `verify.case.json`, its validated reference
@@ -74,35 +104,25 @@ the same Docker daemon, as existing image coordination is scoped to one Suite.
 
 ## Results and evidence
 
-Each repair execution uses the existing trajectory comparison to assess the
-reported defect. That assessment receives the defect definition and reference
-executions, without the expected-behavior or repair-description fields. If the
-defect is absent and execution completed, a separate
-expected-behavior assessment checks actual results against the same GT Case's
-`expected` definition. This second assessment receives candidate evidence only,
-so old reference actions cannot be copied into its account of the new run.
-It reuses the bounded context reader, exact evidence
-citations, full-context request and oracle journal. It does not infer successful
-repair by negating the detection score.
-Before either execution, one oracle call translates the frozen Case and
-`expected` text into required observable outcomes. This call sees no candidate
-or reference actions. The same saved requirements apply to all repair runs.
-Positive expected-behavior decisions need a witness for every requirement.
-Each witness must quote the required evidence source; tool names and declared
-argument constraints are checked against actual logs. The decision cannot
-substitute a model summary for a required tool result or relax those constraints.
-Missing requirements prevent PASS. This is still an LLM-generated specification:
-these checks validate attribution and constraints, not semantic completeness or
-correctness of the generated requirements. Requirements and call records are
-retained under `oracle/` for review.
+Each execution uses the repair-specific Judge protocol. It receives the canonical
+`defect`, `Root cause`, `expected`, historical reference trajectories, and the
+candidate trajectory. It does not receive the submitted source tree or patch.
+Historical and candidate steps have distinct citation IDs. The Judge examines
+actual calls, arguments, results, and responses and returns `bug_exist`,
+`bug_fixed`, or `unknown`. A fix requires observed evidence that the relevant
+operation works and the original Case's expected behavior is satisfied. An
+unrelated failure, unexercised operation, or missing relevant outcome is
+`unknown`. A decisive label requires an existing candidate step and an exact
+output excerpt; `bug_exist` also requires a historical reference citation.
+The bounded full-context request, one evidence-correction call, raw response,
+usage, and journal behavior are shared with the existing oracle. Citation checks
+confirm attribution, while semantic interpretation remains a model judgment.
 
-- `PASS`: the baseline reproduced the target defect, and every requested repair
-  execution both avoided that defect and demonstrated the original expected
-  behavior.
-- `FAIL`: a repair execution demonstrated the reported defect or produced
-  observed results contradicting the original expected behavior.
+- `PASS`: the baseline returned `bug_exist`, and all requested repair executions
+  completed and returned `bug_fixed`.
+- `FAIL`: any repair execution returned `bug_exist`.
 - `UNKNOWN`: no decisive repair failure was established, but baseline
-  reproduction, execution, required outcomes or oracle evidence remain unresolved.
+  reproduction, execution, expected behavior or oracle evidence remain unresolved.
 
 This scope is `original_reproduction_case`. A pass does not claim that unrelated
 functionality or the entire project's regression suite was tested. The LLM

@@ -1,6 +1,7 @@
 """Safe extraction and completeness checks for ABB-restored source."""
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 import hashlib
+import posixpath
 import stat
 import zipfile
 
@@ -14,16 +15,26 @@ def safe_path(target, name):
     return path
 
 
-def extract_source(archive_path, target, check):
+def extract_source(archive_path, target, check, *, allow_symlinks=False):
     target.mkdir()
     inventory = {}
+    links = {}
     with zipfile.ZipFile(archive_path) as archive:
         for entry in archive.infolist():
             check()
             path = safe_path(target, entry.filename)
             mode = entry.external_attr >> 16
             if stat.S_ISLNK(mode):
-                raise ValueError('Source symlinks are not supported')
+                if not allow_symlinks:
+                    raise ValueError('Source symlinks are not supported')
+                text = archive.read(entry).decode('utf-8')
+                if (not text or PurePosixPath(text).is_absolute() or '\\' in text
+                        or ':' in text or '\0' in text):
+                    raise ValueError('Unsupported source symlink target: ' + entry.filename)
+                if entry.filename in links:
+                    raise ValueError('Duplicate source symlink: ' + entry.filename)
+                links[entry.filename] = text
+                continue
             if entry.is_dir():
                 path.mkdir(parents=True, exist_ok=True)
                 continue
@@ -41,7 +52,34 @@ def extract_source(archive_path, target, check):
             if mode & 0o111:
                 path.chmod(path.stat().st_mode | 0o111)
             inventory[entry.filename] = digest.hexdigest()
-    if not inventory:
+    pending, completed = set(), set()
+    def create_link(name):
+        check()
+        if name in completed:
+            return
+        if name in pending:
+            raise ValueError('Cyclic source symlink: ' + name)
+        pending.add(name)
+        text = links[name]
+        relative = posixpath.normpath(posixpath.join(posixpath.dirname(name), text))
+        if relative == '..' or relative.startswith('../'):
+            raise ValueError('Source symlink leaves exported tree: ' + name)
+        # Create linked directories/links first so Windows can infer link type.
+        for dependency in links:
+            if relative == dependency or relative.startswith(dependency + '/'):
+                create_link(dependency)
+        path = safe_path(target, name)
+        destination = (path.parent / text).resolve()
+        if not destination.is_relative_to(target.resolve()):
+            raise ValueError('Source symlink leaves exported tree: ' + name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Windows reparse targets require native separators; keep the link relative.
+        path.symlink_to(Path(text), target_is_directory=destination.is_dir())
+        pending.remove(name)
+        completed.add(name)
+    for name in links:
+        create_link(name)
+    if not inventory and not links:
         raise ValueError('Downloaded Agent source contains no files')
     return inventory
 

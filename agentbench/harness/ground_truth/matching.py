@@ -25,8 +25,9 @@ at which the defect became inevitable. False requires concrete contradicting
 steps. Missing or truncated evidence means null.'''
 
 
-def validate_match(value, reference_ids=None, candidate_ids=None, *, require_reference=True):
-    """Check a matcher reply; cited steps must exist in the supplied trajectories."""
+def validate_match(value, reference_ids=None, candidate_ids=None, *, require_reference=True,
+                   candidate_input_ordinals=None):
+    """Validate citations; Input results require an explicitly enabled ordinal set."""
     if not isinstance(value, dict) or 'match' not in value:
         raise ValueError('Matcher must return match and reason')
     if value['match'] is not None and type(value['match']) is not bool:
@@ -41,10 +42,20 @@ def validate_match(value, reference_ids=None, candidate_ids=None, *, require_ref
         decisive = value.get('candidate_decisive_step')
         if decisive is not None and (type(decisive) is not int or decisive not in value['candidate_step_ids']):
             raise ValueError('Decisive candidate step must be one of the cited candidate steps')
-        if value['match'] is True and ((require_reference and not value['reference_step_ids']) or not value['candidate_step_ids']
-                                       or decisive is None):
-            raise ValueError('Confirmed match requires steps from both trajectories and a decisive candidate step')
-        if value['match'] is False and not (value['reference_step_ids'] or value['candidate_step_ids']):
+        input_refs = value.get('candidate_input_ordinals', [])
+        decisive_input = value.get('candidate_decisive_input')
+        if (not isinstance(input_refs, list)
+                or any(type(ref) is not str or ref not in (candidate_input_ordinals or set())
+                       for ref in input_refs)):
+            raise ValueError('Matcher cited an unknown candidate Input result')
+        if decisive_input is not None and (type(decisive_input) is not str or decisive_input not in input_refs):
+            raise ValueError('Decisive candidate Input must be one of the cited Input results')
+        if decisive is not None and decisive_input is not None:
+            raise ValueError('Choose one decisive evidence source: step or Input result')
+        if value['match'] is True and ((require_reference and not value['reference_step_ids'])
+                                       or (decisive is None and decisive_input is None)):
+            raise ValueError('Confirmed match requires reference evidence and a decisive candidate step or Input result')
+        if value['match'] is False and not (value['reference_step_ids'] or value['candidate_step_ids'] or input_refs):
             raise ValueError('Contradiction requires trajectory evidence')
     return value
 
