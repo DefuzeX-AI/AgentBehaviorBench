@@ -1,0 +1,190 @@
+[
+  [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "# Data Analysis Agent Prompt\n\nYou are an expert Data Analysis Agent. Your task is to perform complex data analysis workflows by orchestrating specialized tools.\n\nYou have access to the following tools:\n1. `search_schema`: Discover candidate tables and relevant fields for a data question.\n2. `show_schema`: Inspect full details for known table names.\n3. `text2sql`: Fetch data from the database by converting a concrete data retrieval question to SQL.\n4. `timeseries_forecast` (when available): Predict future trends based on historical time series data.\n5. `anomaly_detection` (when available): Detect anomalies in a single metric time series. Can scan a whole range (`detection_range`) and return one or more anomalous intervals, or just check the most recent moment.\n6. `adtributor_drilldown`: Perform root cause analysis for anomalies by drilling down into dimensions.\n7. `run_python_code`: Execute Python code for custom analysis (e.g., correlation, aggregation).\n\n## Workflows\n\nFollow these standard workflows based on the user's request:\n\n### 1. Single Metric Trend Forecasting\n- **Goal**: Predict future values for a metric.\n- **Steps**:\n  1. If the relevant table, date field, or metric mapping is unclear, use `search_schema`,\n     then `show_schema` for the most relevant candidate table(s).\n  2. Use `text2sql` to fetch historical time series data for the metric.\n  3. Use `timeseries_forecast` to generate predictions. The underlying model needs at least\n     96 input points; if fewer are available the service automatically left-pads the\n     earliest points with zeros, so do not block on this — but for best quality prefer fetching enough\n     real history.\n  4. Interpret the results and summarize the trend for the user.\n\n### 2. Single Metric Anomaly Detection\n- **Goal**: Identify anomalies in a metric over time.\n- **Steps**:\n  1. If the relevant table, date field, or metric mapping is unclear, use `search_schema`,\n     then `show_schema` for the most relevant candidate table(s). Do NOT use `text2sql` for schema\n     exploration.\n  2. Use `text2sql` to fetch the time series for the metric. Keep the SQL SIMPLE: a plain\n     `GROUP BY <period>` over the date range, ordered by the period. Do NOT ask text2sql to\n     build calendar/date spines, fill missing periods, or embed the anomaly-detection goal —\n     just fetch the raw `(period, value)` rows; periods with no activity will simply be absent.\n     - The period the user asks about (e.g. \"the last 24 hours\") is the **detection range**;\n       `anomaly_detection` also needs **historical context** *before* that range. For best results\n       fetch a range covering at least `96 + detection_range` periods (e.g. to\n       scan the last 24 **hourly** values, fetch at least `96 + 24` hours of hourly\n       data). If fewer historical points are available the forecasting service backfills the earliest\n       points, so do not block on this.\n  3. Build the `input_data` argument yourself as a **continuous, gap-free** series before calling\n     `anomaly_detection`: take the rows returned by `text2sql` and add an entry for every missing\n     period from the earliest returned period through the end of the analysis window (the query's\n     last date), setting each absent period's value to **0**. A missing period for a count/volume\n     metric means 0, and a drop to 0 is exactly the anomaly to catch, so never drop empty periods.\n     For rate, average, or ratio metrics, do NOT blindly fill with 0 (which may create false anomalies);\n     instead, handle them appropriately (e.g. via numerator/denominator). Do NOT do this gap-filling in SQL.\n  4. Call `anomaly_detection` with that gap-free `input_data`, `frequency` matching the data\n     (e.g. \"hourly\"), and `detection_range` = number of trailing points to scan (e.g. 24 for \"the\n     last 24 hours\"). A short window slides across that range and the result is summarised into one\n     or more anomalous intervals. Leave `detection_range` unset only when you just want to check the\n     single most recent moment. Do NOT pass an evaluation/inner-window size — it is derived\n     internally from `frequency`.\n  5. Summarize the detected anomalous interval(s), including their time span, direction (drop/rise)\n     and severity.\n\n### 3. Single Metric Anomaly Drill-Down\n- **Goal**: Find the root cause (dimensions) of an anomaly.\n- **Steps**:\n  1. If the table, date field, metric, or candidate dimensions are unclear, first use `search_schema`, then `show_schema` for candidate tables.\n  2. Clearly separate the **historical context** (for baseline generation) and the **anomaly window** (for actual values).\n  3. **Baseline generation**: If `timeseries_forecast` is available, use `text2sql` to fetch the historical time series and actual values. Use `timeseries_forecast` (with `forecast_window` matching the anomaly window length) to generate the expected baseline, and align the predictions with actual values by time. Only if the forecasting service is unavailable should you use a fallback baseline via SQL (e.g., historical same period, previous period, or moving average).\n  4. **Data formatting for drill-down**: The input data for `adtributor_drilldown` MUST aggregate away the time dimension. Format it as a 1D melted table (list of dicts).\n     - Each row represents the already-aggregated contribution over the entire anomaly window for a specific `dimension_name` and `element_value`.\n     - Do NOT pass time as a dimension unless explicitly analyzing which time bucket contributed most.\n     - For absolute metrics, include `predict` and `real` fields.\n     - For ratio/derived metrics (e.g., CTR, conversion rate), you MUST pass `predict_numerator`, `predict_denominator`, `real_numerator`, and `real_denominator`. Do NOT just pass the final ratio.\n  5. Use `adtributor_drilldown` with the prepared melted table data to find root causes.\n  6. Summarize the findings, explaining which dimensions and elements contributed most to the anomaly.\n\n### 4. Multi-Metric Correlation\n- **Goal**: Understand the relationship between two or more metrics.\n- **Steps**:\n  1. Use `text2sql` to fetch time series data for all relevant metrics.\n  2. Use `run_python_code` to calculate correlation coefficients (e.g., Pearson, Spearman) or perform other statistical tests.\n  3. Interpret the correlation results and explain the relationship to the user.\n\n### 5. Business Combination Analysis\n- **Goal**: Analyze metrics across multiple dimensions (e.g., revenue composition, contribution analysis).\n- **Steps**:\n  1. Use `text2sql` to fetch the necessary multi-dimensional data.\n  2. Use `run_python_code` to perform grouped aggregations, calculate percentages, or decompose contributions.\n  3. Present the structured findings clearly to the user.\n\n## Important Guidelines\n- Always ensure you have the necessary data via `text2sql` before calling analysis tools.\n- Use `search_schema` for table/column discovery and `show_schema` for known table details.\n- Do NOT call `text2sql` to explore schema, list tables, find candidate tables, or ask what tables\n  contain a metric. `text2sql` is only for concrete data retrieval.\n- For `text2sql`, set `visualize=false` when fetching intermediate data for `timeseries_forecast`,\n  `anomaly_detection`, `adtributor_drilldown`, or `run_python_code`. Use `visualize=true` only when\n  the final deliverable itself should include an interactive chart or the user explicitly asks for visualization.\n- For `adtributor_drilldown`, formatting the data correctly as a 1D melted table via `text2sql` is mandatory.\n- If a specific tool (like `timeseries_forecast` or `anomaly_detection`) is unavailable, use\n  `run_python_code` as a fallback if possible, or inform the user about the limitation.\n- Provide clear, concise, and business-focused summaries of your findings. Avoid dumping raw data unless requested.\n\n## Data Integrity\n- Never invent data values. If `text2sql` returns 0 rows or an empty result, clearly say no data\n  was found for the requested period/filter. Do not output made-up numbers, estimates, sample\n  results, or tables.\n- If the empty result may be caused by an overly narrow time filter, you may retry once with a\n  broader or removed time filter. State that you are broadening the scope and why.\n- If still empty, report no data and stop.\n\n\nYou are a deep agent, an AI assistant that helps users accomplish tasks using tools. You respond with text and tool calls. The user can see your responses and tool outputs in real time.\n\n## Core Behavior\n\n- Be concise and direct. Don't over-explain unless asked.\n- NEVER add unnecessary preamble (\"Sure!\", \"Great question!\", \"I'll now...\").\n- Don't say \"I'll now do X\" — just do it.\n- If the request is underspecified, ask only the minimum followup needed to take the next useful action.\n- If asked how to approach something, explain first, then act.\n\n## Professional Objectivity\n\n- Prioritize accuracy over validating the user's beliefs\n- Disagree respectfully when the user is incorrect\n- Avoid unnecessary superlatives, praise, or emotional validation\n\n## Doing Tasks\n\nWhen the user asks you to do something:\n\n1. **Understand first** — read relevant files, check existing patterns. Quick but thorough — gather enough evidence to start, then iterate.\n2. **Act** — implement the solution. Work quickly but accurately.\n3. **Verify** — check your work against what was asked, not against your own output. Your first attempt is rarely correct — iterate.\n\nKeep working until the task is fully complete. Don't stop partway and explain what you would do — just do it. Only yield back to the user when the task is done or you're genuinely blocked.\n\n**When things go wrong:**\n\n- If something fails repeatedly, stop and analyze *why* — don't keep retrying the same approach.\n- If you're blocked, tell the user what's wrong and ask for guidance.\n\n## Clarifying Requests\n\n- Do not ask for details the user already supplied.\n- Use reasonable defaults when the request clearly implies them.\n- Prioritize missing semantics like content, delivery, detail level, or alert criteria.\n- Avoid opening with a long explanation of tool, scheduling, or integration limitations when a concise blocking followup question would move the task forward.\n- Ask domain-defining questions before implementation questions.\n- For monitoring or alerting requests, ask what signals, thresholds, or conditions should trigger an alert.\n\n## Progress Updates\n\nFor longer tasks, provide brief progress updates at reasonable intervals — a concise sentence recapping what you've done and what's next."
+        },
+        {
+          "type": "text",
+          "text": "\n\n## `write_todos`\n\nYou have access to the `write_todos` tool to help you manage and plan complex objectives.\nUse this tool for complex objectives to ensure that you are tracking each necessary step.\nThis tool is very helpful for planning complex objectives, and for breaking down these larger complex objectives into smaller steps.\n\nIt is critical that you mark todos as completed as soon as you are done with a step. Do not batch up multiple steps before marking them as completed.\nFor simple objectives that only require a few steps, it is better to just complete the objective directly and NOT use this tool.\nWriting todos takes time and tokens, use it when it is helpful for managing complex many-step problems! But not for simple few-step requests.\n\n## Important To-Do List Usage Notes to Remember\n\n- The `write_todos` tool should never be called multiple times in parallel.\n- Don't be afraid to revise the To-Do list as you go. New information may reveal new tasks that need to be done, or old tasks that are irrelevant.\n\n## Finishing a task\n\nWhen you finish all work, write your final answer in the message AFTER your last `write_todos` call — not in the same turn as that call. Start the final message with the substantive content the user asked for — the data, computation, summary, or analysis. The user wants the result, not confirmation that the work is done."
+        },
+        {
+          "type": "text",
+          "text": "\n\n## Following Conventions\n\n- Read files before editing — understand existing content before making changes\n- Mimic existing style, naming conventions, and patterns\n\n## Filesystem Tools `ls`, `read_file`, `write_file`, `edit_file`, `glob`, `grep`\n\nYou have access to a filesystem which you can interact with using these tools.\nAll file paths must start with a /. Follow the tool docs for the available tools, and use pagination (offset/limit) when reading large files.\n\n- ls: list files in a directory (requires absolute path)\n- read_file: read a file from the filesystem\n- write_file: write to a file in the filesystem\n- edit_file: edit a file in the filesystem\n- glob: find files matching a pattern (e.g., \"**/*.py\")\n- grep: search for text within files\n\n## Large Tool Results\n\nWhen a tool result is too large, it may be offloaded into the filesystem instead of being returned inline. In those cases, use `read_file` to inspect the saved result in chunks, or use `grep` within `/large_tool_results/` if you need to search across offloaded tool results and do not know the exact file path. Offloaded tool results are stored under `/large_tool_results/<tool_call_id>`."
+        },
+        {
+          "type": "text",
+          "text": "\n\n## `task` (subagent spawner)\n\nYou have access to a `task` tool to launch short-lived subagents that handle isolated tasks. These agents are ephemeral — they live only for the duration of the task and return a single result.\n\nWhen to use the task tool:\n\n- When a task is complex and multi-step, and can be fully delegated in isolation\n- When a task is independent of other tasks and can run in parallel\n- When a task requires focused reasoning or heavy token/context usage that would bloat the orchestrator thread\n- When sandboxing improves reliability (e.g. code execution, structured searches, data formatting)\n- When you only care about the output of the subagent, and not the intermediate steps (ex. performing a lot of research and then returned a synthesized report, performing a series of computations or lookups to achieve a concise, relevant answer.)\n\nSubagent lifecycle:\n\n1. **Spawn** → Provide clear role, instructions, and expected output\n2. **Run** → The subagent completes the task autonomously\n3. **Return** → The subagent provides a single structured result\n4. **Reconcile** → Incorporate or synthesize the result into the main thread\n\nWhen NOT to use the task tool:\n\n- If you need to see the intermediate reasoning or steps after the subagent has completed (the task tool hides them)\n- If the task is trivial (a few tool calls or simple lookup)\n- If delegating does not reduce token usage, complexity, or context switching\n- If splitting would add latency without benefit\n\n## Important Task Tool Usage Notes to Remember\n\n- Whenever possible, parallelize the work that you do. This is true for both tool_calls, and for tasks. Whenever you have independent steps to complete - make tool_calls, or kick off tasks (subagents) in parallel to accomplish them faster. This saves time for the user, which is incredibly important.\n- Remember to use the `task` tool to silo independent tasks within a multi-part objective.\n- You should use the `task` tool whenever you have a complex task that will take multiple steps, and is independent from other tasks that the agent needs to complete. These agents are highly competent and efficient.\n\nAvailable subagent types:\n\n- general-purpose: General-purpose agent for researching complex questions, searching for files and content, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. This agent has access to all tools as the main agent."
+        }
+      ],
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Perform anomaly detection on daily order volume (the count of orders per day) for the period from 2026-07-24 to 2026-10-24 (inclusive), using a daily granularity.\n\nMetric: Daily order volume = number of orders placed on each calendar day. Use the order creation/order date field to group orders by day.\n\nAnalysis goal:\n1. Identify which specific days within 2026-07-24 to 2026-10-24 are anomalous (statistically unusual) relative to the normal daily pattern over this period.\n2. For each anomalous day, report the actual order count, what the expected/normal value would be, and a severity measure (e.g., deviation magnitude, z-score, or percent above/below expected).\n3. Rank or classify the anomalies by severity (e.g., low/medium/high or by absolute deviation).\n4. Provide a brief interpretation of each anomaly (e.g., spike vs. drop).\n\nPlease use an appropriate anomaly detection method (e.g., statistical control limits / z-score / IQR / seasonal decomposition) suitable for a single daily metric time series. Report the total number of anomalous days found and the full list of anomalous days with dates, actual values, expected values, deviation, and severity.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "I'll start by discovering the schema for order data.",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 168,
+          "prompt_tokens": 10132,
+          "total_tokens": 10300,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 10132
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "242fe17b-633a-499b-bbaa-f519098435a2",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16ead-8e94-7e23-ad10-db969158d6bc-0",
+      "tool_calls": [
+        {
+          "name": "search_schema",
+          "args": {
+            "reasoning": "Find the orders table and its order date and order identifier fields to count daily order volume.",
+            "query_list": [
+              "orders",
+              "order date",
+              "order creation date",
+              "order id",
+              "daily order count"
+            ],
+            "metrics": [
+              "order volume",
+              "order count"
+            ],
+            "dimensions": [
+              "order date",
+              "calendar day"
+            ],
+            "max_tables": 5
+          },
+          "id": "call_00_ET_tBJAcslSItmgzSPVZz427898",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 10132,
+        "output_tokens": 168,
+        "total_tokens": 10300,
+        "input_token_details": {
+          "cache_read": 0
+        },
+        "output_token_details": {
+          "reasoning": 0
+        }
+      }
+    },
+    {
+      "content": "{\"candidates\": [{\"table\": \"Order_Items\", \"description\": \"Links products to orders with individual item status and details\", \"selection_rule\": \"Select when queries need product details within orders or item-level status tracking\", \"matched_columns\": [\"order_id\", \"order_item_details\", \"order_item_id\", \"order_item_status\", \"product_id\"], \"date_columns\": [], \"metric_columns\": [], \"dimension_columns\": [], \"columns\": [{\"column_name\": \"order_item_id\", \"display_name\": \"Order Item ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for order items\", \"alias\": \"oi_id\"}, {\"column_name\": \"order_item_details\", \"display_name\": \"Order Item Details\", \"category\": \"attribute\", \"type\": \"VARCHAR(255)\", \"description\": \"Additional order item information\", \"alias\": \"oi_details\"}, {\"column_name\": \"order_item_status\", \"display_name\": \"Order Item Status\", \"category\": \"status\", \"type\": \"VARCHAR(10)\", \"description\": \"Current status of the order item (Finish|Payed|Cancel)\", \"alias\": \"oi_status\"}, {\"column_name\": \"product_id\", \"display_name\": \"Product ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for products\", \"alias\": \"prod_id\"}, {\"column_name\": \"order_id\", \"display_name\": \"Order ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for orders\", \"alias\": \"ord_id\"}], \"match_reason\": \"Order_Items matches 5 relevant column(s)\"}, {\"table\": \"Orders\", \"description\": \"Main order table containing order status, placement date, and customer relationships\", \"selection_rule\": \"Select when queries involve order status, order history, or customer order relationships\", \"matched_columns\": [\"customer_id\", \"date_order_placed\", \"order_details\", \"order_id\", \"order_status\"], \"date_columns\": [\"date_order_placed\"], \"metric_columns\": [], \"dimension_columns\": [], \"columns\": [{\"column_name\": \"order_details\", \"display_name\": \"Order Details\", \"category\": \"attribute\", \"type\": \"VARCHAR(255)\", \"description\": \"Additional order information\", \"alias\": \"ord_details\"}, {\"column_name\": \"customer_id\", \"display_name\": \"Customer ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for customers\", \"alias\": \"cust_id\"}, {\"column_name\": \"date_order_placed\", \"display_name\": \"Order Placed Date\", \"category\": \"temporal\", \"type\": \"DATETIME\", \"description\": \"Date and time when the order was placed\", \"alias\": \"ord_date\"}, {\"column_name\": \"order_status\", \"display_name\": \"Order Status\", \"category\": \"status\", \"type\": \"VARCHAR(10)\", \"description\": \"Current status of the order (Shipped|Packing|On Road)\", \"alias\": \"ord_status\"}, {\"column_name\": \"order_id\", \"display_name\": \"Order ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for orders\", \"alias\": \"ord_id\"}], \"match_reason\": \"Orders matches 5 relevant column(s); has date/time columns for time filtering or grouping\"}, {\"table\": \"Customers\", \"description\": \"Contains customer information including unique ID, name, state, and additional details\", \"selection_rule\": \"Select when queries involve customer information, customer names, customer location/state, or need to join orders with customer data\", \"matched_columns\": [\"customer_details\", \"customer_id\", \"customer_name\"], \"date_columns\": [], \"metric_columns\": [], \"dimension_columns\": [], \"columns\": [{\"column_name\": \"customer_id\", \"display_name\": \"Customer ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for customers\", \"alias\": \"cust_id\"}, {\"column_name\": \"customer_details\", \"display_name\": \"Customer Details\", \"category\": \"attribute\", \"type\": \"VARCHAR(255)\", \"description\": \"Additional customer information\", \"alias\": \"cust_details\"}, {\"column_name\": \"customer_name\", \"display_name\": \"Customer Name\", \"category\": \"attribute\", \"type\": \"VARCHAR(80)\", \"description\": \"Name of the customer\", \"alias\": \"cust_name\"}], \"match_reason\": \"Customers matches 3 relevant column(s)\"}, {\"table\": \"Shipments\", \"description\": \"Shipment tracking information including tracking numbers, dates, and shipment details\", \"selection_rule\": \"Select when queries involve shipping, delivery tracking, or fulfillment information\", \"matched_columns\": [\"order_id\", \"shipment_date\", \"shipment_id\"], \"date_columns\": [\"shipment_date\"], \"metric_columns\": [], \"dimension_columns\": [], \"columns\": [{\"column_name\": \"shipment_id\", \"display_name\": \"Shipment ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for shipments\", \"alias\": \"ship_id\"}, {\"column_name\": \"shipment_date\", \"display_name\": \"Shipment Date\", \"category\": \"temporal\", \"type\": \"DATETIME\", \"description\": \"Date and time when the shipment was sent\", \"alias\": \"ship_date\"}, {\"column_name\": \"order_id\", \"display_name\": \"Order ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for orders\", \"alias\": \"ord_id\"}], \"match_reason\": \"Shipments matches 3 relevant column(s); has date/time columns for time filtering or grouping\"}, {\"table\": \"Shipment_Items\", \"description\": \"Junction table linking shipments to specific order items\", \"selection_rule\": \"Select when queries need to track which specific items are in which shipments\", \"matched_columns\": [\"order_item_id\", \"shipment_id\"], \"date_columns\": [], \"metric_columns\": [], \"dimension_columns\": [], \"columns\": [{\"column_name\": \"order_item_id\", \"display_name\": \"Order Item ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for order items\", \"alias\": \"oi_id\"}, {\"column_name\": \"shipment_id\", \"display_name\": \"Shipment ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for shipments\", \"alias\": \"ship_id\"}], \"match_reason\": \"Shipment_Items matches 2 relevant column(s)\"}], \"matched_column_count\": 14, \"unmatched_terms\": [], \"warnings\": [\"Returned top 5 tables out of 7 candidates.\"]}",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "search_schema",
+      "id": "86607b1d-e460-405d-977e-92b723a8cd30",
+      "tool_call_id": "call_00_ET_tBJAcslSItmgzSPVZz427898",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 144,
+          "prompt_tokens": 11786,
+          "total_tokens": 11930,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 75,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 10240
+          },
+          "prompt_cache_hit_tokens": 10240,
+          "prompt_cache_miss_tokens": 1546
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "8f500ab7-0bd6-4068-a3d4-47efcdb3ec41",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16ead-92f5-7d62-93ae-ce59fa724c37-0",
+      "tool_calls": [
+        {
+          "name": "show_schema",
+          "args": {
+            "reasoning": "Confirm Orders table date field and identifier for daily order counts.",
+            "tables": [
+              "Orders"
+            ]
+          },
+          "id": "call_00_bkEM1tW9z5kSZoPu1WDY0880",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 11786,
+        "output_tokens": 144,
+        "total_tokens": 11930,
+        "input_token_details": {
+          "cache_read": 10240
+        },
+        "output_token_details": {
+          "reasoning": 75
+        }
+      }
+    },
+    {
+      "content": "{\"schemas\": [{\"table\": \"Orders\", \"description\": \"Main order table containing order status, placement date, and customer relationships\", \"selection_rule\": \"Select when queries involve order status, order history, or customer order relationships\", \"sql_rule\": \"Use order_id as primary key. Join with Customers via customer_id for customer information\", \"derived_metric\": \"\", \"columns\": [{\"column_name\": \"order_id\", \"display_name\": \"Order ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for orders\", \"alias\": \"ord_id\"}, {\"column_name\": \"customer_id\", \"display_name\": \"Customer ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for customers\", \"alias\": \"cust_id\"}, {\"column_name\": \"order_status\", \"display_name\": \"Order Status\", \"category\": \"status\", \"type\": \"VARCHAR(10)\", \"description\": \"Current status of the order (Shipped|Packing|On Road)\", \"alias\": \"ord_status\"}, {\"column_name\": \"date_order_placed\", \"display_name\": \"Order Placed Date\", \"category\": \"temporal\", \"type\": \"DATETIME\", \"description\": \"Date and time when the order was placed\", \"alias\": \"ord_date\"}, {\"column_name\": \"order_details\", \"display_name\": \"Order Details\", \"category\": \"attribute\", \"type\": \"VARCHAR(255)\", \"description\": \"Additional order information\", \"alias\": \"ord_details\"}], \"date_columns\": [\"date_order_placed\"], \"metric_columns\": [], \"dimension_columns\": []}], \"missing_tables\": [], \"warnings\": []}",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "show_schema",
+      "id": "aae1ea41-1bf4-41be-a03b-fe6102a47dd8",
+      "tool_call_id": "call_00_bkEM1tW9z5kSZoPu1WDY0880",
+      "artifact": null,
+      "status": "success"
+    }
+  ]
+]

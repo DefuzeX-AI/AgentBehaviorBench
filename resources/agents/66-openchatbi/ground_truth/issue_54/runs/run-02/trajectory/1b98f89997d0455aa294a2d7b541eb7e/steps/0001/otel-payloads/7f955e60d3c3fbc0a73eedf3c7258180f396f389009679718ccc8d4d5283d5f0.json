@@ -1,0 +1,39 @@
+{
+  "sql_execution_result": "SQL_SUCCESS",
+  "schema_info": {
+    "columns": [
+      "Order Item Status",
+      "Number of Order Items"
+    ],
+    "column_types": {
+      "Order Item Status": "object",
+      "Number of Order Items": "int64"
+    },
+    "row_count": 6,
+    "numeric_columns": [
+      "Number of Order Items"
+    ],
+    "categorical_columns": [
+      "Order Item Status"
+    ],
+    "datetime_columns": [],
+    "unique_counts": {
+      "Order Item Status": 6
+    },
+    "result_limit": 10000
+  },
+  "data": "Order Item Status,Number of Order Items\nCanceled,3829\nFinish,3729\nPacked,3773\nPending,3725\nShipped,3671\nTotal,18727\n",
+  "messages": [
+    {
+      "content": "```sql\nSELECT\n  order_item_status AS \"Order Item Status\",\n  COUNT(*) AS \"Number of Order Items\"\nFROM Order_Items\nGROUP BY order_item_status\nUNION ALL\nSELECT\n  'Total' AS \"Order Item Status\",\n  COUNT(*) AS \"Number of Order Items\"\nFROM Order_Items\n```\nSQL Result (limited to first 10000 rows):\n```csv\nOrder Item Status,Number of Order Items\nCanceled,3829\nFinish,3729\nPacked,3773\nPending,3725\nShipped,3671\nTotal,18727\n\n```",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "429f67e7-5550-473f-9327-381920182400",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

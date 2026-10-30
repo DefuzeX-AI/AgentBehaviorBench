@@ -1,0 +1,68 @@
+[
+  {
+    "graph": null,
+    "update": {
+      "messages": [
+        {
+          "content": "",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 2460,
+              "prompt_tokens": 21518,
+              "total_tokens": 23978,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 11,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cached_tokens": 21376
+              },
+              "prompt_cache_hit_tokens": 21376,
+              "prompt_cache_miss_tokens": 142
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-flash",
+            "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+            "id": "6ffaf90b-09d8-434c-88c3-fa44d7c8a676",
+            "finish_reason": "tool_calls",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a16eae-54c6-7f82-bb66-35cfb4a23885-0",
+          "tool_calls": [
+            {
+              "name": "run_python_code",
+              "args": {
+                "code": "\nimport pandas as pd, numpy as np\nraw = \"\"\"2025-11-30,50\n2025-12-01,66\n2025-12-02,74\n2025-12-03,43\n2025-12-04,37\n2025-12-05,43\n2025-12-06,63\n2025-12-07,36\n2025-12-08,22\n2025-12-09,25\n2025-12-10,34\n2025-12-11,28\n2025-12-12,50\n2025-12-13,27\n2025-12-14,20\n2025-12-15,33\n2025-12-16,29\n2025-12-17,24\n2025-12-18,20\n2025-12-19,50\n2025-12-20,27\n2025-12-21,20\n2025-12-22,26\n2025-12-23,29\n2025-12-24,58\n2025-12-25,21\n2025-12-26,21\n2025-12-27,28\n2025-12-28,27\n2025-12-29,22\n2025-12-30,24\n2025-12-31,22\n2026-01-01,60\n2026-01-02,59\n2026-01-03,55\n2026-01-04,51\n2026-01-05,33\n2026-01-06,40\n2026-01-07,50\n2026-01-08,31\n2026-01-09,24\n2026-01-10,27\n2026-01-11,20\n2026-01-12,24\n2026-01-13,24\n2026-01-14,24\n2026-01-15,20\n2026-01-16,44\n2026-01-17,28\n2026-01-18,26\n2026-01-19,23\n2026-01-20,21\n2026-01-21,24\n2026-01-22,27\n2026-01-23,20\n2026-01-24,22\n2026-01-25,25\n2026-01-26,22\n2026-01-27,24\n2026-01-28,27\n2026-01-29,22\n2026-01-30,26\n2026-01-31,25\n2026-02-01,58\n2026-02-02,57\n2026-02-03,63\n2026-02-04,40\n2026-02-05,47\n2026-02-06,49\n2026-02-07,33\n2026-02-08,23\n2026-02-09,22\n2026-02-10,27\n2026-02-11,40\n2026-02-12,33\n2026-02-13,34\n2026-02-14,31\n2026-02-15,33\n2026-02-16,26\n2026-02-17,29\n2026-02-18,28\n2026-02-19,57\n2026-02-20,25\n2026-02-21,20\n2026-02-22,22\n2026-02-23,27\n2026-02-24,23\n2026-02-25,26\n2026-02-26,29\n2026-02-27,27\n2026-02-28,23\n2026-03-01,59\n2026-03-02,44\n2026-03-03,81\n2026-03-04,32\n2026-03-05,63\n2026-03-06,40\n2026-03-07,37\n2026-03-08,23\n2026-03-09,33\n2026-03-10,34\n2026-03-11,23\n2026-03-12,34\n2026-03-13,31\n2026-03-14,23\n2026-03-15,29\n2026-03-16,26\n2026-03-17,21\n2026-03-18,28\n2026-03-19,21\n2026-03-20,29\n2026-03-21,28\n2026-03-22,24\n2026-03-23,25\n2026-03-24,29\n2026-03-25,20\n2026-03-26,21\n2026-03-27,26\n2026-03-28,24\n2026-03-29,27\n2026-03-30,23\n2026-03-31,21\n2026-04-01,58\n2026-04-02,46\n2026-04-03,40\n2026-04-04,53\n2026-04-05,73\n2026-04-06,47\n2026-04-07,45\n2026-04-08,22\n2026-04-09,25\n2026-04-10,20\n2026-04-11,51\n2026-04-12,30\n2026-04-13,25\n2026-04-14,20\n2026-04-15,26\n2026-04-16,27\n2026-04-17,28\n2026-04-18,20\n2026-04-19,25\n2026-04-20,27\n2026-04-21,25\n2026-04-22,23\n2026-04-23,29\n2026-04-24,24\n2026-04-25,21\n2026-04-26,24\n2026-04-27,29\n2026-04-28,22\n2026-04-29,21\n2026-04-30,28\n2026-05-01,63\n2026-05-02,47\n2026-05-03,50\n2026-05-04,33\n2026-05-05,41\n2026-05-06,38\n2026-05-07,35\n2026-05-08,23\n2026-05-09,33\n2026-05-10,22\n2026-05-11,27\n2026-05-12,22\n2026-05-13,28\n2026-05-14,26\n2026-05-15,20\n2026-05-16,49\n2026-05-17,25\n2026-05-18,27\n2026-05-19,20\n2026-05-20,38\n2026-05-21,22\n2026-05-22,29\n2026-05-23,23\n2026-05-24,24\n2026-05-25,26\n2026-05-26,20\n2026-05-27,27\n2026-05-28,50\n2026-05-29,24\n2026-05-30,20\n2026-05-31,29\"\"\"\nrows=[r.split(',') for r in raw.strip().split('\\n')]\ndf=pd.DataFrame(rows,columns=['date','count']); df['date']=pd.to_datetime(df['date']); df['count']=df['count'].astype(int)\ns=df.set_index('date')['count'].asfreq('D')\ndom=s.index.day\nexp=[np.median(s[(dom==d.day)&(s.index!=d)]) for d in s.index]\nexp=pd.Series(exp,index=s.index)\nres=s-exp\nmad=np.median(np.abs(res-np.median(res))); scale=1.4826*mad\nz=res/scale\nprint(\"robust scale (1.4826*MAD of residuals) = %.2f ; residual median %.2f\"%(scale,np.median(res)))\ngmad=1.4826*np.median(np.abs(s-np.median(s))); gz=(s-np.median(s))/gmad\n\nout=pd.DataFrame({'actual':s,'expected':exp.round(1),'dev':res,'pct':(res/exp*100).round(1),'z':z.round(2),'gross_z':gz.round(2)})\nout['dow']=out.index.day_name().str[:3]\nw=out.loc['2026-02-28':'2026-05-31'].copy()\nprint(\"window days:\",len(w),\" total orders:\",w['actual'].sum(),\" mean:\",round(w['actual'].mean(),2),\" mean expected:\",round(w['expected'].mean(),2))\ndef sev(a):\n    return 'High' if a>=5 else ('Medium' if a>=4 else 'Low')\nw['anom']=w['z'].abs()>=3\nf=w[w['anom']].sort_values('z',key=abs,ascending=False).copy()\nf['dir']=np.where(f['dev']>0,'Spike','Drop')\nf['sev']=[sev(abs(v)) for v in f['z']]\nprint(\"\\n== ANOMALOUS DAYS:\",len(f),\"==\")\npd.set_option('display.width',250)\nprint(f[['actual','expected','dev','pct','z','gross_z','dow','dir','sev']].to_string())\nprint(\"\\nby direction:\",f['dir'].value_counts().to_dict(),\"| by severity:\",f['sev'].value_counts().to_dict())\nprint(\"\\nflagged only vs monthly pattern (|z|>=3 but |gross_z|<2):\",int(((w['z'].abs()>=3)&(w['gross_z'].abs()<2)).sum()))\nprint(\"\\ntop 12 |z| in window:\")\nprint(w.reindex(w['z'].abs().sort_values(ascending=False).index)[['actual','expected','dev','pct','z','dow']].head(12).to_string())\nprint(\"\\nnormal-day residual summary: mean %.2f  p5 %.1f  p95 %.1f\"% (res.loc['2026-02-28':].mean(),res.loc['2026-02-28':].quantile(.05),res.loc['2026-02-28':].quantile(.95)))\n",
+                "reasoning": "Compute day-of-month leave-one-out baseline, robust z-scores, and rank anomalies in the latest available 93-day window."
+              },
+              "id": "call_00_CZwRo0OJ90y7LOqh4CmN6808",
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "usage_metadata": {
+            "input_tokens": 21518,
+            "output_tokens": 2460,
+            "total_tokens": 23978,
+            "input_token_details": {
+              "cache_read": 21376
+            },
+            "output_token_details": {
+              "reasoning": 11
+            }
+          }
+        }
+      ]
+    },
+    "resume": null,
+    "goto": []
+  }
+]

@@ -1,0 +1,43 @@
+{
+  "sql_execution_result": "SQL_SUCCESS",
+  "schema_info": {
+    "columns": [
+      "Minimum Order Placed Date",
+      "Maximum Order Placed Date",
+      "Distinct Order Dates",
+      "Total Orders"
+    ],
+    "column_types": {
+      "Minimum Order Placed Date": "object",
+      "Maximum Order Placed Date": "object",
+      "Distinct Order Dates": "int64",
+      "Total Orders": "int64"
+    },
+    "row_count": 1,
+    "numeric_columns": [
+      "Distinct Order Dates",
+      "Total Orders"
+    ],
+    "categorical_columns": [],
+    "datetime_columns": [
+      "Minimum Order Placed Date",
+      "Maximum Order Placed Date"
+    ],
+    "unique_counts": {},
+    "result_limit": 10000
+  },
+  "data": "Minimum Order Placed Date,Maximum Order Placed Date,Distinct Order Dates,Total Orders\n2025-11-30,2026-05-31,183,5893\n",
+  "messages": [
+    {
+      "content": "```sql\nSELECT MIN(DATE(date_order_placed)) AS \"Minimum Order Placed Date\",\n       MAX(DATE(date_order_placed)) AS \"Maximum Order Placed Date\",\n       COUNT(DISTINCT DATE(date_order_placed)) AS \"Distinct Order Dates\",\n       COUNT(order_id) AS \"Total Orders\"\nFROM Orders;\n```\nSQL Result (limited to first 10000 rows):\n```csv\nMinimum Order Placed Date,Maximum Order Placed Date,Distinct Order Dates,Total Orders\n2025-11-30,2026-05-31,183,5893\n\n```",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "88da93de-f498-46bf-abd1-ac37621c79e9",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

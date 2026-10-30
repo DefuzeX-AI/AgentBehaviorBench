@@ -1,0 +1,15 @@
+[
+  {
+    "name": "text2sql",
+    "args": {
+      "reasoning": "Fetch daily order counts (raw period,value rows) with enough preceding history for baseline/anomaly model context.",
+      "context": {
+        "Shared Context": "Table Orders (order_id, date_order_placed DATETIME). Metric: daily order volume = COUNT(DISTINCT order_id) grouped by calendar day.",
+        "Current Subtask": "Return one row per calendar day with the number of orders placed that day, from 2026-04-01 through 2026-10-24 inclusive. Columns: order_date (DATE), order_count (integer). Aggregate with COUNT(DISTINCT order_id) grouped by DATE(date_order_placed). Order by order_date ascending. Simple GROUP BY only - do not build date spines or fill missing days."
+      },
+      "visualize": false
+    },
+    "id": "call_00_HQ0TBQA8o8Ub7NcMskwa9958",
+    "type": "tool_call"
+  }
+]

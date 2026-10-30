@@ -1,0 +1,76 @@
+[
+  [
+    {
+      "content": "You are a language expert and professional SQL engineer tasked with analyzing questions from MyCompany users and selecting the appropriate table to write SQL. \n- You need to analyze the user's question, find the possible dimensions and metrics, and then select the tables and all required columns related to the query. \n- I will give you the business knowledge introduction and the glossaries of MyCompany for reference.\n- I will give you the data warehouse introduction about how these tables are generated and organized.\n- I will give you the candidate tables and their schema, read the table description and rule carefully to understand the purpose and capability of the table, and select the appropriate tables and columns.\n\n# Sales Business System Glossary\n\n## Overview\nYou're answering questions related to a sales order tracking business system that manages the complete customer order lifecycle from placement to delivery.\n\n## Key Business Concepts\n\n**Customer Management:**\n- Customer: Individual or entity who places orders\n- Customer Details: Additional information like contact info, preferences, or notes\n\n**Order Processing:**\n- Order: A request from a customer to purchase products\n- Order Status: Current state - Valid values: \"Shipped\", \"Packing\", \"On Road\"\n- Order Item: Individual product within an order (orders can contain multiple items)\n- Order Item Status: Status of specific items - Valid values: \"Finish\", \"Payed\", \"Cancel\"\n\n**Product Catalog:**\n- Product: Items available for purchase\n- Product Name (`product_name`): Represents the product category. Values include food, book,\n  clothes, electronics, kitchen, beauty, toy, music, outdoor, garden, sports, office, pet,\n  health, and phone. Some values use `category-code` format (e.g. `beauty-1050`); the prefix\n  before `-` is the category. For category aggregation, normalize with:\n  `CASE WHEN INSTR(product_name, '-') > 0 THEN SUBSTR(product_name, 1, INSTR(product_name, '-') - 1)\n  ELSE product_name END`.\n- Product Details: Specifications, descriptions, or additional product information\n\n**Fulfillment & Shipping:**\n- Shipment: Physical delivery package sent to customer\n- Shipment Items: Specific order items included in a shipment\n- Tracking Number: Unique identifier for package tracking\n- Shipment Date: When package was dispatched\n\n**Financial Processing:**\n- Invoice: Bill generated for completed orders\n- Invoice Number: Unique identifier for billing purposes\n- Invoice Date: When billing document was created\n\n## Business Rules\n- One order can have multiple items (products)\n- One order can be fulfilled through multiple shipments\n- Each shipment links to one invoice for billing\n- Order items can have different statuses within the same order\n- Customers can have multiple orders over time\n\n\n[data_warehouse_introduction]\n\n# Input Structure Awareness\nThe user context in the chat history may contain a section called \"Deferred Tasks\".\n- **CRITICAL**: You MUST completely IGNORE any tables or columns that might be needed for \"Deferred Tasks\". Only select tables for the exact query requested in the final \"Please select the appropriate tables for the question:\" prompt.\n\n# Candidate Tables\nI found the following tables and their relevant columns and descriptions that might contain the data the user is looking for.\n\n## Table: Customers \n### Table Description: \nContains customer information including unique ID, name, state, and additional details \n### Rule: \nSelect when queries involve customer information, customer names, customer location/state, or need to join orders with customer data\n### Columns: \nCategory(Name, Display Name, Description): \n- attribute(customer_name, Customer Name, \"Name of the customer\")\n- attribute(customer_details, Customer Details, \"Additional customer information\")\n- identifier(customer_id, Customer ID, \"Unique identifier for customers\")\n\n\n## Table: Order_Items \n### Table Description: \nLinks products to orders with individual item status and details \n### Rule: \nSelect when queries need product details within orders or item-level status tracking\n### Columns: \nCategory(Name, Display Name, Description): \n- identifier(order_id, Order ID, \"Unique identifier for orders\")\n- identifier(order_item_id, Order Item ID, \"Unique identifier for order items\")\n- attribute(order_item_details, Order Item Details, \"Additional order item information\")\n- status(order_item_status, Order Item Status, \"Current status of the order item (Finish|Payed|Cancel)\")\n\n\n## Table: Shipments \n### Table Description: \nShipment tracking information including tracking numbers, dates, and shipment details \n### Rule: \nSelect when queries involve shipping, delivery tracking, or fulfillment information\n### Columns: \nCategory(Name, Display Name, Description): \n- identifier(order_id, Order ID, \"Unique identifier for orders\")\n\n\n## Table: Shipment_Items \n### Table Description: \nJunction table linking shipments to specific order items \n### Rule: \nSelect when queries need to track which specific items are in which shipments\n### Columns: \nCategory(Name, Display Name, Description): \n- identifier(order_item_id, Order Item ID, \"Unique identifier for order items\")\n\n\n## Table: Orders \n### Table Description: \nMain order table containing order status, placement date, and customer relationships \n### Rule: \nSelect when queries involve order status, order history, or customer order relationships\n### Columns: \nCategory(Name, Display Name, Description): \n- temporal(date_order_placed, Order Placed Date, \"Date and time when the order was placed\")\n- identifier(customer_id, Customer ID, \"Unique identifier for customers\")\n- identifier(order_id, Order ID, \"Unique identifier for orders\")\n- status(order_status, Order Status, \"Current status of the order (Shipped|Packing|On Road)\")\n- attribute(order_details, Order Details, \"Additional order information\")\n\n\n# Examples\nHere are some examples of questions and selected tables related to the user's question\n- Question: Show order status and customer information   Selected Tables: [Orders,Customers]\n- Question: Which items are in each shipment?   Selected Tables: [Shipments,Shipment_Items,Order_Items]\n- Question: Show complete order fulfillment chain   Selected Tables: [Orders,Order_Items,Shipments]\n- Question: What products are in each order?   Selected Tables: [Orders,Order_Items]\n- Question: Show me all customers   Selected Tables: [Customers]\n- Question: What orders were placed today?   Selected Tables: [Orders]\n- Question: Show me customer orders with their details   Selected Tables: [Customers,Orders]\n- Question: Show shipment tracking information   Selected Tables: [Shipments]\n\n\n# General Rules\n- Must follow the table description and rule to select the table first\n- If it is not clear which table to select, you can check the columns in the table to find the columns most related to the question\n- The \"Candidate Tables\" contain all the tables and columns you can use, NEVER make up columns or tables.\n- VERY IMPORTANT: the columns you outputted **MUST** be contained in the table you selected, as described in the \"# Candidate Tables\" section.\n- If the question is asking about the metadata of an entity only, you should find a suitable dimension table\n- If the question needs to join the fact table with the dimension table, you should also output the dimension table\n- If there are very similar questions in examples, you can refer to the selected tables in examples.\n- If there are multiple tables that both need requirements, you should select the most relevant one.\n- Select and output multiple tables when single table do not contain all fields and need join from multiple tables.\n\n\n# Output Format \nYou should output a JSON object, it should include:\n   - tables: JSON array of selected tables and columns\n     - table: The selected table\n     - columns: The columns in the table that are related to the question\n   - reasoning: The reasoning behind the table selection\nStrictly only output the format of JSON below, and do not output any extra description content.\n\n\n## Example\n```json\n{\n    \"reasoning\": \"the reason you select the two tables and columns\",\n    \"tables\": [\n      {\n        \"table\": \"table_name1\",\n        \"columns\": [\"column1\", \"column2\", \"column3\"]\n      },\n      {\n        \"table\": \"table_name2\",\n        \"columns\": [\"column4\", \"column5\"]\n      }]\n}\n```\n",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "{\"Shared Context\": \"Order_Items(order_item_id, order_id, order_item_status). Actual status values in the data appear to be 'Shipped', 'Packed', 'Pending', 'Canceled' (plus possibly 'Finish').\", \"Current Subtask\": \"Report the distribution of order_item_status across all Order_Items rows, and the total count of 'open' items defined as order_item_status NOT IN ('Finish','Canceled'). No chart.\"}",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "ec474c70-b0f8-4960-bd91-2461e2d1c367"
+    },
+    {
+      "content": "{\n  \"reasoning\": \"The subtask asks for two things over ALL Order_Items rows (no temporal language, so no time filter): (1) the distribution of order_item_status, which is a GROUP BY on the order_item_status dimension with a row count metric, and (2) the total count of 'open' items, a derived metric defined as order_item_status NOT IN ('Finish','Canceled'). Note the context flags a discrepancy: glossary lists status values as 'Finish','Payed','Cancel' but actual data uses 'Shipped','Packed','Pending','Canceled'. Per the subtask, 'open' is defined by excluding 'Finish' and 'Canceled', so I preserve that exact definition. There is no specific entity/ID to filter on, so no WHERE filter applies to the base query; the 'open' condition is a conditional aggregation (metric), not a restrictive filter. No time range is implied (all-time totals), and no timezone or visualization is requested ('No chart'). All elements are clear; no clarification needed.\",\n  \"keywords\": [\"order_item_status\", \"order item status\", \"distribution\", \"order items\", \"count\", \"open items\"],\n  \"dimensions\": [\"order_item_status\"],\n  \"metrics\": [\"order_item_count\", \"open_order_item_count\"],\n  \"filter\": [],\n  \"start_time\": null,\n  \"end_time\": null,\n  \"timezone\": null,\n  \"rewrite_question\": \"Report the distribution of order_item_status across all Order_Items rows (group by order_item_status and count the number of rows per status), and compute the total count of 'open' order items defined as order_item_status NOT IN ('Finish', 'Canceled'). No chart.\"\n}",
+      "additional_kwargs": {
+        "parsed": null,
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 827,
+          "prompt_tokens": 3655,
+          "total_tokens": 4482,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 460,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 3328
+          },
+          "prompt_cache_hit_tokens": 3328,
+          "prompt_cache_miss_tokens": 327
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "582cbfeb-b492-4809-af93-d24ff0fd3a17",
+        "finish_reason": "stop",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16d98-017d-74f2-b997-97d35a94b7b2-0",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 3655,
+        "output_tokens": 827,
+        "total_tokens": 4482,
+        "input_token_details": {
+          "cache_read": 3328
+        },
+        "output_token_details": {
+          "reasoning": 460
+        }
+      }
+    },
+    {
+      "content": "Please select the appropriate tables for the question: Report the distribution of order_item_status across all Order_Items rows (group by order_item_status and count the number of rows per status), and compute the total count of 'open' order items defined as order_item_status NOT IN ('Finish', 'Canceled'). No chart.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": null
+    }
+  ]
+]

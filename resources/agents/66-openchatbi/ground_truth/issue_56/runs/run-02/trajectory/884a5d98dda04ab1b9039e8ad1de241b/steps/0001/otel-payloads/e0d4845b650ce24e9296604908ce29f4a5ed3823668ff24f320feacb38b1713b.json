@@ -1,0 +1,153 @@
+[
+  [
+    {
+      "content": "You are a language expert and professional SQL engineer tasked with analyzing questions from MyCompany users and selecting the appropriate table to write SQL. \n- You need to analyze the user's question, find the possible dimensions and metrics, and then select the tables and all required columns related to the query. \n- I will give you the business knowledge introduction and the glossaries of MyCompany for reference.\n- I will give you the data warehouse introduction about how these tables are generated and organized.\n- I will give you the candidate tables and their schema, read the table description and rule carefully to understand the purpose and capability of the table, and select the appropriate tables and columns.\n\n# Sales Business System Glossary\n\n## Overview\nYou're answering questions related to a sales order tracking business system that manages the complete customer order lifecycle from placement to delivery.\n\n## Key Business Concepts\n\n**Customer Management:**\n- Customer: Individual or entity who places orders\n- Customer Details: Additional information like contact info, preferences, or notes\n\n**Order Processing:**\n- Order: A request from a customer to purchase products\n- Order Status: Current state - Valid values: \"Shipped\", \"Packing\", \"On Road\"\n- Order Item: Individual product within an order (orders can contain multiple items)\n- Order Item Status: Status of specific items - Valid values: \"Finish\", \"Payed\", \"Cancel\"\n\n**Product Catalog:**\n- Product: Items available for purchase\n- Product Name (`product_name`): Represents the product category. Values include food, book,\n  clothes, electronics, kitchen, beauty, toy, music, outdoor, garden, sports, office, pet,\n  health, and phone. Some values use `category-code` format (e.g. `beauty-1050`); the prefix\n  before `-` is the category. For category aggregation, normalize with:\n  `CASE WHEN INSTR(product_name, '-') > 0 THEN SUBSTR(product_name, 1, INSTR(product_name, '-') - 1)\n  ELSE product_name END`.\n- Product Details: Specifications, descriptions, or additional product information\n\n**Fulfillment & Shipping:**\n- Shipment: Physical delivery package sent to customer\n- Shipment Items: Specific order items included in a shipment\n- Tracking Number: Unique identifier for package tracking\n- Shipment Date: When package was dispatched\n\n**Financial Processing:**\n- Invoice: Bill generated for completed orders\n- Invoice Number: Unique identifier for billing purposes\n- Invoice Date: When billing document was created\n\n## Business Rules\n- One order can have multiple items (products)\n- One order can be fulfilled through multiple shipments\n- Each shipment links to one invoice for billing\n- Order items can have different statuses within the same order\n- Customers can have multiple orders over time\n\n\n[data_warehouse_introduction]\n\n# Input Structure Awareness\nThe user context in the chat history may contain a section called \"Deferred Tasks\".\n- **CRITICAL**: You MUST completely IGNORE any tables or columns that might be needed for \"Deferred Tasks\". Only select tables for the exact query requested in the final \"Please select the appropriate tables for the question:\" prompt.\n\n# Candidate Tables\nI found the following tables and their relevant columns and descriptions that might contain the data the user is looking for.\n\n## Table: Shipment_Items \n### Table Description: \nJunction table linking shipments to specific order items \n### Rule: \nSelect when queries need to track which specific items are in which shipments\n### Columns: \nCategory(Name, Display Name, Description): \n- identifier(order_item_id, Order Item ID, \"Unique identifier for order items\")\n\n\n## Table: Orders \n### Table Description: \nMain order table containing order status, placement date, and customer relationships \n### Rule: \nSelect when queries involve order status, order history, or customer order relationships\n### Columns: \nCategory(Name, Display Name, Description): \n- attribute(order_details, Order Details, \"Additional order information\")\n- identifier(customer_id, Customer ID, \"Unique identifier for customers\")\n- temporal(date_order_placed, Order Placed Date, \"Date and time when the order was placed\")\n- identifier(order_id, Order ID, \"Unique identifier for orders\")\n- status(order_status, Order Status, \"Current status of the order (Shipped|Packing|On Road)\")\n\n\n## Table: Shipments \n### Table Description: \nShipment tracking information including tracking numbers, dates, and shipment details \n### Rule: \nSelect when queries involve shipping, delivery tracking, or fulfillment information\n### Columns: \nCategory(Name, Display Name, Description): \n- temporal(shipment_date, Shipment Date, \"Date and time when the shipment was sent\")\n- identifier(order_id, Order ID, \"Unique identifier for orders\")\n\n\n## Table: Order_Items \n### Table Description: \nLinks products to orders with individual item status and details \n### Rule: \nSelect when queries need product details within orders or item-level status tracking\n### Columns: \nCategory(Name, Display Name, Description): \n- identifier(order_item_id, Order Item ID, \"Unique identifier for order items\")\n- status(order_item_status, Order Item Status, \"Current status of the order item (Finish|Payed|Cancel)\")\n- identifier(order_id, Order ID, \"Unique identifier for orders\")\n- attribute(order_item_details, Order Item Details, \"Additional order item information\")\n\n\n## Table: Customers \n### Table Description: \nContains customer information including unique ID, name, state, and additional details \n### Rule: \nSelect when queries involve customer information, customer names, customer location/state, or need to join orders with customer data\n### Columns: \nCategory(Name, Display Name, Description): \n- identifier(customer_id, Customer ID, \"Unique identifier for customers\")\n- attribute(customer_details, Customer Details, \"Additional customer information\")\n- attribute(customer_name, Customer Name, \"Name of the customer\")\n\n\n## Table: Invoices \n### Table Description: \nStores invoice information with unique invoice numbers, dates, and details \n### Rule: \nSelect when queries involve billing, invoice tracking, or financial reporting\n### Columns: \nCategory(Name, Display Name, Description): \n- temporal(invoice_date, Invoice Date, \"Date and time the invoice was created\")\n\n\n# Examples\nHere are some examples of questions and selected tables related to the user's question\n- Question: Show complete order fulfillment chain   Selected Tables: [Orders,Order_Items,Shipments,Invoices]\n- Question: What products are in each order?   Selected Tables: [Orders,Order_Items]\n- Question: Show order status and customer information   Selected Tables: [Orders,Customers]\n- Question: What orders were placed today?   Selected Tables: [Orders]\n- Question: Show me all customers   Selected Tables: [Customers]\n- Question: Show me customer orders with their details   Selected Tables: [Customers,Orders]\n- Question: Show shipment tracking information   Selected Tables: [Shipments]\n- Question: Which items are in each shipment?   Selected Tables: [Shipments,Shipment_Items,Order_Items]\n- Question: What invoices were created this month?   Selected Tables: [Invoices]\n\n\n# General Rules\n- Must follow the table description and rule to select the table first\n- If it is not clear which table to select, you can check the columns in the table to find the columns most related to the question\n- The \"Candidate Tables\" contain all the tables and columns you can use, NEVER make up columns or tables.\n- VERY IMPORTANT: the columns you outputted **MUST** be contained in the table you selected, as described in the \"# Candidate Tables\" section.\n- If the question is asking about the metadata of an entity only, you should find a suitable dimension table\n- If the question needs to join the fact table with the dimension table, you should also output the dimension table\n- If there are very similar questions in examples, you can refer to the selected tables in examples.\n- If there are multiple tables that both need requirements, you should select the most relevant one.\n- Select and output multiple tables when single table do not contain all fields and need join from multiple tables.\n\n\n# Output Format \nYou should output a JSON object, it should include:\n   - tables: JSON array of selected tables and columns\n     - table: The selected table\n     - columns: The columns in the table that are related to the question\n   - reasoning: The reasoning behind the table selection\nStrictly only output the format of JSON below, and do not output any extra description content.\n\n\n## Example\n```json\n{\n    \"reasoning\": \"the reason you select the two tables and columns\",\n    \"tables\": [\n      {\n        \"table\": \"table_name1\",\n        \"columns\": [\"column1\", \"column2\", \"column3\"]\n      },\n      {\n        \"table\": \"table_name2\",\n        \"columns\": [\"column4\", \"column5\"]\n      }]\n}\n```\n",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Retrieve the daily count of orders for the period 2026-07-25 to 2026-10-25 inclusive. Group by calendar day of the order date and count orders per day. Return two columns: date and daily_order_count, ordered ascending by date. Do not aggregate into weekly or monthly; keep daily granularity.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "c3a7bf5f-27b4-4907-8949-3fbb348dda83"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "parsed": null,
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 238,
+          "prompt_tokens": 3628,
+          "total_tokens": 3866,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 124,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 3328
+          },
+          "prompt_cache_hit_tokens": 3328,
+          "prompt_cache_miss_tokens": 300
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "6a80517d-e44a-40e1-80d1-30bb551a5f96",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a173b2-6706-7d60-835f-dda333961aaf-0",
+      "tool_calls": [
+        {
+          "name": "search_knowledge",
+          "args": {
+            "reasoning": "Need to confirm the exact column names for order date and the order count metric before extraction.",
+            "query_list": [
+              "order date column",
+              "daily order count",
+              "orders table date_order_placed"
+            ],
+            "knowledge_bases": [
+              "columns",
+              "business"
+            ]
+          },
+          "id": "call_00_WgE9ER4YTbAtdHRNxCZ72160",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 3628,
+        "output_tokens": 238,
+        "total_tokens": 3866,
+        "input_token_details": {
+          "cache_read": 3328
+        },
+        "output_token_details": {
+          "reasoning": 124
+        }
+      }
+    },
+    {
+      "content": "{\"warnings\": [], \"columns\": [{\"column_name\": \"customer_details\", \"display_name\": \"Customer Details\", \"category\": \"attribute\", \"type\": \"VARCHAR(255)\", \"description\": \"Additional customer information\", \"alias\": \"cust_details\"}, {\"column_name\": \"customer_id\", \"display_name\": \"Customer ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for customers\", \"alias\": \"cust_id\"}, {\"column_name\": \"customer_name\", \"display_name\": \"Customer Name\", \"category\": \"attribute\", \"type\": \"VARCHAR(80)\", \"description\": \"Name of the customer\", \"alias\": \"cust_name\"}, {\"column_name\": \"date_order_placed\", \"display_name\": \"Order Placed Date\", \"category\": \"temporal\", \"type\": \"DATETIME\", \"description\": \"Date and time when the order was placed\", \"alias\": \"ord_date\"}, {\"column_name\": \"invoice_date\", \"display_name\": \"Invoice Date\", \"category\": \"temporal\", \"type\": \"DATETIME\", \"description\": \"Date and time the invoice was created\", \"alias\": \"inv_date\"}, {\"column_name\": \"order_details\", \"display_name\": \"Order Details\", \"category\": \"attribute\", \"type\": \"VARCHAR(255)\", \"description\": \"Additional order information\", \"alias\": \"ord_details\"}, {\"column_name\": \"order_id\", \"display_name\": \"Order ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for orders\", \"alias\": \"ord_id\"}, {\"column_name\": \"order_item_details\", \"display_name\": \"Order Item Details\", \"category\": \"attribute\", \"type\": \"VARCHAR(255)\", \"description\": \"Additional order item information\", \"alias\": \"oi_details\"}, {\"column_name\": \"order_item_id\", \"display_name\": \"Order Item ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for order items\", \"alias\": \"oi_id\"}, {\"column_name\": \"order_item_status\", \"display_name\": \"Order Item Status\", \"category\": \"status\", \"type\": \"VARCHAR(10)\", \"description\": \"Current status of the order item (Finish|Payed|Cancel)\", \"alias\": \"oi_status\"}, {\"column_name\": \"order_status\", \"display_name\": \"Order Status\", \"category\": \"status\", \"type\": \"VARCHAR(10)\", \"description\": \"Current status of the order (Shipped|Packing|On Road)\", \"alias\": \"ord_status\"}, {\"column_name\": \"shipment_date\", \"display_name\": \"Shipment Date\", \"category\": \"temporal\", \"type\": \"DATETIME\", \"description\": \"Date and time when the shipment was sent\", \"alias\": \"ship_date\"}], \"business\": \"# Sales Business System Glossary\\n\\n## Overview\\nYou're answering questions related to a sales order tracking business system that manages the complete customer order lifecycle from placement to delivery.\\n\\n## Key Business Concepts\\n\\n**Customer Management:**\\n- Customer: Individual or entity who places orders\\n- Customer Details: Additional information like contact info, preferences, or notes\\n\\n**Order Processing:**\\n- Order: A request from a customer to purchase products\\n- Order Status: Current state - Valid values: \\\"Shipped\\\", \\\"Packing\\\", \\\"On Road\\\"\\n- Order Item: Individual product within an order (orders can contain multiple items)\\n- Order Item Status: Status of specific items - Valid values: \\\"Finish\\\", \\\"Payed\\\", \\\"Cancel\\\"\\n\\n**Product Catalog:**\\n- Product: Items available for purchase\\n- Product Name (`product_name`): Represents the product category. Values include food, book,\\n  clothes, electronics, kitchen, beauty, toy, music, outdoor, garden, sports, office, pet,\\n  health, and phone. Some values use `category-code` format (e.g. `beauty-1050`); the prefix\\n  before `-` is the category. For category aggregation, normalize with:\\n  `CASE WHEN INSTR(product_name, '-') > 0 THEN SUBSTR(product_name, 1, INSTR(product_name, '-') - 1)\\n  ELSE product_name END`.\\n- Product Details: Specifications, descriptions, or additional product information\\n\\n**Fulfillment & Shipping:**\\n- Shipment: Physical delivery package sent to customer\\n- Shipment Items: Specific order items included in a shipment\\n- Tracking Number: Unique identifier for package tracking\\n- Shipment Date: When package was dispatched\\n\\n**Financial Processing:**\\n- Invoice: Bill generated for completed orders\\n- Invoice Number: Unique identifier for billing purposes\\n- Invoice Date: When billing document was created\\n\\n## Business Rules\\n- One order can have multiple items (products)\\n- One order can be fulfilled through multiple shipments\\n- Each shipment links to one invoice for billing\\n- Order items can have different statuses within the same order\\n- Customers can have multiple orders over time\\n\"}",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "search_knowledge",
+      "id": "7622d15d-6f96-41b1-bd64-5c6dfc42fb2d",
+      "tool_call_id": "call_00_WgE9ER4YTbAtdHRNxCZ72160",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "{\n  \"reasoning\": \"The question explicitly requests a daily aggregation of order counts between 2026-07-25 and 2026-10-25 inclusive, grouped by calendar day of the order date with no coarser time grain. The relevant temporal column is `date_order_placed` (Order Placed Date), and the metric is a count of orders via `order_id`. No filters beyond the explicit date range are needed. No timezone was specified, so UTC is used. The result should return date and daily_order_count ordered ascending by date.\",\n  \"keywords\": [\"order\", \"order count\", \"daily order count\", \"order date\", \"date_order_placed\", \"daily\"],\n  \"dimensions\": [\"date_order_placed\", \"order_id\"],\n  \"metrics\": [\"order count\"],\n  \"filter\": [\"date_order_placed >= '2026-07-25 00:00:00'\", \"date_order_placed <= '2026-10-25 23:59:59'\"],\n  \"start_time\": \"2026-07-25 00:00:00\",\n  \"end_time\": \"2026-10-25 23:59:59\",\n  \"timezone\": \"UTC\",\n  \"rewrite_question\": \"Retrieve the daily order count (COUNT of order_id) grouped by calendar day of the order placement date (date_order_placed) for the period from 2026-07-25 00:00:00 to 2026-10-25 23:59:59 inclusive. Keep daily granularity (no weekly or monthly rollup) and return two columns: date and daily_order_count, ordered ascending by date.\"\n}",
+      "additional_kwargs": {
+        "parsed": null,
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 482,
+          "prompt_tokens": 4837,
+          "total_tokens": 5319,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 121,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 3584
+          },
+          "prompt_cache_hit_tokens": 3584,
+          "prompt_cache_miss_tokens": 1253
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "e201ff01-55bf-4cc4-b07e-5a1fc3cc2233",
+        "finish_reason": "stop",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a173b2-6f7f-79a3-a5e0-c59a25e0c927-0",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 4837,
+        "output_tokens": 482,
+        "total_tokens": 5319,
+        "input_token_details": {
+          "cache_read": 3584
+        },
+        "output_token_details": {
+          "reasoning": 121
+        }
+      }
+    },
+    {
+      "content": "Please select the appropriate tables for the question: Retrieve the daily order count (COUNT of order_id) grouped by calendar day of the order placement date (date_order_placed) for the period from 2026-07-25 00:00:00 to 2026-10-25 23:59:59 inclusive. Keep daily granularity (no weekly or monthly rollup) and return two columns: date and daily_order_count, ordered ascending by date.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": null
+    }
+  ]
+]

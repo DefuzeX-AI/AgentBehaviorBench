@@ -1,0 +1,67 @@
+{
+  "case_id": "ir-openchatbi-57-v1",
+  "issue": {
+    "repository": "zhongyu09/openchatbi",
+    "number": 57,
+    "url": "https://github.com/zhongyu09/openchatbi/issues/57",
+    "state": "closed",
+    "title": "Example catalog declares status values that do not exist in `example/tracking_orders.sqlite` (`Finish|Payed|Cancel`, `Shipped|Packing|On Road`), leading the agent to wrong filters and wrong statements"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.0.0b1 (main@97818e4f)",
+  "commit_version": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+  "pinned_contains_fix": false,
+  "fixed_in": "unreleased:cd6f437a7b40d2ad279cad1fd7f89bf8dfe4e177 (PR #58, merged 2026-10-27)",
+  "steps": [
+    "The warehouse team is reconciling open order items. Please list every order item that is still open (order_item_status is neither 'Finish' nor 'Canceled'), with order_item_id, order_id and order_item_status, and tell me how many open items are in that list. No chart needed."
+  ],
+  "expected": "The example catalog (common_columns.csv, bi.yaml, sql_example.yaml) must describe the status values that are actually stored in example/tracking_orders.sqlite (order_item_status: Pending | Packed | Shipped | Finish | Canceled; order_status: Pending | Processed | Shipped | Delivered | Returned | Canceled), so that the agent filters with real values and does not make false statements about the data to the user.",
+  "defect": "The catalog injected into the Text2SQL prompts declares order_item_status in {Finish, Payed, Cancel} and order_status in {Shipped, Packing, On Road}; apart from Finish and Shipped none of these values exist (actual Order_Items: Canceled 3,829 / Finish 3,729 / Packed 3,773 / Pending 3,725 / Shipped 3,671). The agent trusts the catalog: 2/10 runs first executed order_item_status NOT IN ('Finish','Cancel') (14,998 rows, counting the 3,829 Canceled items as open) before re-querying; 7/10 hedged the SQL with NOT IN ('Finish','Cancel','Canceled'); run-01 tells the user the data stores 'Canceled' and not 'Cancel' as 'documented' while first reporting 23,727 as the table size (true 18,727); run-02 tells the user that Finish/Payed/Cancel 'do not exist in the data' although Finish has 3,729 rows. 9 of 9 answers spent text on the discrepancy.",
+  "fault location": [
+    {
+      "file": "example/common_columns.csv",
+      "function": "order_item_status row",
+      "line_start": 12,
+      "line_end": 12,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/example/common_columns.csv#L12-L12",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "'Current status of the order item (Finish|Payed|Cancel)'; PR #58 changes it to Pending | Packed | Shipped | Finish | Canceled."
+    },
+    {
+      "file": "example/common_columns.csv",
+      "function": "order_status row",
+      "line_start": 14,
+      "line_end": 14,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/example/common_columns.csv#L14-L14",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "'Current status of the order (Shipped|Packing|On Road)'; PR #58 changes it to Pending | Processed | Shipped | Delivered | Returned | Canceled."
+    },
+    {
+      "file": "example/bi.yaml",
+      "function": "basic_knowledge_glossary",
+      "line_start": 30,
+      "line_end": 32,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/example/bi.yaml#L30-L32",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Glossary lines 'Valid values: \"Shipped\", \"Packing\", \"On Road\"' and 'Valid values: \"Finish\", \"Payed\", \"Cancel\"'; PR #58 aligns both with the database."
+    },
+    {
+      "file": "example/sql_example.yaml",
+      "function": "pending orders example",
+      "line_start": 25,
+      "line_end": 25,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/example/sql_example.yaml#L25-L25",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "WHERE o.order_status = 'pending' (lower-case) matches zero rows in SQLite's case-sensitive comparison; PR #58 changes it to 'Pending'."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zhongyu09/openchatbi/pull/58. The example catalog shipped with the project was written for a different data set than example/tracking_orders.sqlite: common_columns.csv lines 12 and 14 and bi.yaml lines 30 and 32 enumerate status values (Finish|Payed|Cancel, Shipped|Packing|On Road) that the example database does not contain, and sql_example.yaml line 25 uses a lower-case 'pending' literal. These descriptions are injected into the Text2SQL prompts as business knowledge, so the model reasons about non-existent values, sometimes filters on them (NOT IN ('Finish','Cancel') leaves Canceled items in the 'open' set) and sometimes reports the mismatch to the user incorrectly. The defect is model-independent (catalog versus data), while the specific wrong statements vary by run. Retained evidence: run-01 = ABB suite_94fd5e30c8ed4cb8ac466f10a70f24d3 (executed NOT IN ('Finish','Cancel') first, then NOT IN ('Finish','Canceled'); answer claims the data uses 'Canceled' not 'Cancel' as documented and reports 23,727 items); run-02 = suite_41fffe5c89b84f02abdf0cae260e1a94 (answer states Finish/Payed/Cancel do not exist in the data). A third run, suite_2c3e92464c554aa9895844383979c9f8, also executed the ('Finish','Cancel') filter first (14,998 rows) and is not retained here because of its size."
+}

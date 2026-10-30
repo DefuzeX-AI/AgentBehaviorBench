@@ -1,0 +1,97 @@
+{
+  "messages": [
+    {
+      "content": "The warehouse team is reconciling open order items. Please list every order item that is still open (order_item_status is neither 'Finish' nor 'Canceled'), with order_item_id, order_id and order_item_status, and tell me how many open items are in that list. No chart needed.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "c9d95ce8-4bb1-408d-a665-3017935982b4"
+    },
+    {
+      "content": "I'll first check the relevant table structure.",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 225,
+          "prompt_tokens": 4646,
+          "total_tokens": 4871,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 54,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 2176
+          },
+          "prompt_cache_hit_tokens": 2176,
+          "prompt_cache_miss_tokens": 2470
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "d1f1bb17-af77-429f-8cf9-d82c165ae550",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16d92-ad8e-7560-9441-186d2f6f9bd3-0",
+      "tool_calls": [
+        {
+          "name": "search_schema",
+          "args": {
+            "reasoning": "Need to find order item table with order_item_id, order_id, order_item_status",
+            "query_list": [
+              "order item",
+              "order_item_status",
+              "order item id"
+            ],
+            "dimensions": [
+              "order_item_status"
+            ],
+            "metrics": [
+              "open order items"
+            ],
+            "max_tables": 5,
+            "include_columns": true
+          },
+          "id": "call_00_0XDSGWWjWPoJZjpxDbYZ9309",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 4646,
+        "output_tokens": 225,
+        "total_tokens": 4871,
+        "input_token_details": {
+          "cache_read": 2176
+        },
+        "output_token_details": {
+          "reasoning": 54
+        }
+      }
+    }
+  ],
+  "history_messages": [
+    {
+      "content": "The warehouse team is reconciling open order items. Please list every order item that is still open (order_item_status is neither 'Finish' nor 'Canceled'), with order_item_id, order_id and order_item_status, and tell me how many open items are in that list. No chart needed.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "c9d95ce8-4bb1-408d-a665-3017935982b4"
+    }
+  ],
+  "sends": [
+    {
+      "type": "Send",
+      "value": "Send(node='use_tool', arg={'messages': [AIMessage(content=\"I'll first check the relevant table structure.\", additional_kwargs={}, response_metadata={}, tool_calls=[{'name': 'search_schema', 'args': {'reasoning': 'Need to find order item table with order_item_id, order_id, order_item_status', 'query_list': ['order item', 'order_item_status', 'order item id'], 'dimensions': ['order_item_status'], 'metrics': ['open order items'], 'max_tables': 5, 'include_columns': True}, 'id': 'call_00_0XDSGWWjWPoJZjpxDbYZ9309', 'type': 'tool_call'}], invalid_tool_calls=[])]})"
+    }
+  ]
+}

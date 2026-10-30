@@ -1,0 +1,6 @@
+{
+  "sql": "SELECT\n  order_item_status AS \"Order Item Status\",\n  COUNT(*) AS \"Order Item Count\"\nFROM Order_Items\nWHERE order_item_status NOT IN ('Finish', 'Cancel', 'Canceled')\nGROUP BY order_item_status\nUNION ALL\nSELECT\n  'Total Open' AS \"Order Item Status\",\n  COUNT(*) AS \"Order Item Count\"\nFROM Order_Items\nWHERE order_item_status NOT IN ('Finish', 'Cancel', 'Canceled');",
+  "sql_retry_count": 0,
+  "sql_execution_result": "",
+  "previous_sql_errors": []
+}

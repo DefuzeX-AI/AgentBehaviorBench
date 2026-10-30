@@ -1,0 +1,78 @@
+{
+  "case_id": "ir-openchatbi-54-v1",
+  "issue": {
+    "repository": "zhongyu09/openchatbi",
+    "number": 54,
+    "url": "https://github.com/zhongyu09/openchatbi/issues/54",
+    "state": "closed",
+    "title": "`text2sql` tool result drops the SQL sub-graph's \"limited to first N rows\" label (and SQL error messages), so the agent treats a truncated 10,000-row result as complete"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.0.0b1 (main@97818e4f)",
+  "commit_version": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+  "pinned_contains_fix": false,
+  "fixed_in": "unreleased:98158a8b479a88a9c45d44d9920cb9c155a2ddad (PR #59, merged 2026-10-27; truncation half only, see Root cause)",
+  "steps": [
+    "The warehouse team is reconciling open order items. Please list every order item that is still open (order_item_status is neither 'Finish' nor 'Canceled'), with order_item_id, order_id and order_item_status, and tell me how many open items are in that list. No chart needed."
+  ],
+  "expected": "With the default sql_result_limit of 10,000 and 11,169 matching Order_Items rows, the text2sql tool result and the answer must say that the returned list is limited to the first 10,000 rows (execute_sql_node already labels the sub-graph message 'SQL Result (limited to first 10000 rows)', and the README states the limit exists to keep unbounded result sets out of the agent context). The agent must not present or offer the truncated rows as the complete 11,169-row list and must not derive facts such as the ID range from them.",
+  "defect": "The text2sql ToolMessage contains exactly 10,000 CSV data rows and no truncation label. The agent never tells the user the list is partial, ends by offering to export 'the complete 11,169-row list' it does not hold, and in run-01 states 'full list runs from ID 18 -> 16,774' (16,774 is the order_item_id of the 10,000th row; the true maximum open item is 18,742). Over 10 independent runs: 10/10 unlabelled 10,000-row results (11 tool results, 0 labelled), 0/10 disclosures of truncation, 8/10 'complete list' export offers, 1/10 wrong fact derived from the cut list; the correct total 11,169 appeared only when the model added its own COUNT(*) OVER () or GROUP BY query.",
+  "fault location": [
+    {
+      "file": "openchatbi/agent_graph.py",
+      "function": "_format_sql_response",
+      "line_start": 124,
+      "line_end": 152,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/agent_graph.py#L124-L152",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Rebuilds the text2sql tool result from sql / data / visualization_dsl only and never reads the sub-graph messages or schema_info['result_limit'], so the label is dropped. PR #59 appends a truncation note here when schema_info.row_count >= result_limit."
+    },
+    {
+      "file": "openchatbi/text2sql/generate_sql.py",
+      "function": "execute_sql_node",
+      "line_start": 638,
+      "line_end": 649,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/text2sql/generate_sql.py#L638-L649",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Builds result_label 'SQL Result (limited to first N rows)' but returns it only inside messages; the 'data' channel is the bare CSV that the tool wrapper forwards."
+    },
+    {
+      "file": "openchatbi/text2sql/generate_sql.py",
+      "function": "_execute_sql",
+      "line_start": 447,
+      "line_end": 454,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/text2sql/generate_sql.py#L447-L454",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Wraps the query in SELECT * FROM (...) LIMIT 10000 (_limit_sql_query, lines 52-56) and reads fetchmany(10000), so the sub-graph cannot distinguish exactly 10,000 rows from more than 10,000 rows."
+    },
+    {
+      "file": "openchatbi/text2sql/generate_sql.py",
+      "function": "execute_sql_node (timeout / security branches)",
+      "line_start": 684,
+      "line_end": 692,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/text2sql/generate_sql.py#L684-L692",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The SQL_EXECUTE_TIMEOUT and SQL_SECURITY_ERROR branches also put their user-facing text only into messages, so the same wrapper discards it (by inspection; not exercised in the retained runs)."
+    },
+    {
+      "file": "openchatbi/graph_state.py",
+      "function": "SQLOutputState",
+      "line_start": 75,
+      "line_end": 89,
+      "commit": "97818e4fdcea85535cdfa53d8ae4054878342af1",
+      "url": "https://github.com/zhongyu09/openchatbi/blob/97818e4fdcea85535cdfa53d8ae4054878342af1/openchatbi/graph_state.py#L75-L89",
+      "role": "source_review",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Output schema of the SQL sub-graph (sql_graph.py:162 compiles with output_schema=SQLOutputState) exports schema_info and messages but not sql_execution_result; PR #59's error-forwarding branch keys on sql_execution_result and is therefore unreachable end-to-end (reported in the issue #54 follow-up comment, unresolved as of 2026-10-29)."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM (truncation notice) IN https://github.com/zhongyu09/openchatbi/pull/59. At 97818e4f execute_sql_node emits the 'limited to first 10000 rows' label only into the SQL sub-graph's messages, while the text2sql tool wrapper _format_sql_response rebuilds the ToolMessage from sql, data and visualization_dsl, so the main agent receives a bare 10,000-row CSV (about 240 KB; 87k-231k prompt tokens per request afterwards) with no sign that rows were dropped, and agent_prompt.md only covers the zero-row case. The model therefore reasons as if the list were complete: it offers to export 'the complete 11,169-row list' and, in run-01, reports the ID of the 10,000th row as the end of the list. Because the query is wrapped in LIMIT 10000 and read with fetchmany(10000), the sub-graph itself cannot tell 'exactly 10,000' from 'more'. PR #59 (merge 98158a8b) adds a note when schema_info.row_count >= result_limit; its second half (forwarding timeout/security messages keyed on sql_execution_result) is dead code because SQLOutputState does not export that key. Retained evidence: run-01 = ABB suite_603de369ac6948e7afacec7cc09c0bc3 (user-visible wrong ID range 'ID 18 -> 16,774'); run-02 = suite_7ca83a68135749068e85ddd1320d2eb8 ('I listed every Order_Items row' plus a 'complete 11,169-row list' export offer; total correct via COUNT(*) OVER ()). Both are single-turn runs of the pinned unit with deepseek-flash through the ABB native runner (10 runs total, 0 infrastructure failures, all LLM calls HTTP 200)."
+}

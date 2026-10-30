@@ -1,0 +1,73 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```sql\nSELECT\n  order_item_status AS \"Order Item Status\",\n  COUNT(*) AS \"Order Item Count\"\nFROM Order_Items\nWHERE order_item_status NOT IN ('Finish', 'Cancel', 'Canceled')\nGROUP BY order_item_status\nUNION ALL\nSELECT\n  'Total Open' AS \"Order Item Status\",\n  COUNT(*) AS \"Order Item Count\"\nFROM Order_Items\nWHERE order_item_status NOT IN ('Finish', 'Cancel', 'Canceled');\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```sql\nSELECT\n  order_item_status AS \"Order Item Status\",\n  COUNT(*) AS \"Order Item Count\"\nFROM Order_Items\nWHERE order_item_status NOT IN ('Finish', 'Cancel', 'Canceled')\nGROUP BY order_item_status\nUNION ALL\nSELECT\n  'Total Open' AS \"Order Item Status\",\n  COUNT(*) AS \"Order Item Count\"\nFROM Order_Items\nWHERE order_item_status NOT IN ('Finish', 'Cancel', 'Canceled');\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 955,
+              "prompt_tokens": 1815,
+              "total_tokens": 2770,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 855,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cached_tokens": 896
+              },
+              "prompt_cache_hit_tokens": 896,
+              "prompt_cache_miss_tokens": 919
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-flash",
+            "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+            "id": "e066e75d-206d-40d7-821a-729d45b8787c",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a16da1-4617-7d02-8eae-adb348b2fd9a-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 955,
+      "prompt_tokens": 1815,
+      "total_tokens": 2770,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 855,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": 896
+      },
+      "prompt_cache_hit_tokens": 896,
+      "prompt_cache_miss_tokens": 919
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-flash",
+    "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+    "id": "e066e75d-206d-40d7-821a-729d45b8787c"
+  },
+  "run": null,
+  "type": "LLMResult"
+}
