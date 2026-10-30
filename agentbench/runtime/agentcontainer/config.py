@@ -37,6 +37,7 @@ class AgentContainerConfig:
     model_target: ModelTargetConfig | None = None
     model_metadata_paths: tuple[str, ...] = ()
     replacement_model_provider: ModelTargetProvider | None = None
+    cpus: float | None = None
 
     @classmethod
     def from_agent_dir(
@@ -83,6 +84,11 @@ class AgentContainerConfig:
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
             raise ContainerConfigurationError("runtime.timeout_sec must be positive")
 
+        cpus = runtime.get("cpus")
+        if cpus is not None and (isinstance(cpus, bool) or not isinstance(cpus, (int, float))
+                                 or not math.isfinite(cpus) or not 0 < cpus <= 4):
+            raise ContainerConfigurationError("runtime.cpus must be a finite number in (0, 4]")
+
         return cls(
             agent_root=root,
             agent_id=_required_string(manifest, "agent_id"),
@@ -92,6 +98,7 @@ class AgentContainerConfig:
             workdir=_optional_string(launch, "workdir") or "/opt/agent",
             timeout_sec=float(timeout),
             environment=environment,
+            cpus=float(cpus) if cpus is not None else None,
             model_target=target,
             model_metadata_paths=metadata_paths,
             replacement_model_provider=replacement_provider,

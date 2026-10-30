@@ -11,6 +11,17 @@ from .exporter import FileExporter
 from .routing import attach
 
 
+def _tool_json(value):
+    """Project observed Pydantic messages, retaining unsupported-value omissions."""
+    if isinstance(value, dict):
+        return {key: _tool_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_tool_json(item) for item in value]
+    if callable(getattr(value, 'model_dump', None)):
+        return _tool_json(value.model_dump())
+    return value
+
+
 class OtelSession:
     def __init__(self, directory, invocation_id, session_id, secrets=(), provider=None):
         existing = provider or trace.get_tracer_provider()
@@ -28,7 +39,7 @@ class OtelSession:
     def _tool_content(self, span, label, value):
         """Attach observed JSON tool content; unsupported values stay omitted."""
         try:
-            payload = json.dumps(redact(value, self.exporter.secrets), ensure_ascii=True, allow_nan=False)
+            payload = json.dumps(redact(_tool_json(value), self.exporter.secrets), ensure_ascii=True, allow_nan=False)
         except (ValueError, TypeError, RecursionError):
             self.exporter.annotate(span, {f'abb.tool_{label}_omission': 'not_json_serializable'})
             return
