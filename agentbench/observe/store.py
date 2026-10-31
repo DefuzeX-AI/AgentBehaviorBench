@@ -101,7 +101,7 @@ def redact(value, secrets=()):
     return value
 
 
-def atomic_json(path: Path, value):
+def atomic_json(path: Path, value, *, mode=0o600):
     # Independent writers must never share the same intermediate pathname.
     stream = tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", dir=path.parent,
@@ -111,6 +111,7 @@ def atomic_json(path: Path, value):
     try:
         with stream:
             json.dump(json_value(value), stream, ensure_ascii=False, indent=2)
+        temporary.chmod(mode)
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)

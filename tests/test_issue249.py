@@ -2,6 +2,7 @@
 import asyncio
 import json
 from pathlib import Path
+import stat
 import sys
 from types import SimpleNamespace
 
@@ -259,6 +260,8 @@ def test_mcp_environment_echo_is_redacted_from_channel_span_transport(tmp_path, 
     pytest.importorskip('acp')
     pytest.importorskip('opentelemetry.sdk')
     from agentbench.runtime.agentcontainer.channel import serve
+    import os
+    from pathlib import Path
 
     key = 'ABB_MCP_TEST_VALUE'
     value = '{{CHANNEL_MCP_SECRET_8df2}}'
@@ -270,6 +273,15 @@ def test_mcp_environment_echo_is_redacted_from_channel_span_transport(tmp_path, 
     responses = tmp_path / 'responses'
     requests.mkdir()
     responses.mkdir()
+    replace = Path.replace
+
+    def checked_replace(temporary, destination):
+        if destination.name == 'done.json':
+            assert stat.S_IMODE(temporary.stat().st_mode) & 0o044 == 0o044
+            assert stat.S_IMODE(destination.parent.stat().st_mode) & 0o055 == 0o055
+        return replace(temporary, destination)
+
+    monkeypatch.setattr(Path, 'replace', checked_replace)
 
     async def run_channel():
         channel = asyncio.create_task(serve(root=root, requests=requests, responses=responses))
@@ -282,15 +294,23 @@ def test_mcp_environment_echo_is_redacted_from_channel_span_transport(tmp_path, 
                 'framework': 'acp',
                 'input': 'mcp-secret-metadata',
             }))
-            await asyncio.wait_for(_wait_for_file(responses / '00000000' / 'done.json'), timeout=15)
+            done = responses / '00000000' / 'done.json'
+            await asyncio.wait_for(_wait_for_file(done), timeout=15)
+            assert stat.S_IMODE(done.stat().st_mode) & 0o044 == 0o044
             (requests / '00000001.json').write_text(json.dumps({'operation': 'close'}))
             await asyncio.wait_for(channel, timeout=15)
+            close_done = responses / '00000001' / 'done.json'
+            assert stat.S_IMODE(close_done.stat().st_mode) & 0o044 == 0o044
         finally:
             if not channel.done():
                 channel.cancel()
                 await asyncio.gather(channel, return_exceptions=True)
 
-    asyncio.run(run_channel())
+    previous_umask = os.umask(0o077)
+    try:
+        asyncio.run(run_channel())
+    finally:
+        os.umask(previous_umask)
 
     spans = (responses / '00000000' / 'spans.jsonl').read_text()
     assert value not in spans

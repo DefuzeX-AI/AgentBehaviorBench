@@ -20,6 +20,7 @@ async def serve(root=Path('/opt/agent'), requests=REQUESTS, responses=RESPONSES)
     exporter = WireExporter()
     provider.add_span_processor(WireSpanProcessor(exporter))
     sequence = 0
+    from agentbench.sdk.common.output_permissions import share_output
     try:
         while True:
             request = requests / f'{sequence:08d}.json'
@@ -31,16 +32,18 @@ async def serve(root=Path('/opt/agent'), requests=REQUESTS, responses=RESPONSES)
             folder.mkdir(exist_ok=True)
             if envelope.get('operation') == 'close':
                 await session.aclose()
-                atomic_json(folder / 'done.json', {'sequence': sequence, 'session': session.snapshot()})
+                share_output(folder)
+                atomic_json(folder / 'done.json',
+                            {'sequence': sequence, 'session': session.snapshot()}, mode=0o644)
                 return
             exporter.destination = folder / 'spans.jsonl'
             await execute(root, request, folder, provider=provider, session=session,
                           observation_secret_sink=exporter.add_secrets)
             if not provider.force_flush() or exporter.error:
                 raise RuntimeError('Agent telemetry transport failed')
-            from agentbench.sdk.common.output_permissions import share_output
             share_output(folder)
-            atomic_json(folder / 'done.json', {'sequence': sequence, 'session': session.snapshot()})
+            atomic_json(folder / 'done.json',
+                        {'sequence': sequence, 'session': session.snapshot()}, mode=0o644)
             sequence += 1
     finally:
         await session.aclose()
