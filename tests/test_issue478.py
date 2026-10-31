@@ -44,8 +44,8 @@ def test_incompatible_or_incomplete_selection_fails(changes):
 def test_shared_selection_has_no_static_routes_or_secrets():
     data = tomllib.loads((UNIT / 'agent.toml').read_text())
     assert data['model']['provider'] == 'deepseek'
-    assert data['model']['source'] == 'native'
-    assert data['model']['runtime_configurable'] is True
+    assert 'source' not in data['model']
+    assert 'runtime_configurable' not in data['model']
     assert not data['llm_interception'].get('routes')
     assert not data['llm_interception'].get('credentials')
     assert not data['runtime']['secret_env_keys']
