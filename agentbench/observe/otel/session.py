@@ -128,10 +128,16 @@ class OtelSession:
 
     def close(self):
         with self.lock:
+            # A framework may abandon a call (e.g. a cancelled LangChain model
+            # task) without any end/error callback. Like ACP tools at the prompt
+            # boundary (#354), the span is closed and exported as an unobserved
+            # outcome; it is Agent behavior, not lost trace evidence.
             unfinished = len(self.spans)
             for span in self.spans.values():
-                self.exporter.annotate(span, {'abb.incomplete': True})
-                span.set_status(Status(StatusCode.ERROR, 'Step did not finish before execution closed'))
+                self.exporter.annotate(span, {'abb.incomplete': True,
+                                              'abb.control_flow': 'outcome_not_observed'})
+                span.set_status(Status(StatusCode.ERROR,
+                    'Outcome not observed: step did not finish before execution closed'))
                 span.end()
             self.spans.clear()
             if self.root:
@@ -141,8 +147,9 @@ class OtelSession:
                 flushed = self.provider.force_flush()
                 error = self.exporter.error or self.error
                 atomic_json(self.directory / 'otel-status.json', {
-                    'status': 'complete' if not error and not unfinished and flushed else 'incomplete',
-                    'unfinished_spans': unfinished, 'error': error})
+                    'status': 'complete' if not error and flushed else 'incomplete',
+                    'unfinished_spans': unfinished, 'outcome_not_observed': bool(unfinished),
+                    'error': error})
             finally:
                 self.router.detach(self.exporter)
                 self.exporter.shutdown()
