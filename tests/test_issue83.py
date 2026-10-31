@@ -151,7 +151,7 @@ protocols = ["openai-chat"]
 def validator(state, monkeypatch, *, control=None):
     # Exercise the real drain/check logic without waiting two seconds per failure.
     wait = state.wait_for_idle
-    monkeypatch.setattr(state, 'wait_for_idle', lambda **kw: wait(timeout=.02, quiet=0, **kw))
+    monkeypatch.setattr(state, 'wait_for_idle', lambda **kw: wait(**{**kw, 'timeout': .02, 'quiet': 0}))
     runtime = SimpleNamespace(control=control or RunControl())
     return DockerRuntime._trace_validation_callback(runtime, state)
 
