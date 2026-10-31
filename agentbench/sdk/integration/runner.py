@@ -228,6 +228,17 @@ class ContainerSDKRunner:
                 raise ValueError('Unknown Agent result status')
         if not seen:
             raise ValueError('SDK result has no executed inputs')
+        from agentbench import trajectory
+        try:
+            if trajectory.read(root) is None:
+                raise FileNotFoundError('Execution package has no trajectory.json')
+        except (OSError, ValueError) as exc:
+            # trajectory.json is derived evidence: report it as incomplete in run.json,
+            # never turn an accepted execution into a failure.
+            status = read(directory / 'run.json')
+            status['trajectory'] = {**(status.get('trajectory') or {}), 'status': 'failed', 'path': 'trajectory.json',
+                                    'error_type': type(exc).__name__, 'error': str(exc)}
+            Artifacts(directory, environ=self.context.environ).save('run.json', status)
         normalized = None if unjudged else Report(report['status'], report.get('confidence'),
                             tuple(report['issues']), tuple(report['evidence_gaps']))
         return BenchmarkResult(registration.agent_id, registration.framework, manifest['run_id'],

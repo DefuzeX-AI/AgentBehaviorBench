@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-mistral-vibe-1304-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 1304,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/1304",
+    "state": "open",
+    "title": "bug: Subagent child slots are never released: idle children permanently consume the max_children budget, and no tool can close them",
+    "body": "### Component\n\nCLI\n\n### Summary\n\nOnce a session has spawned `max_children` (default 8) subagents, the slots are consumed **for the lifetime of the session**, even if every child is idle, finished, or its result has long been consumed. There is no way for the parent agent to close/release a child, and the limit is not configurable. In a long orchestrator session this bricks subagent delegation entirely: the only recovery is starting a new session and losing all context.\n\n\n### Reproduction steps\n\n1. Start a session and spawn 8 subagents sequentially (one task each, all complete normally, results consumed).\n2. Attempt a 9th spawn for an unrelated task.\n3. Result: spawn is refused — the child limit is reached. `agents.list` shows all 8 children idle/finished, none running.\n4. There is no `agents.close` / `agents.stop` / `agents.remove` tool exposed to the parent, so the slots can never be freed. The session is permanently at capacity.\n\n### Versions / environment\n\n- mistral-vibe 3.0.1 (uv tool install, python 3.14) - Linux, orchestrator session using subagents via the `agents.*` tool namespace\n\n### Logs & screenshots\n\n```shell\n\n```"
+  },
+  "version_choice": "pinned",
+  "reported_version": "3.0.1",
+  "commit_version": "63d0e8f17e2c1f0d9e1d6f4399ab2dc10fbdf477",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Use the native child-agent tools to delegate eight separate tiny tasks, one at a time. For task i (1 through 8), ask a new child named child-i to reply with its number, wait for it to finish, and consume its result. After all eight are finished, delegate one more tiny task to a new child named child-9. Report actual tool outcomes."
+  ],
+  "expected": "Completed children can release the active-child budget so a later task can be delegated.",
+  "defect": "The ninth spawn is refused because idle completed children permanently occupy all eight slots.",
+  "fault location": [],
+  "Root cause": "The reported child registry counts retained session children toward max_children and exposes no release/close operation. Completion changes activity status but not registry occupancy. Source confirmation and later runtime validation must distinguish an intentional retained-session limit from an active-child limit."
+}

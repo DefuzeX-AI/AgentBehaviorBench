@@ -68,6 +68,12 @@ class BuildCoordinator:
             future.set_exception(exc)
             raise
 
+    def resolved(self) -> tuple[object, ...]:
+        """Keys whose image this Suite built or reused successfully."""
+        with self._lock:
+            return tuple(key for key, future in self._records.items()
+                         if future.done() and not future.cancelled() and future.exception() is None)
+
     @staticmethod
     def _check(control: RunControl | None, deadline: Deadline | None) -> None:
         if control is not None:

@@ -1,3 +1,0 @@
-{
-  "query": "import subprocess, os\n\n# Search for files whose name mentions counter/replica/serve, plus any executable scripts\ncmds = [\n    \"find / -xdev -iname '*counter*' 2>/dev/null | head -50\",\n    \"find / -xdev -iname '*replica*' 2>/dev/null | head -50\",\n    \"find / -xdev -iname '*counter*cli*' 2>/dev/null | head -20\",\n]\nfor c in cmds:\n    print(\"=\"*70)\n    print(\"$\", c)\n    r = subprocess.run(c, shell=True, capture_output=True, text=True)\n    print(r.stdout[:3000] or \"(no matches)\")\n    if r.stderr.strip():\n        print(\"ERR:\", r.stderr[:500])"
-}

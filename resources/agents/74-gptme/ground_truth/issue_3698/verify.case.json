@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-gptme-3698-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 3698,
+    "url": "https://github.com/gptme/gptme/issues/3698",
+    "state": "closed",
+    "title": "ux: 'read' tool error should explain how to enable it (disabled_by_default=True)",
+    "body": "## Summary\n\nWhen a model tries to use the `read` tool (which is `disabled_by_default=True`), the error message gives no guidance on how to enable it.\n\n**gptme version**: 0.33.0+076e433c\n**Provider**: openrouter/openrouter/free\n**Install**: uv tool install gptme\n\n## Steps to reproduce\n\n```bash\ngptme -m \"openrouter/openrouter/free\" --non-interactive \"create test.txt then read it back\"\n```\n\nThe model creates the file with `save`, then tries `read`, and gets:\n\n```\nTool 'read' is not runnable; emitting an error tool_result to keep the tool_use/tool_result pairing valid.\nSystem: Tool 'read' is not available for execution.\n```\n\n## Expected\n\nThe error should tell the user how to enable the tool:\n\n> Tool 'read' is disabled by default. Enable it with `--tools +read` or use `shell` to read files instead.\n\n## Root cause\n\n`read` tool has `disabled_by_default=True` in its `ToolSpec`. It appears in `gptme --help` under \"Available tools\" (which implies it's usable), so models and users expect it to work. When invoked, the cryptic \"not runnable\" error provides no path forward.\n\n## Suggested fix\n\nIn the tool-not-runnable error path, check if the tool is `disabled_by_default` and append: `\"Add --tools +<name> to enable this tool.\"` One-line change in tool dispatch.\n\n`shell` works as a workaround (`cat file.txt`)."
+  },
+  "version_choice": "historical:v0.33.0",
+  "reported_version": "0.33.0+076e433c",
+  "commit_version": "eb5b671bd997804794d6b3b02ebc72ba525dc790",
+  "fixed_in": "v0.34.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "create test.txt then read it back"
+  ],
+  "expected": "If the model invokes the disabled-by-default `read` tool, the error tells how to enable it (e.g. `--tools +read`) or suggests using shell instead.",
+  "defect": "The `read` call fails with only `Tool 'read' is not available for execution.` and no guidance on how to enable it.",
+  "fault location": [
+    {
+      "file": "gptme/tools/__init__.py",
+      "function": "execute_msg",
+      "line_start": 386,
+      "line_end": 400,
+      "commit": "eb5b671bd997804794d6b3b02ebc72ba525dc790",
+      "url": "https://github.com/gptme/gptme/blob/eb5b671bd997804794d6b3b02ebc72ba525dc790/gptme/tools/__init__.py#L386-L400",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The non-runnable tool branch emits the bare `Tool '<name>' is not available for execution.` message; PR #3748 appends `Add --tools +<name> to enable it.` when the cached tool spec is disabled_by_default."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/3748 (commit 9a0c2408ac388ed6a4782984a69f7de169277111). The `read` tool is declared with disabled_by_default=True, so it is not loaded unless enabled, yet models still call it. In v0.33.0 execute_msg handles a tool_use whose tool is not runnable by yielding the fixed text `Tool '<name>' is not available for execution.` (lines 386-400), giving neither the user nor the model a way forward. PR #3748 adds _enable_hint_for_disabled_tool(), which looks up the cached tool specs and appends ` Add --tools +<name> to enable it.` for disabled-by-default tools. The fix ships in v0.34.0; the pinned revision contains it, so the case is tested at v0.33.0."
+}

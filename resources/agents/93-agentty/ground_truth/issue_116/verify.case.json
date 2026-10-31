@@ -1,0 +1,46 @@
+{
+ "case_id": "ir-agentty-116-v1",
+ "issue": {
+  "repository": "agentty-org/agentty",
+  "number": 116,
+  "url": "https://github.com/agentty-org/agentty/issues/116",
+  "state": "closed",
+  "title": "ACP: parallel tool calls lose their arguments except the last one",
+  "body": "### What happened\n\nRunning `agentty acp` with an OpenAI-compatible provider, when the model returns several tool calls in one response, only the last call gets its arguments. The others run with `{}` and fail, e.g.\n\n```\n[invalid args] path required (received keys: (no object / empty))\n```\n\nThe model's stream does contain full arguments for every call (checked in the raw response). The model then has to retry, and the retry loses arguments the same way if it is parallel again.\n\nLooks like `src/acp/server.cpp` keeps a single `cur_tool_json` buffer: it is cleared on every `StreamToolUseStart`, deltas ignore `ev.id`, and `StreamToolUseEnd` always parses into `assistant.tool_calls.back()`. The OpenAI transport only sends the End events at the end of the turn, so every End writes the last call's JSON into the last call. The TUI path matches by id and is fine.\n\n### Steps to reproduce\n\n1. `agentty acp --provider <openai-compatible host> -m deepseek-v4-flash --sandbox off`\n2. From an ACP client ask it to create four small files (e.g. a package with `__init__.py` and three modules) and then run one of them.\n3. The model writes them in parallel; all but the last `write` fail with the error above.\n\nHappened in 10 out of 10 runs (3–6 lost calls per run).\n\n### agentty version\n\n0.9.32\n\n### OS\n\nLinux\n\n### Provider and model\n\nOpenAI-compatible / deepseek-v4-flash\n"
+ },
+ "version_choice": "pinned",
+ "reported_version": "0.9.32",
+ "commit_version": "b8c8b7192c3d003a1c733693f2c8447019851374",
+ "fixed_in": "v0.9.33",
+ "pinned_contains_fix": false,
+ "steps": [
+  "Create a small Python package with __init__.py and three modules, then run one of them."
+ ],
+ "expected": "Every parallel write call receives the arguments the model streamed for it, so all four files are created and one module runs.",
+ "defect": "When the model emits several tool calls in one response, only the last call keeps its arguments; the others execute with `{}` and fail with `[invalid args] path required (received keys: (no object / empty))`.",
+ "fault location": [
+  {
+   "file": "src/acp/server.cpp",
+   "function": "AgentServer::stream_completion",
+   "line_start": 2914,
+   "line_end": 2914,
+   "commit": "b8c8b7192c3d003a1c733693f2c8447019851374",
+   "url": "https://github.com/agentty-org/agentty/blob/b8c8b7192c3d003a1c733693f2c8447019851374/src/acp/server.cpp#L2914-L2914",
+   "role": "upstream_fix",
+   "verification": "fix_diff_mapped_to_tested_revision",
+   "explanation": "A single `std::string cur_tool_json` buffer holds argument JSON for the whole response; commit fe2808a replaces it with a per-call-id map plus a find_call lookup."
+  },
+  {
+   "file": "src/acp/server.cpp",
+   "function": "AgentServer::stream_completion",
+   "line_start": 2980,
+   "line_end": 3004,
+   "commit": "b8c8b7192c3d003a1c733693f2c8447019851374",
+   "url": "https://github.com/agentty-org/agentty/blob/b8c8b7192c3d003a1c733693f2c8447019851374/src/acp/server.cpp#L2980-L3004",
+   "role": "upstream_fix",
+   "verification": "fix_diff_mapped_to_tested_revision",
+   "explanation": "StreamToolUseStart clears the shared buffer, StreamToolUseDelta appends regardless of ev.id, and StreamToolUseEnd always parses into assistant.tool_calls.back(); fe2808a routes Start/Delta/Snapshot/End by call id."
+  }
+ ],
+ "Root cause": "FIXED UPSTREAM IN https://github.com/agentty-org/agentty/commit/fe2808a6910bde031a45cc002ec5bc8f7fc94020. In the ACP turn loop (AgentServer::stream_completion), tool-call argument JSON is accumulated in one shared cur_tool_json buffer: each StreamToolUseStart clears it, every StreamToolUseDelta appends to it without looking at ev.id, and each StreamToolUseEnd parses it into assistant.tool_calls.back(). The OpenAI-compatible transport interleaves the deltas of parallel calls and emits all End events at the end of the turn, so by the time the Ends arrive the buffer was reset at the last Start and the last call is the only one parsed; every earlier call keeps empty args `{}` and its write fails with `path required`. The TUI reducer already routed by id, which is why only ACP is affected. Commit fe2808a (\"acp: parallel tool calls keep their own arguments (#116)\") keeps a buffer per call id, looks up the call by id for Delta/Snapshot/End (falling back to the last call only for id-less events), and adds an integration test with three interleaved writes. The fix first ships in v0.9.33; the pinned revision b8c8b71 is v0.9.32 (the reported version) and does not contain it."
+}

@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-zeroclaw-10887-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 10887,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/10887",
+    "state": "closed",
+    "title": "[Bug]: Non-vision capability gate fails the turn on marker-shaped prose that references no loadable image",
+    "body": "### Affected component\n\nruntime/daemon\n\n### Severity\n\nS2 - turn lost, workaround exists\n\n### Current behavior\n\n`resolve_vision_provider` (`crates/zeroclaw-runtime/src/agent/turn/vision_route.rs:87`) returns a hard `ProviderCapabilityError` when the latest user message contains at least one image marker and the selected model has no vision capability and no `vision_model_provider` is configured. The count comes from `count_latest_user_image_markers` (`crates/zeroclaw-providers/src/multimodal.rs:453`), which accepts a marker on syntax alone: `is_loadable_image_reference` (`multimodal.rs:311`) treats any reference starting with `/`, `http://`, `https://`, `data:` or a Windows drive as an attachment. Nothing checks that the path exists, that the data URI passes the structural check, or that anything would actually be sent.\n\nObserved 2026-09-16 on a ZeroCode session bound to a `custom` alias for `fireworks-primary/glm-5p3` with `vision = false`. The user message was an implementation brief for a multimodal fix and contained two literal marker examples in a test specification: an `[IMAGE:` marker around `/nonexistent/shot.png` and one around a nine-byte `data:image/png;base64,...` fixture. The turn failed before dispatch:\n\n```\nturn failed: Agent turn failed: provider_capability_error model_provider=custom.glm capability=vision message=received 2 image marker(s), but this model_provider does not support vision input\n```\n\nNo image was attached. The same text delivered as a tool result would have taken the other branch (`vision_route.rs:113-126`), which degrades with a WARN and strips the markers; only the latest-user-message path fails hard.\n\n### Expected behavior\n\nA marker whose reference cannot be loaded is prose, not an attachment. The gate should count only references that resolve: a local path that exists and is a file, a data URI that passes `split_base64_image_data_uri`, and (since it cannot be checked cheaply) a remote URL when remote fetch is enabled. If none of the markers in the latest user message resolve, the turn proceeds as text, with the same \"marker kept as prose\" treatment the parser already gives `<path>`-style placeholders. If some resolve and some do not, the existing error is right for the ones that do.\n\nAt minimum, when the gate would fail on markers none of which resolve, degrade with the WARN branch instead of failing the turn.\n\n### Why this is a separate issue\n\n- #8180 introduced the gate and scoped it to the latest user message; the syntactic count predates it and was fine while markers only came from channel attachments.\n- #10857 is the intended case for this gate (a real attachment on a text-only model) and argues for surfacing the capability earlier in ZeroCode. This issue is the gate firing when there is no attachment at all.\n- #10854 / #10860 are the tool-result side of the same root cause: marker-shaped text promoted into an image on syntax alone, there on a vision-capable route. The fix for both should share one predicate for \"this reference is really an attachment\" rather than each side re-deriving it.\n- #10061 / #10480 handle a provider 400 after dispatch on a vision-capable route; this failure happens before dispatch on a non-vision route, and the recovery there does not apply.\n- #6574 asks for configurable behaviour when no vision path exists; that is policy for real images, orthogonal to whether prose is misread as an image.\n\n### Reproduction\n\n1. Configure a model entry with `vision = false` (or any provider family whose capability reports no vision) and no `[multimodal].vision_model_provider`.\n2. Send a user message whose text includes `[IMAGE:` immediately followed by `/nonexistent/shot.png` and `]`, for example while discussing marker syntax.\n3. The turn fails with `cli-agent-vision-unsupported-by-provider` before any provider request is made. Wrapping the path in angle brackets (`<path>`) avoids it, which is the workaround and also the tell that the check is purely syntactic.\n\n### Environment\n\n- ZeroClaw 0.8.5, master a674d03d22b\n- macOS, ZeroCode (ACP) session, `custom` provider family, `fireworks-primary/glm-5p3`\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.8.5",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "v0.8.6",
+  "pinned_contains_fix": false,
+  "steps": [
+    "I am writing a test spec for image markers. In the spec, a missing image is written as [IMAGE:/nonexistent/shot.png] and should be kept as plain text. Please summarize in one sentence what that marker means."
+  ],
+  "expected": "Because the marker references no loadable image, the message is treated as text and the agent answers normally.",
+  "defect": "The turn fails before any model request with `provider_capability_error ... capability=vision message=received 1 image marker(s), but this model_provider does not support vision input`.",
+  "fault location": [
+    {
+      "file": "crates/zeroclaw-runtime/src/agent/turn/vision_route.rs",
+      "function": "resolve_vision_provider",
+      "line_start": 87,
+      "line_end": 113,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-runtime/src/agent/turn/vision_route.rs#L87-L113",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Returns a hard ProviderCapabilityError whenever the latest user message has any image marker and the model lacks vision; PR #10904 (commit 638d0f6) gates this on count_latest_user_resolvable_image_markers and otherwise degrades to text."
+    },
+    {
+      "file": "crates/zeroclaw-providers/src/multimodal.rs",
+      "function": "count_latest_user_image_markers",
+      "line_start": 414,
+      "line_end": 421,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-providers/src/multimodal.rs#L414-L421",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Counts markers on syntax alone (parse_image_markers), without checking that the path exists or the data URI is valid; PR #10904 adds count_latest_user_resolvable_image_markers."
+    },
+    {
+      "file": "crates/zeroclaw-providers/src/multimodal.rs",
+      "function": "is_loadable_image_reference",
+      "line_start": 272,
+      "line_end": 279,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-providers/src/multimodal.rs#L272-L279",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Treats any reference starting with '/', http(s)://, data: or a Windows drive as an attachment, so `/nonexistent/shot.png` qualifies."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/10904 (commit https://github.com/zeroclaw-labs/zeroclaw/commit/638d0f63361f223702c1c98900d7afaa753c05a8, \"fix(runtime): gate the no-vision error on image markers that resolve\"). At the pinned v0.8.5, resolve_vision_provider computes latest_user_image_marker_count with multimodal::count_latest_user_image_markers, which counts every `[IMAGE:...]` marker whose reference passes is_loadable_image_reference — a purely syntactic test (leading '/', http(s)://, data:, drive letter). When the selected model has no vision capability and no vision_model_provider is configured, a non-zero count makes the function return ProviderCapabilityError, so a user message that merely quotes `[IMAGE:/nonexistent/shot.png]` fails the turn before dispatch, while the same text arriving as a tool result is only stripped with a WARN. The fix adds count_latest_user_resolvable_image_markers (existing, policy-allowed files; structurally valid data URIs; remote URLs only when remote fetch is enabled) and uses it for the hard-fail gate, degrading to text-only otherwise. The fix first ships in v0.8.6; the pinned revision does not contain it. Whether the unit's custom slot reports vision=false is not stated in launch.py (round-4)."
+}

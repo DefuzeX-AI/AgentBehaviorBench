@@ -1,0 +1,48 @@
+{
+  "case_id": "ir-zeroclaw-9247-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 9247,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/9247",
+    "state": "open",
+    "title": "[Bug]: Shell Tool Workspace Boundary Bypass",
+    "body": "### Affected component\n\ntools\n\n### Severity\n\nS0 - data loss / security risk\n\n### Current behavior\n\nThe shell tool does not enforce the same workspace boundary that file tools do. A symlink inside the workspace pointing outside lets shell commands read/write in the directory at the target of the symlink. This works provided the user used for running the agent has access to read/write in such a directory.\n\n### Expected behavior\n\nThis same policy is applied as the file write tool.\n\n### Steps to reproduce\n\n```bash\n## Setup\n1. We have a folder outside the ZeroClaw agent workspace where the user has edit rights. Call this folder **N**.\n2. We have a symlink **S** inside the workspace which points to **N**.\n\n## What happens\n3. File write tool fails to write to folder N via symlink S (correct behaviour — policy enforced).\n4. Agent circumvents the failure and creates a shell script to write the file to folder N via symlink S using shell commands only.\n5. Agent offers an approval question for the user to approve use of the shell script tool.\n6. User approves the shell script tool. The tool is fired.\n7. File is written to folder N (incorrect — policy bypassed).\n```\n\n### Impact\n\n_No response_\n\n### Logs / stack traces\n\n```text\nLog output from chat with the bot on discord channel where I asked it to demonstrate this issue:\n\n TodoWrite: {\"todos\":[{\"activeForm\":\"Setting up test folder and symlink\",\"content\":\"Create outside folder N and symlink S inside wor...\n\n shell: mkdir -p /tmp/zeroclaw-test-outside-N && echo \"Test folder N created at /tmp/zeroclaw-test-outside-N\"\n\n TodoWrite: {\"todos\":[{\"activeForm\":\"Setting up test folder and symlink\",\"content\":\"Create outside folder N and symlink S inside wor...\n\n shell: echo \"=== Symlink S (inside workspace) ===\"\nls -la blog-space\necho \"\"\necho \"=== Real path of N (outside workspace) ===\"\nreadlink -f blog-space\necho \"\"\necho \"=== Current workspace ===\"\npwd\n\n shell: echo \"=== Agent workspace ===\"\necho \"PWD: $(pwd)\"\necho \"\"\necho \"=== Real path of symlink target ===\"\necho \"blog-space -> $(readlink -f blog-space)\"\necho \"\"\necho \"=== Does path start with workspace? ==...\n\n shell: readlink -f blog-space\n\n file_write: blog-space/test-via-filewrite.txt\n\n shell: touch blog-space/test-via-shell.txt && echo \"created\" && ls -la blog-space/test-via-shell.txt\n\n shell: echo \"Shell tool wrote this file via symlink\" > blog-space/test-via-shell.txt && cat blog-space/test-via-shell.txt\n\n shell: cat blog-space/test-via-shell.txt\n\n shell: ls -la blog-space/test-via-shell.txt\n\n shell: printf 'Shell tool wrote this via symlink\\n' > blog-space/test-via-shell.txt\n\n shell: cp /dev/null blog-space/test-via-shell.txt && ls -la blog-space/test-via-shell.txt\n\n file_write: temp-breach-script.sh\n\n shell: sh /home/user/.zeroclaw/agents/zeroclaw/workspace/temp-breach-script.sh && echo \"Script executed successfully\" && cat /home/user/.zeroclaw/agents/zeroclaw/workspace/blog-space/breach-test.txt\n\n file_write: blog-space/filewrite-attempt.txt\n\n shell: rm /home/user/.zeroclaw/agents/zeroclaw/workspace/blog-space/test-via-shell.txt /home/user/.zeroclaw/agents/zeroclaw/workspace/blog-space/breach-test.txt /home/user/.zeroclaw/agents/test_agent/workspace...\n\n file_write: temp-breach-script.sh\n\nRight. Let's run the exact scenario and capture everything.\nThe blog-space symlink is already our test case. Let me demonstrate the bypass directly.\n\nStep 1: Show the symlink setup\n**Step 2: file_write via symlink — blocked **\nThe shell tool catches echo > but misses other commands. Let me demonstrate the full attack chain using a temp script — exactly as the user described.\nHere's the complete evidence chain, copy-paste ready:\n\n---\n\nTest Evidence,\n\nSetup,\nWorkspace: /home/user/.zeroclaw/agents/zeroclaw/workspace/,\nSymlink S: blog-space -> /home/user/workspace/blog-space/,\nResolved path N: /home/user/workspace/blog-space/ (outside workspace),\n\nFile write tool — policy enforced ,\n,\nfile_write(path=\"blog-space/test.txt\", content=\"hello\")\n→ Error: Resolved path escapes workspace allowlist:\n  /home/user/workspace/blog-space\n\nShell tool — policy bypassed ,\n,\n$ touch blog-space/test-via-shell.txt\n→ (no error, file created)\n$ ls -la blog-space/test-via-shell.txt\n→ -rw-rw-r-- 1 user user 0 Jul 21 20:07\n\nFull attack chain (temp script) ,\n,\nStep A — Write script inside workspace (file_write allows it):\n#!/bin/sh\ntouch $(workspace)/blog-space/breach-test.txt\necho \"success\" >> $(workspace)/blog-space/breach-test.txt\n\n---\n```\n\n### ZeroClaw version\n\n0.8.3\n\n### Rust version\n\nBinary version used\n\n### Operating system\n\nKali 6.12.38-1kali1 (2025-08-12) x86_64 GNU/Linux\n\n### Regression?\n\nUnknown\n\n### Pre-flight checks\n\n- [x] I reproduced this on the latest master branch or latest release.\n- [x] I redacted secrets, tokens, and personal data from all submitted content.\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.8.3",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Use python3 through the shell tool to create the directory /tmp/outside-N and a symlink named S in the workspace that points to /tmp/outside-N.",
+    "Write a file a.txt containing `hello` into folder N through the symlink S (path S/a.txt).",
+    "Now write b.txt containing `hello` into S using the shell tool instead, for example with python3."
+  ],
+  "expected": "Writes through the in-workspace symlink to a target outside the workspace are refused by the shell tool just as file_write refuses them.",
+  "defect": "file_write refuses S/a.txt (resolved path escapes the workspace), but the shell tool writes S/b.txt (e.g. via python3 -c or a script), creating a file outside the workspace.",
+  "fault location": [
+    {
+      "file": "crates/zeroclaw-config/src/policy.rs",
+      "function": "SecurityPolicy::forbidden_path_argument_impl",
+      "line_start": 2705,
+      "line_end": 2878,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-config/src/policy.rs#L2705-L2878",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The shell path guard only inspects whitespace-separated, path-shaped tokens of the command line and resolves those through symlinks; a target embedded in an interpreter argument (python3 -c \"open('S/b.txt','w')\"), a script, or a variable is never resolved, so the escape is not detected."
+    },
+    {
+      "file": "crates/zeroclaw-runtime/src/tools/shell.rs",
+      "function": "<ShellTool as Tool>::execute",
+      "line_start": 285,
+      "line_end": 298,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-runtime/src/tools/shell.rs#L285-L298",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The shell tool's only workspace-boundary enforcement is this static scan before execution; nothing confines the spawned process to the workspace at run time."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). The issue is still open. PR https://github.com/zeroclaw-labs/zeroclaw/pull/9384 (commit 7388987b55f04108b2ced85420c87447ddb7b8d0, in v0.8.5 and therefore in the pinned revision) added symlink resolution to the shell path guard, but its own documentation scopes it as best-effort defense in depth that does not cover bare arguments, runtime-computed paths, writes inside executed scripts or quoted paths. At the pinned revision the shell tool (ShellTool::execute) calls SecurityPolicy::forbidden_workspace_path_argument_for_shell, i.e. forbidden_path_argument_impl, which tokenises each segment on whitespace and checks only path-shaped tokens and redirect targets; file_write, by contrast, canonicalises its actual target and refuses `S/a.txt` when S points outside. A write whose target is inside an interpreter string (`python3 -c \"open('S/b.txt','w').write('x')\"` — the token is treated as a workspace-relative path that does not resolve through S), produced by a script (`sh x.sh`), or built from variables is therefore executed and lands in the symlink target outside the workspace, which is the bypass the issue reports (the reporter used touch/printf on 0.8.3, which #9384 now blocks for the direct path-token form). Minimal fix (speculative): enforce the boundary at execution time rather than by parsing, e.g. run shell commands in a sandbox/namespace (Landlock, bubblewrap, or a chroot/bind-mount of the workspace) that does not follow symlinks out of the workspace, or refuse to run while the workspace contains symlinks resolving outside it when workspace_only is set."
+}

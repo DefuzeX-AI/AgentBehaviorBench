@@ -135,7 +135,7 @@ If you configure several services, set `ABB_MODEL_PROVIDER=deepseek` or
 `GLM_API_BASE_URL` matches your account and API service. Agents using web search
 also need `TAVILY_API_KEY`, as specified by their configuration.
 
-**ACP Agents**: units 15-32 and 36 use the same OpenRouter -> DeepSeek -> GLM
+**ACP Agents** without a provider pin use the same OpenRouter -> DeepSeek -> GLM
 selection. DeepSeek is optional. Constrained deployments retain dedicated settings:
 MiniMax Code requires `MINIMAX_API_KEY`; Claude ACP needs its Anthropic Messages
 `CODEX_*` endpoint; Qwen Code's native web search requires DashScope and `QWEN_*` settings.

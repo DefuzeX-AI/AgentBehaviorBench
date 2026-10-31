@@ -1,4 +1,0 @@
-{
-  "content": "from pathlib import Path\n\n\ndef main() -> None:\n    input_path = Path.cwd() / \"input.txt\"\n    output_path = Path.cwd() / \"output.txt\"\n\n    try:\n        content = input_path.read_text(encoding=\"utf-8\")\n    except OSError as error:\n        raise SystemExit(f\"Unable to read {input_path}: {error}\") from error\n\n    summary = (\n        f\"Lines: {len(content.splitlines())}\\n\"\n        f\"Words: {len(content.split())}\\n\"\n        f\"Characters: {len(content)}\\n\"\n    )\n\n    try:\n        output_path.write_text(summary, encoding=\"utf-8\")\n    except OSError as error:\n        raise SystemExit(f\"Unable to write {output_path}: {error}\") from error\n\n\nif __name__ == \"__main__\":\n    main()\n",
-  "encoding": "utf-8"
-}

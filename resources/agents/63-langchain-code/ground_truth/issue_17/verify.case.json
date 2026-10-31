@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-langchain-code-17-v1",
+  "issue": {
+    "repository": "zamalali/langchain-code",
+    "number": 17,
+    "url": "https://github.com/zamalali/langchain-code/issues/17",
+    "state": "open",
+    "title": "Deep mode: delegating to a sub-agent (`task`) always fails with \"StructuredTool does not support sync invocation\"",
+    "body": "**What happens**\n\nIn `--mode deep`, whenever the model calls the `task` tool the turn ends with\n\n```\nAgent error: StructuredTool does not support sync invocation.\n```\n\nThe sub-agent never runs.\n\n**Environment**\n\nlangchain-code `d75d039` (current main), Linux, Python 3.11, OpenAI-compatible model (DeepSeek `deepseek-v4-flash`).\n\n**Steps to reproduce**\n\n1. `langcode chat --mode deep`\n2. Ask: `Please delegate this job to your general-purpose sub-agent rather than doing it yourself: the sub-agent should create the file report/total.txt containing only the sum of 17, 25 and 58.`\n3. The model calls `task` and the turn fails with the error above. No file is created.\n\nReproduced in 10 out of 10 fresh runs.\n\n**Likely cause**\n\n`task` in `agent/subagents.py` (L107) only has an `async def` implementation, but the CLI runs the deep agent with the sync `agent.invoke(...)` (`cli/commands/chat.py` L568), so the async-only tool gets called synchronously.\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "d75d039",
+  "commit_version": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Please delegate this job to your general-purpose sub-agent rather than doing it yourself: the sub-agent should create the file report/total.txt containing only the sum of 17, 25 and 58."
+  ],
+  "expected": "The deep agent should delegate to its general-purpose sub-agent and let it create report/total.txt containing only 100, as requested in issue #17 and supported by the unit requirement.md and create_task_tool at the pinned commit.",
+  "defect": "Invoking the async-only task tool through the synchronous deep-agent turn raises StructuredTool does not support sync invocation., so the turn fails before the sub-agent runs or creates report/total.txt.",
+  "fault location": [
+    {
+      "file": "src/langchain_code/agent/subagents.py",
+      "function": "create_task_tool.task",
+      "line_start": 99,
+      "line_end": 131,
+      "commit": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+      "url": "https://raw.githubusercontent.com/zamalali/langchain-code/d75d039ce2b4d1d2bff01d7f8858068209564ecc/src/langchain_code/agent/subagents.py",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "src/langchain_code/cli/commands/chat.py",
+      "function": "chat",
+      "line_start": 568,
+      "line_end": 568,
+      "commit": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+      "url": "https://raw.githubusercontent.com/zamalali/langchain-code/d75d039ce2b4d1d2bff01d7f8858068209564ecc/src/langchain_code/cli/commands/chat.py",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "An async-only subagent task tool is invoked through the synchronous chat execution path. StructuredTool cannot service that synchronous call and raises before the delegated job executes. The retained failure is exactly StructuredTool does not support sync invocation."
+}

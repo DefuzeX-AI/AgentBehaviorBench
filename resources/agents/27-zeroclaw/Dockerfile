@@ -27,7 +27,7 @@ USER agent
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends chromium libnss3-tools fonts-liberation && rm -rf /var/lib/apt/lists/*
 COPY abb-chromium /usr/local/bin/abb-chromium
-RUN chmod 755 /usr/local/bin/abb-chromium
+RUN sed -i 's/\r$//' /usr/local/bin/abb-chromium && chmod 755 /usr/local/bin/abb-chromium
 COPY zz-abb-lean /etc/chromium.d/zz-abb-lean
 
 # agent-browser CLI (ZeroClaw's agent_browser backend), native linux-x64 binary

@@ -1,0 +1,47 @@
+{
+  "case_id": "ir-llxprt-code-414-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 414,
+    "url": "https://github.com/vybestack/llxprt-code/issues/414",
+    "state": "closed",
+    "title": "Bug: Tool responses with mixed content incorrectly identified as user messages in OpenAI format",
+    "body": "## Description\n\nWhen using providers that require OpenAI message format (like Cerebras GLM), tool responses containing mixed content (both functionResponse and text parts) are incorrectly converted to user messages instead of tool messages, causing API rejections.\n\n## Impact\n\n- **Affected Providers**: Cerebras GLM, potentially other OpenAI-compatible APIs\n- **Severity**: Critical - prevents tool usage with affected providers\n- **Error**: `400 status code (no body)` from API, actual error: \"An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'\"\n\n## Root Cause\n\nTwo related issues in message conversion logic:\n\n1. **geminiChat.ts** (line ~1988): `convertPartListUnionToIContent()` only checks for `hasAIContent` (function calls) but not for tool responses when determining speaker type. Mixed content with tool responses + text parts defaults to `speaker: 'human'` instead of `speaker: 'tool'`.\n\n2. **ContentConverters.ts** (line ~336): `fromGeminiContent()` uses `blocks.every()` to check if ALL blocks are tool_response, but should use `blocks.some()` to check if ANY block is a tool_response. This causes mixed content (tool_response + text blocks) to not be recognized as tool speaker.\n\n## Reproduction\n\n```bash\nnode scripts/start.js --profile-load cerebrasglm46 --prompt \"use read_many_files to look at the docs dir summarize\"\n```\n\nWhen `read_many_files` returns large output, it creates:\n- 1 functionResponse part (metadata)\n- Multiple text parts (content)\n\nThis gets converted to OpenAI format as:\n- Message with `role: 'user'` (WRONG)\n\nShould be:\n- Message with `role: 'tool'` and `tool_call_id` (CORRECT)\n\n## Solution\n\n1. In `geminiChat.ts`: Track `hasToolResponse` flag and prioritize tool speaker over human\n2. In `ContentConverters.ts`: Change `blocks.every()` to `blocks.some()` for tool response detection\n3. Added `--dumponerror` CLI flag and `/set dumponerror` for debugging (dumps request to `~/.llxprt/dumps/`)\n\n## Credits\n\n**Diagnosed and fixed by @janfeddersen-wq** - Identified the exact issue through request body analysis and provided the complete fix."
+  },
+  "version_choice": "historical:v0.4.7",
+  "reported_version": "v0.4.7",
+  "commit_version": "14c020bdef0ab7b3d76e1977da8336a2e353c18b",
+  "fixed_in": "v0.4.8",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a directory `docs` containing three markdown files `guide.md`, `api.md` and `faq.md`, each with at least 60 lines of descriptive text about a fictional command-line tool called widgetctl.",
+    "use read_many_files to look at the docs dir summarize"
+  ],
+  "expected": "The read_many_files result is sent back to the model as a tool message answering the tool_call_id, and the agent summarizes the docs.",
+  "defect": "The mixed tool result (one functionResponse part plus text parts) is converted to a `role: 'user'` message instead of a tool message, so OpenAI-format endpoints reject the request (\"An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'\", surfaced as `400 status code (no body)`).",
+  "fault location": [
+    {
+      "file": "packages/core/src/core/geminiChat.ts",
+      "function": "GeminiChat.convertPartListUnionToIContent",
+      "line_start": 1956,
+      "line_end": 1989,
+      "commit": "14c020bdef0ab7b3d76e1977da8336a2e353c18b",
+      "url": "https://github.com/vybestack/llxprt-code/blob/14c020bdef0ab7b3d76e1977da8336a2e353c18b/packages/core/src/core/geminiChat.ts#L1956-L1989",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "For mixed part lists only function calls are tracked (hasAIContent), so functionResponse + text parts fall through to speaker 'human'; PR #415 adds hasToolContent and returns speaker 'tool' when any functionResponse is present."
+    },
+    {
+      "file": "packages/core/src/services/history/ContentConverters.ts",
+      "function": "ContentConverters.toIContent",
+      "line_start": 333,
+      "line_end": 340,
+      "commit": "14c020bdef0ab7b3d76e1977da8336a2e353c18b",
+      "url": "https://github.com/vybestack/llxprt-code/blob/14c020bdef0ab7b3d76e1977da8336a2e353c18b/packages/core/src/services/history/ContentConverters.ts#L333-L340",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Marks user-role content as tool only when every block is a tool_response (blocks.every), so tool_response + text blocks stay human; PR #415 switches to blocks.some()."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/415. When read_many_files returns large output, the tool result is a part list with one functionResponse plus several text parts. In v0.4.7, GeminiChat.convertPartListUnionToIContent handles this 'mixed' case by setting the speaker to 'ai' only if a functionCall is present and otherwise defaulting to 'human', and ContentConverters.toIContent only upgrades a user-role content to the 'tool' speaker when all blocks are tool_response. Both paths therefore classify the tool result as a human message, the OpenAI provider serializes it as `role: 'user'`, and the assistant tool_call is left without a matching tool message, which strict OpenAI-compatible APIs reject with HTTP 400. Commit e170bc6 (PR #415) tracks hasToolContent and prefers the 'tool' speaker in geminiChat.ts, and uses blocks.some() in ContentConverters.ts (it also adds a --dumponerror debug flag, unrelated to the defect). The fix first ships in v0.4.8; the pinned v0.11.0 contains it, so the case is tested at v0.4.7, the latest release before the issue was opened on 2025-11-01."
+}

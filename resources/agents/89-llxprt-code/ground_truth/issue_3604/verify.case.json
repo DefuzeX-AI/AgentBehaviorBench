@@ -1,0 +1,24 @@
+{
+  "case_id": "ir-llxprt-code-3604-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3604,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3604",
+    "state": "closed",
+    "title": "replace tool turns literal Rust CRLF escapes into control characters",
+    "body": "While editing a Rust HTTP test fixture with the built-in `replace` tool, `new_string` containing literal backslash-r/backslash-n sequences was written as control characters. The replacement reported success. Running rustfmt then left multiline strings with LF-only delimiters, and a local WebSocket handshake test timed out waiting for the HTTP header terminator.\n\nThe submitted replacement was Rust source `while !request.ends_with(b\"\\r\\n\\r\\n\") {` and an HTTP response string using the same escaped line endings. Reading the file after replacement and formatting showed a byte string containing two literal blank lines instead. A second replacement produced the same result. A unified diff applied with `apply_patch` preserved the Rust escape sequences, and the same test then passed.\n\nExpected: exact text replacement preserves source-code escape sequences after JSON decoding, without an additional unescape pass.\n\nWorkload evidence: PR66 fixes in serdesAI, `serdes-ai-providers/examples/codex_haiku.rs`, macOS TS LLxprt driver using gpt-6-astra via codex. Local artifacts are `tmp/pr66-final-fixes/example-initial-handshake.log`, `example-line-ending-edit.log`, and passing `example.log`. No LLxprt implementation changes were made."
+  },
+  "version_choice": "pinned",
+  "reported_version": "unknown",
+  "commit_version": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create http.rs with exactly this one-line Rust source and a final newline: fn main() { let x = b\"old\"; }. Read it with read_file.",
+    "Use the built-in replace tool to replace the complete source line with exactly the following text (backslashes are literal source characters):\nfn main() { let x = b\"\\r\\n\\r\\n\"; }\nThen inspect the actual file bytes."
+  ],
+  "expected": "Exact replacement preserves literal source-code escape sequences after JSON decoding.",
+  "defect": "replace writes physical newline/CR control characters where new_string contained literal backslash escape sequences, corrupting source code.",
+  "fault location": [],
+  "Root cause": "The observed behavior is consistent with an additional escape-normalization step after JSON decoding, which makes literal backslash-n indistinguishable from an actual newline. The reports do not identify a confirmed implementation line; do not label an arbitrary edit helper as the root cause."
+}

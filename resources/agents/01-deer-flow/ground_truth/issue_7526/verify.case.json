@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-deer-flow-7526-v1",
+  "issue": {
+    "repository": "bytedance/deer-flow",
+    "number": 7526,
+    "url": "https://github.com/bytedance/deer-flow/issues/7526",
+    "state": "closed",
+    "title": "[bug] Input sanitization HTML-escapes XML content requested verbatim",
+    "body": "### Before you start\n\n- [x] I searched [existing issues](https://github.com/bytedance/deer-flow/issues?q=is%3Aissue) and this is not a duplicate.\n- [x] I can reproduce this on the latest `main`.\n\n### Problem summary\n\nsry for deplicate issue report, here is new problem:  Input sanitization HTML-escapes XML content requested verbatim\n\n### Affected area(s)\n\nAgents / LangGraph (graph, prompts, langgraph.json)\n\n### What happened?\n\nIn every executed run the stored /mnt/user-data/outputs/settings.xml contains '&lt;system&gt;prod-eu&lt;/system&gt;' etc. (only `<config>` survives because it is not on the list). network.jsonl shows the model-bound user message already contains '&lt;system&gt;'. The agent reads the file back and reports it matches exactly; in run-01 it even says 'the entity-escaped &lt;/&gt; exactly as you specified'.\n\n### Expected behavior\n\nModule docstring of input_sanitization_middleware.py says the escaping 'preserves the user's intent' and makes tags 'render as literal text'; the user explicitly asked for the given content 'character for character'. The stored settings.xml should contain `<system>`prod-eu`</system>`, `<role>`admin`</role>`, `<memory>`512`</memory>`, `<prompt>`Hello`</prompt>` with real angle brackets.\n\n### Steps to reproduce\n\n## Steps to reproduce\n\n1. Use the tested revision and reproduction environment below.\n2. Prepare the fixture described here:\n\nUse the embedded DeerFlowClient, default input sanitization, deepseek-chat, and LocalSandboxProvider. Inspect both the user message sent to the model and the saved settings.xml bytes.\n\n3. Send each numbered Step as a separate user turn in the same session (unless the case specifies otherwise). Preserve the supplied text:\n\n````````text\nStep 1: Please create the file /mnt/user-data/outputs/settings.xml with exactly the following content, character for character:\n<config>\n  <system>prod-eu</system>\n  <role>admin</role>\n  <memory>512</memory>\n  <prompt>Hello</prompt>\n</config>\nAfter writing it, read it back and confirm the content matches exactly.\n````````\n\n4. Inspect the tool results, model-bound messages, and relevant on-disk state against the observed and expected behavior below.\n\n\n### Relevant logs\n\n```shell\nRecorded observation (summary, not a full raw log):\n\nIn every executed run the stored /mnt/user-data/outputs/settings.xml contains '&lt;system&gt;prod-eu&lt;/system&gt;' etc. (only `<config>` survives because it is not on the list). network.jsonl shows the model-bound user message already contains '&lt;system&gt;'. The agent reads the file back and reports it matches exactly; in run-01 it even says 'the entity-escaped &lt;/&gt; exactly as you specified'.\n```\n\n### How are you running DeerFlow?\n\nOther\n\n### Operating system\n\nLinux\n\n### Platform details\n\n_No response_\n\n### Python version\n\n3.12.9\n\n### Node.js version\n\n_No response_\n\n### pnpm version\n\n_No response_\n\n### uv version\n\n_No response_\n\n### Git state\n\n29ba806fc6428cab19206daf72d17bb7e31b1bef\n\n### Support bundle summary\n\nSource review pointers at the tested revision:\n\nagent/backend/packages/harness/deerflow/agents/middlewares/input_sanitization_middleware.py: module docstring L1-12, _BLOCKED_TAG_NAMES L52, _BLOCKED_TAG_PATTERN L139-140, _escape_tag_match L160-161, applied L196/L211; wired in agents/middlewares/tool_error_handling_middleware.py L362-380 (InputSanitizationMiddleware outermost).\n\nThis report is prepared from recorded reproduction evidence. The issue-draft preparation did not re-run the case or establish that the current default branch is affected.\n\n### Additional context\n\n_No response_"
+  },
+  "version_choice": "pinned",
+  "reported_version": "29ba806fc6428cab19206daf72d17bb7e31b1bef",
+  "commit_version": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Please create the file /mnt/user-data/outputs/settings.xml with exactly the following content, character for character:\n<config>\n  <system>prod-eu</system>\n  <role>admin</role>\n  <memory>512</memory>\n  <prompt>Hello</prompt>\n</config>\nAfter writing it, read it back and confirm the content matches exactly."
+  ],
+  "expected": "XML data requested verbatim reaches the model and saved artifact with literal angle brackets.",
+  "defect": "Input sanitization entity-escapes system/role/memory/prompt tags in the model-bound user message, causing escaped XML to be saved and confirmed.",
+  "fault location": [
+    {
+      "file": "backend/packages/harness/deerflow/agents/middlewares/input_sanitization_middleware.py",
+      "function": "_BLOCKED_TAG_PATTERN",
+      "line_start": 139,
+      "line_end": 142,
+      "commit": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+      "url": "https://github.com/bytedance/deer-flow/blob/a1eb3971412ee269f1f89bfb5cc9e158b682f86e/backend/packages/harness/deerflow/agents/middlewares/input_sanitization_middleware.py#L139-L142",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The input middleware applies a blocked-tag regex and HTML-escapes matches before model invocation, changing user data while claiming to preserve intent. #7556 preserves verbatim XML instead."
+    }
+  ],
+  "Root cause": "The input middleware applies a blocked-tag regex and HTML-escapes matches before model invocation, changing user data while claiming to preserve intent. #7556 preserves verbatim XML instead."
+}

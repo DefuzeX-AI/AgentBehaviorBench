@@ -37,6 +37,7 @@ def test_generation_without_prespecified_slots_uses_preparation_storage(tmp_path
     assert [call['role'] for call in calls] == ['controller']
     assert calls[0]['settings']['isolated_agent'] is False
     assert calls[0]['closed'] == 1 and calls[0]['validated'] == []
+    assert not (directory / 'sdk-source').exists()
 
 
 @pytest.mark.parametrize('relative', ['.', '../outside', '/absolute', 'C:/outside'])
@@ -50,6 +51,7 @@ def test_private_files_cannot_escape_controller_storage(tmp_path, relative):
     assert calls == []
     status = json.loads(next((tmp_path / 'runs').glob('*/run.json')).read_text())
     assert status['status'] == 'failed' and status['cleanup_status'] == 'not_started'
+    assert not next((tmp_path / 'runs').iterdir()).joinpath('sdk-source').exists()
 
 
 @pytest.mark.parametrize('require_identity', [False, True])
@@ -102,3 +104,40 @@ def test_controller_cleanup_failure_still_closes_agent_and_records_outcome(tmp_p
     assert all(call['closed'] == 1 for call in calls)
     status = json.loads(next((tmp_path / 'runs').glob('*/run.json')).read_text())
     assert status['status'] == 'failed' and status['cleanup_status'] == 'failed'
+    assert status['source_cleanup_status'] == 'retained'
+    assert next((tmp_path / 'runs').glob('*/sdk-source/echo.py')).is_file()
+
+
+def test_source_removed_after_artifact_collection_even_when_collection_fails(tmp_path):
+    services, calls = fake_services()
+    def collect(directory, status, **kwargs):
+        assert all(call['closed'] == 1 for call in calls)
+        assert (directory / 'sdk-source/echo.py').is_file()
+        assert (directory / 'trajectory.json').is_file()
+        raise RuntimeError('artifact collection failed')
+    with pytest.raises(RuntimeError, match='artifact collection failed'):
+        run_evaluation(source_agent(tmp_path), context=context(services), output=tmp_path / 'runs',
+                       stage_agent=unchanged_stage, collect_artifacts=collect)
+    directory = next((tmp_path / 'runs').iterdir())
+    assert not (directory / 'sdk-source').exists()
+    assert (directory / 'trajectory.json').is_file()
+    assert (directory / 'judge/report.json').is_file()
+
+
+@pytest.mark.parametrize('reject_trace', [False, True])
+def test_source_cleanup_failure_is_reported_in_run_record(tmp_path, monkeypatch, reject_trace):
+    services, _ = fake_services(reject_trace=reject_trace)
+    def fail(directory):
+        raise PermissionError('source locked')
+    monkeypatch.setattr('agentbench.sdk.integration.execution.cleanup_source', fail)
+    error = RuntimeError if reject_trace else PermissionError
+    message = 'Agent evidence rejected' if reject_trace else 'source locked'
+    with pytest.raises(error, match=message):
+        run_evaluation(source_agent(tmp_path), context=context(services), output=tmp_path / 'runs',
+                       stage_agent=unchanged_stage)
+    directory = next((tmp_path / 'runs').iterdir())
+    status = json.loads((directory / 'run.json').read_text())
+    assert status['status'] == 'failed'
+    assert status['source_cleanup_status'] == 'failed'
+    assert status['source_cleanup_error_type'] == 'PermissionError'
+    assert (directory / 'sdk-source/echo.py').is_file()

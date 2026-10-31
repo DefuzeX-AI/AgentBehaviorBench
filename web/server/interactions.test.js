@@ -23,6 +23,26 @@ test('Vite serves the Python interaction contract with pagination and rejects es
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test('Vite trajectory bridge serves the derived step sequence of an attempt', async t => {
+  const root = await mkdtemp(path.join(tmpdir(), 'abb-trajectory-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const step = path.join(root, 'run/steps/0001');
+  await mkdir(step, { recursive: true });
+  await writeFile(path.join(root, 'run/run.json'), JSON.stringify({ run_id: 'run', agent_id: 'alpha', case_id: 'c', status: 'succeeded' }));
+  await writeFile(path.join(step, 'input.json'), JSON.stringify({ input_id: 'step-1', case_id: 'c', payload: 'hi' }));
+  await writeFile(path.join(step, 'request.json'), JSON.stringify({ agent_id: 'alpha', framework: 'langgraph', input: 'hi' }));
+  await writeFile(path.join(step, 'result.json'), JSON.stringify({ status: 'succeeded', output: 'hello' }));
+  const trajectory = await interactionPage(root, 'run', {}, undefined, 'agentbench.trajectory');
+  assert.equal(trajectory.schema, 'abb.agent-trajectory.v1');
+  assert.equal(trajectory.derived_on_read, true);
+  assert.deepEqual(trajectory.steps, []);
+  assert.equal(trajectory.inputs[0].result.output, 'hello');
+  await writeFile(path.join(root, 'run/run.json'), JSON.stringify({ run_id: 'run', agent_id: 'alpha', case_id: 'c', status: 'running' }));
+  const pending = await interactionPage(root, 'run', {}, undefined, 'agentbench.trajectory');
+  assert.equal(pending.status, 'pending');
+  assert.equal(pending.steps, undefined);
+});
+
 test('Vite timing bridge reads saved measurements again after reopening', async t => {
   const root = await mkdtemp(path.join(tmpdir(), 'abb-timeline-'));
   t.after(() => rm(root, { recursive: true, force: true }));

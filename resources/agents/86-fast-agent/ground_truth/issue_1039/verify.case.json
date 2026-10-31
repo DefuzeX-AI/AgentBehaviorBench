@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-fast-agent-1039-v1",
+  "issue": {
+    "repository": "evalstate/fast-agent",
+    "number": 1039,
+    "url": "https://github.com/evalstate/fast-agent/issues/1039",
+    "state": "open",
+    "title": "ACP terminal execution passes inline shell comments as command arguments",
+    "body": "## Description\n\nWhen the ACP client offers a terminal, fast-agent's execute tool decides via _needs_shell_wrapper whether to wrap a command in /bin/sh; '#' is not a trigger, so 'touch build.log # ci-marker' is sent as terminal/create {command: touch, args: [build.log, #, ci-marker]} and creates stray files '#' and 'ci-marker'.\n\nObserved behavior:\nterminal_started shows command 'touch' with args ['build.log','#','ci-marker']; file evidence shows /workspace/project/#, build.log and ci-marker created.\n\n## Steps to reproduce\n\n1. Use the tested revision and reproduction environment below.\n2. Prepare the fixture described here:\n\nUse ACP with a client advertising terminal capability and an empty workspace. The trailing # comment must remain in the command.\n\n3. Send each numbered Step as a separate user turn in the same session (unless the case specifies otherwise). Preserve the supplied text:\n\n````````text\nStep 1: In the current working directory, run exactly this shell command, verbatim and unmodified (keep the trailing comment): touch build.log # ci-marker\nThen list the files in the directory and tell me exactly which files exist now.\n````````\n\n4. Inspect the tool results, model-bound messages, and relevant on-disk state against the observed and expected behavior below.\n\n## Expected behavior\n\nPer the execute tool description ('Execute a shell command'; shell operators are wrapped automatically) and fast-agent's local shell runtime (create_subprocess_shell), '# ci-marker' is a shell comment and only build.log is created.\n\n## Actual behavior\n\nterminal_started shows command 'touch' with args ['build.log','#','ci-marker']; file evidence shows /workspace/project/#, build.log and ci-marker created.\n\n## Environment\n\nTested source revision: `5463895ba113f1ffc4b67c0346f5d65fc4e3d469`.\n\nUse ACP with a client advertising terminal capability and an empty workspace. The trailing # comment must remain in the command.\n\nModel/provider: Exact model/provider was not recorded in the supplied row.\n\n## Additional context\n\nSource review pointers at the tested revision:\n\nsrc/fast_agent/acp/terminal_runtime.py: _SHELL_ONLY_CHARS/_SHELL_EXPANSION_CHARS (~L35-36), _needs_shell_wrapper (~L87-139), _resolve_terminal_command (~L148-160), _build_create_params; src/fast_agent/utils/commandline.py split_commandline (shlex.split posix, comments=False); contrast src/fast_agent/tools/local_shell_executor.py:531\n\nThis report is prepared from recorded reproduction evidence. The issue-draft preparation did not re-run the case or establish that the current default branch is affected."
+  },
+  "version_choice": "pinned",
+  "reported_version": "5463895ba113f1ffc4b67c0346f5d65fc4e3d469",
+  "commit_version": "5c4453b8e13d1bfc808db6236516b283c4f2c227",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In the current working directory, run exactly this shell command, verbatim and unmodified (keep the trailing comment): touch build.log # ci-marker\nThen list the files in the directory and tell me exactly which files exist now."
+  ],
+  "expected": "`# ci-marker` is treated as a shell comment, so only build.log is created.",
+  "defect": "The command is sent to terminal/create as command `touch` with args ['build.log', '#', 'ci-marker'], creating stray files `#` and `ci-marker` next to build.log.",
+  "fault location": [
+    {
+      "file": "src/fast_agent/acp/terminal_runtime.py",
+      "function": "_needs_shell_wrapper",
+      "line_start": 117,
+      "line_end": 123,
+      "commit": "5c4453b8e13d1bfc808db6236516b283c4f2c227",
+      "url": "https://github.com/evalstate/fast-agent/blob/5c4453b8e13d1bfc808db6236516b283c4f2c227/src/fast_agent/acp/terminal_runtime.py#L117-L123",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The scan for shell syntax checks _SHELL_ONLY_CHARS, _SHELL_EXPANSION_CHARS and a word-initial `~`, but not a word-initial `#`, so a command with a trailing comment is judged not to need /bin/sh."
+    },
+    {
+      "file": "src/fast_agent/acp/terminal_runtime.py",
+      "function": "_resolve_terminal_command",
+      "line_start": 155,
+      "line_end": 166,
+      "commit": "5c4453b8e13d1bfc808db6236516b283c4f2c227",
+      "url": "https://github.com/evalstate/fast-agent/blob/5c4453b8e13d1bfc808db6236516b283c4f2c227/src/fast_agent/acp/terminal_runtime.py#L155-L166",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "Without the wrapper, the command is split with split_commandline (shlex, comments=False), so `#` and `ci-marker` become literal argv entries passed to terminal/create."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). When the ACP client offers a terminal, the execute tool turns the model's command string into a terminal/create command plus args via _resolve_terminal_command. It only wraps the string in `/bin/sh -lc` if _needs_shell_wrapper detects shell syntax; that scan recognizes `|&;><()\\n`, `$`*?[]{}` and a word-initial `~`, but not a word-initial `#`, and split_commandline uses shlex without comment handling. `touch build.log # ci-marker` is therefore split into command `touch` and args ['build.log', '#', 'ci-marker'], and touch creates the files `#` and `ci-marker`, unlike the local shell runtime (create_subprocess_shell) where `#` starts a comment. Minimal fix: treat an unquoted `#` at word start as shell syntax in _needs_shell_wrapper (change line 121 to `if char in {\"~\", \"#\"} and at_word_start:`), so such commands are run through /bin/sh. This is exactly what open, unmerged PR https://github.com/evalstate/fast-agent/pull/1040 proposes; it is not merged, so it is not treated as an upstream fix."
+}

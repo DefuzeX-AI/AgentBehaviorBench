@@ -1,0 +1,47 @@
+{
+ "case_id": "ir-gptme-4490-v1",
+ "issue": {
+  "repository": "gptme/gptme",
+  "number": 4490,
+  "url": "https://github.com/gptme/gptme/issues/4490",
+  "state": "open",
+  "title": "Thinking tags inside a save block silently prevent tool execution",
+  "body": "## Description\n\nWhen the user asks gptme to write a file whose content contains `<thinking>`...`</thinking>` lines, the model emits a correct `save` code block, but gptme's codeblock parser cuts the reply up to `</thinking>`, so no tool runs, nothing is reported back, the turn ends and the file is never created.\n\nObserved behavior:\nStep 1: the `save` code block /workspace/project/prompt_template.xml block (content identical to the template, incl. `<thinking>` lines) is not executed: no 'Saved to'/tool output in the next LLM request, no prompt_template.xml in file-evidence, ACP prompt ends with end_turn. A following `shell` code block cat -A ... block in the same reply is not executed either. Side effect: the ACP stream hides lines between `<thinking>` and `</thinking>` (gptme/llm/__init__.py ~983-1060), so the Judge often claims the saved content lacked the thinking section, contradicting the network log.\n\n## Steps to reproduce\n\n1. Use the tested revision and reproduction environment below.\n2. Prepare the fixture described here:\n\nUse ACP or another markdown-tool-format session with deepseek-chat and an empty workspace. A control using `<reasoning>` instead of `<thinking>` wrote the file successfully.\n\n3. Send each numbered Step as a separate user turn in the same session (unless the case specifies otherwise). Preserve the supplied text:\n\n````````text\nStep 1: In the current working directory, create a file named prompt_template.xml for our LLM evaluation harness. Its content must be exactly the following template (keep every tag and line as-is):\n\n<system>\nso Assume You are a careful math tutor.\n</system>\n<instructions>\nBefore answering, reason inside the thinking tags, then give only the final number inside the answer tags.\n</instructions>\n<thinking>\nWork through the problem step by step here.\n</thinking>\n<answer>\nFinal numeric answer here.\n</answer>\nStep 2: Please show me the exact current content of prompt_template.xml as it is on disk, so I can verify it was created correctly.\n````````\n\n4. Inspect the tool results, model-bound messages, and relevant on-disk state against the observed and expected behavior below.\n\n## Expected behavior\n\nA well-formed save/shell block is executed (file written), or at least the failure is reported to the model/user rather than silently ignored. Basis: gptme/tools/save.py tool description 'Create or overwrite a file with the given content' and markdown format 'To write to a file, use a code block with the language tag: save `<path>`' (every example shows a 'System: Saved to ...' result); gptme/tools/shell.py: shell blocks are executed and their output returned.\n\n## Actual behavior\n\nStep 1: the `save` code block /workspace/project/prompt_template.xml block (content identical to the template, incl. `<thinking>` lines) is not executed: no 'Saved to'/tool output in the next LLM request, no prompt_template.xml in file-evidence, ACP prompt ends with end_turn. A following `shell` code block cat -A ... block in the same reply is not executed either. Side effect: the ACP stream hides lines between `<thinking>` and `</thinking>` (gptme/llm/__init__.py ~983-1060), so the Judge often claims the saved content lacked the thinking section, contradicting the network log.\n\n## Environment\n\nTested source revision: `0dec026304c3beafb3784a991582bc17dad33e5f`.\n\nUse ACP or another markdown-tool-format session with deepseek-chat and an empty workspace. A control using `<reasoning>` instead of `<thinking>` wrote the file successfully.\n\nModel/provider: deepseek-chat via the recorded test harness.\n\n## Additional context\n\nSource review pointers at the tested revision:\n\ngptme/codeblock.py _extract_codeblocks (~357-420: strips everything before `</thinking>`/`</think>` when a line-start opening tag precedes it, returns when only an opening tag exists; does not check whether the tag is inside a code-block body); gptme/tools/base.py:1204/1286 ToolUse.iter_from_content -> Codeblock.iter_from_markdown; gptme/acp/agent.py prompt() -> run_chat_turn (~1318-1400, breaks silently when no runnable tool); gptme/llm/__init__.py ~1117-1137 (stream stop on complete tool block) and ~983-1060 (display hiding).\n\nThis report is prepared from recorded reproduction evidence. The issue-draft preparation did not re-run the case or establish that the current default branch is affected."
+ },
+ "version_choice": "pinned",
+ "reported_version": "0dec0263",
+ "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+ "fixed_in": "not-fixed",
+ "pinned_contains_fix": false,
+ "steps": [
+  "In the current working directory, create a file named prompt_template.xml for our LLM evaluation harness. Its content must be exactly the following template (keep every tag and line as-is):\n\n<system>\nso Assume You are a careful math tutor.\n</system>\n<instructions>\nBefore answering, reason inside the thinking tags, then give only the final number inside the answer tags.\n</instructions>\n<thinking>\nWork through the problem step by step here.\n</thinking>\n<answer>\nFinal numeric answer here.\n</answer>",
+  "Please show me the exact current content of prompt_template.xml as it is on disk, so I can verify it was created correctly."
+ ],
+ "expected": "The save block is executed and prompt_template.xml is written with the exact template, or a failure is reported instead of being silently ignored.",
+ "defect": "The model's well-formed save block (and any following shell block) is never executed: no 'Saved to' result, no prompt_template.xml on disk, and the ACP turn ends with end_turn.",
+ "fault location": [
+  {
+   "file": "gptme/codeblock.py",
+   "function": "_extract_codeblocks",
+   "line_start": 377,
+   "line_end": 391,
+   "commit": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+   "url": "https://github.com/gptme/gptme/blob/0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07/gptme/codeblock.py#L377-L391",
+   "role": "static_analysis",
+   "verification": "source_inferred_at_tested_revision",
+   "explanation": "Finds the first `</thinking>` anywhere in the reply and, because a line-start `<thinking>` exists before it (inside the save block's content), discards everything up to and including that tag, cutting the save block's opening fence away."
+  },
+  {
+   "file": "gptme/codeblock.py",
+   "function": "_extract_codeblocks",
+   "line_start": 404,
+   "line_end": 407,
+   "commit": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+   "url": "https://github.com/gptme/gptme/blob/0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07/gptme/codeblock.py#L404-L407",
+   "role": "static_analysis",
+   "verification": "source_inferred_at_tested_revision",
+   "explanation": "The unclosed-thinking early exit also matches `<thinking>` at a line start inside a code fence and returns without extracting any block."
+  }
+ ],
+ "Root cause": "INFERRED FROM SOURCE (no upstream fix found). gptme-acp parses tool calls from the reply in markdown format via _extract_codeblocks() in gptme/codeblock.py. Before scanning fences it strips model 'thinking' sections: it searches the whole reply for the first `</thinking>`/`</think>` and, if a `<thinking>` occurs at any line start before it, drops everything up to that closing tag (lines 377-391). The tags are not checked against code-fence state, so when the file content inside a ```save block contains `<thinking>` ... `</thinking>` lines, the save block's opening fence and first lines are discarded; the remaining text no longer forms the save block, nothing is executed, no tool result is produced and the turn ends silently (the separate unclosed-tag early exit at lines 404-407 has the same blind spot). Minimal fix: only treat thinking tags as section markers when they appear at a line start outside any code fence, which is what the still-open PR https://github.com/gptme/gptme/pull/4491 (commit 91bcdd797, `_is_standalone_outside_fences`) proposes; it is not merged."
+}

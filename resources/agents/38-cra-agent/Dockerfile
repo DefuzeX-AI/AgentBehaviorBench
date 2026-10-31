@@ -12,7 +12,7 @@
 FROM python:3.11-slim
 
 # Package index override for dependency layers, so the build can use a mirror.
-ARG ABB_PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
+ARG ABB_PIP_INDEX_URL=https://pypi.org/simple
 
 # Pinned so a build is reproducible. This is the resolution the binding was
 # verified against on 2026-10-07; upstream declares the same packages as open
@@ -114,7 +114,8 @@ RUN set -eu; \
 # Finding ids are not affected -- see the note below the download layer.
 # Everything else -- evaluation, output, exit codes -- is the real semgrep.
 COPY runtime/semgrep_shim.py /opt/semgrep-shim/bin/semgrep
-RUN chmod +x /opt/semgrep-shim/bin/semgrep \
+RUN sed -i 's/\r$//' /opt/semgrep-shim/bin/semgrep \
+    && chmod +x /opt/semgrep-shim/bin/semgrep \
     && for RULESET in p/owasp-top-ten p/cwe-top-25; do \
         ID="$(printf '%s' "$RULESET" | tr '/' '-')"; \
         curl -sSL --retry 5 --retry-delay 2 --retry-all-errors --max-time 300 \

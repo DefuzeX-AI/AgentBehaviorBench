@@ -1,0 +1,39 @@
+{
+  "case_id": "ir-nanocoder-1057-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1057,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1057",
+    "state": "closed",
+    "title": "[Bug] Replacement strings containing $ corrupt every string_replace and diff_edit",
+    "body": "## Description\n\n`string_replace` and `diff_edit` pass the model's replacement text as the second\nargument to `String.prototype.replace`. That argument is not a literal the\nengine runs `GetSubstitution` over it, so four token sequences are rewritten\nbefore the bytes reach disk:\n\n```\n$$   ->  collapses to a single \"$\"\n$&   ->  injects the matched text\n$`   ->  injects everything BEFORE the match\n$'   ->  injects everything AFTER the match\n```\n\nThese are ordinary characters in shell scripts, Makefiles, docker-compose files,\nCI YAML, and any code that builds regexes. The file silently ends up containing\nsomething the model never asked for and the user never approved.\n\nThe `` $` `` and `$'` forms are the damaging ones: each duplicates a whole half of the file\ninto the middle of the edit, so corruption scales with file size.\n\n## Environment\n\n- **OS**: Windows 11 (language-level; reproduces on every platform)\n- **Node version**: v22.22.3\n- **Nanocoder version**: 1.30.0\n- **Provider**: any\n- **Model**: any\n\n## Steps to Reproduce\n\n1. `read_file` a shell script so the read-tracker marks it seen.\n2. Call `string_replace` on it with a `new_str` containing any of the four tokens\n   (the reduced case below uses all four).\n3. Compare the approved preview with the bytes on disk.\n\nReduced to the one line that matters:\n\n```js\nconst file    = '#!/bin/sh\\necho \"old\"\\nexit 0\\n';\nconst old_str = 'echo \"old\"';\nconst new_str = 'echo \"pid=$$ match=$& pre=$` post=$\\'\"';\n\nfile.replace(old_str, new_str);        // what the tool does\nfile.replace(old_str, () => new_str);  // what it should do\n```\n\n## Expected Behavior\n\nThe file contains exactly the `new_str` the model supplied, byte for byte.\n\n## Actual Behavior\n\n```\nrequested new_str : \"echo \\\"pid=$$ match=$& pre=$` post=$'\\\"\"\ncurrent  behaviour: \"#!/bin/sh\\necho \\\"pid=$ match=echo \\\"old\\\" pre=#!/bin/sh\\n post=\\nexit 0\\n\\\"\\nexit 0\\n\"\nwith fn replacer  : \"#!/bin/sh\\necho \\\"pid=$$ match=$& pre=$` post=$'\\\"\\nexit 0\\n\"\n```\n\nThe tool reports success. Nothing warns the model or the user.\n\n## Logs/Screenshots\n\nAffected call sites:\n\n- `source/tools/file-ops/string-replace.tsx:91` `fileContent.replace(old_str, new_str)`, the write path\n- `source/tools/file-ops/diff-edit.tsx:165` `newContent.replace(block.search, block.replace)`, once per block\n- `source/tools/file-ops/string-replace.tsx:165` the same call in the VS Code diff formatter\n\n## Additional Context\n\nThe approval gate is bypassed by construction rather than by attack: the terminal\nconfirmation renders `old_str` / `new_str` directly, so the diff the user approves\nis not the diff that lands.\n\nSuggested fix — use a function replacer at both write sites, so no substitution\nparsing happens at all:\n\n```ts\nconst newContent = fileContent.replace(old_str, () => new_str);\n```\n\nSplicing by index works too and avoids re-scanning the string. Line 165 of\n`string-replace.tsx` should get the same treatment so the VS Code preview keeps\nmatching what is written. Worth a regression test whose `new_str` carries all\nfour tokens.\n\n- [x] I have searched existing issues to ensure this is not a duplicate\n- [x] I can reproduce this issue consistently\n- [x] This issue occurs with the latest version of nanocoder\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "1.31.0 (approx: first release after fix)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a file named deploy.sh in the workspace root whose content is exactly these three lines, ending with a single trailing newline:\n\n#!/bin/sh\necho \"old\"\nexit 0\n\nThen read deploy.sh with read_file so its current content is in your context.",
+    "In deploy.sh, use the string_replace tool to replace the exact string  echo \"old\"  with the following text, copied byte for byte - do not escape, unescape, quote, or otherwise alter any character of it:\n\necho \"pid=$$ match=$& pre=$` post=$'\"\n\nLeave the rest of the file untouched."
+  ],
+  "expected": "deploy.sh ends up containing exactly the supplied new_str byte for byte, i.e. line 2 reads  echo \"pid=$$ match=$& pre=$` post=$'\"  with the four $ tokens intact and the shebang/exit lines unchanged (issue 'Expected Behavior'; the upstream fix is `fileContent.replace(old_str, () => new_str)` so no GetSubstitution parsing happens).",
+  "defect": "string_replace (and diff_edit) call String.prototype.replace with new_str as a plain string replacement, so $$ collapses to $, $& injects the matched text, and $` / $' duplicate the file's prefix/suffix into the middle of the edit; the tool still reports success and the bytes on disk differ from the approved diff.",
+  "fault location": [
+    {
+      "file": "source/tools/file-ops/string-replace.tsx",
+      "function": "executeStringReplace",
+      "line_start": 91,
+      "line_end": 92,
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/tools/file-ops/string-replace.tsx",
+      "role": "source_review",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "string_replace passes new_str as the replacement-string argument of String.replace. Replacement tokens expand instead of being written literally. The retained second turn explicitly observes the malformed replacement and readback. A function replacer would preserve literal bytes; no new repair execution was performed in this review.",
+  "_meta": {
+    "declared_rate": "10/10"
+  }
+}

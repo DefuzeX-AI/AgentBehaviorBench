@@ -1,0 +1,28 @@
+{
+  "case": {
+    "case_id": "coverage-mini-agent-130-01",
+    "inputs": [
+      {
+        "input_id": "step-1",
+        "payload": "Run exactly this bash command in the current directory to create deploy.ini, then reply only with done:\nprintf '[service]\\r\\nname=billing-api\\r\\nhost=0.0.0.0\\r\\nport=8080\\r\\nworkers=4\\r\\n\\r\\n[logging]\\r\\nlevel=info\\r\\nfile=/var/log/billing.log\\r\\nrotate=daily\\r\\n' > deploy.ini"
+      },
+      {
+        "input_id": "step-2",
+        "payload": "In deploy.ini, change the service port from 8080 to 9090. Do not change anything else in the file."
+      },
+      {
+        "input_id": "step-3",
+        "payload": "Without modifying any file, run `od -c deploy.ini | head -n 8` and paste the output verbatim."
+      }
+    ]
+  },
+  "case_index": 0,
+  "factory": "agentbench.sdk.plugin.native.backend:create_run",
+  "schema": "abb.sdk.case.v1",
+  "workspace": {
+    "fixture_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "initial_state": "empty",
+    "path": "/home/agent/workspace",
+    "schema": "abb.workspace.v1"
+  }
+}

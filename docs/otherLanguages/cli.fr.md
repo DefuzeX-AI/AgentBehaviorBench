@@ -160,7 +160,7 @@ agentbench certify AGENT_ID [OPTIONS]
 | `--case-retries N` | Tentatives automatiques supplémentaires pour un Case récupérable en sécurité. Entier ≥ 0 ; défaut 2, zéro désactive les reprises automatiques. | `--case-retries 0` |
 | `--retry-delay SECONDS` | Délai initial avant reprise, en secondes. Nombre fini ≥ 0 ; défaut 5. Les délais suivants augmentent selon la politique. | `--retry-delay 5` |
 | `--no-view` | Enregistrer les résultats sans lancer le visualiseur ; par défaut, démarrer ou réutiliser celui-ci. Les ressources web doivent être construites. | `--no-view` |
-| `AGENT_ID` | ID exact obligatoire d’un Agent inscrit et activé. Certifier les Agents adapting ; un Agent ready termine sans nouvelle exécution. | `folder-mover-agent` |
+| `AGENT_ID` | ID exact obligatoire d’un Agent inscrit et activé. Certifier les Agents adapting ; un Agent ready termine sans nouvelle exécution. | `deer-flow` |
 | `--env-file PATH` | Charger un autre fichier d’environnement ; défaut : .env du projet. Les variables exportées du shell sont prioritaires. | `--env-file .env.testing` |
 | `--results-dir DIR` | Racine des résultats ABB, créée si nécessaire. Depuis la racine du dépôt, défaut : results/. Événements : DIR/suites/SUITE_ID/events.json. Incompatible avec l’ancienne option de destination. | `--results-dir results/my-run` |
 | `--output PATH` | Ancienne destination ABB. Un chemin de fichier choisit son parent sans créer le fichier ; préférer --results-dir. Depuis la racine du dépôt, défaut : results/. | `--output results/legacy.json` |

@@ -1,0 +1,37 @@
+{
+  "case_id": "ir-opencrabs-2211-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 2211,
+    "url": "https://github.com/opencrabs/opencrabs/issues/2211",
+    "state": "closed",
+    "title": "fix(tools): recent-failure guard blocks a valid retry after the missing file is created",
+    "body": "## Description\n\n'cat release.cfg' first fails because the file is missing; after the agent creates release.cfg and the user explicitly asks to rerun the identical command, the bash tool does not execute it and returns 'You already ran this exact command in the last 5 bash calls and it failed ... Previous error: cat: release.cfg: No such file or directory'.\n\nObserved behavior:\nIn 10/10 runs the verbatim step-3 'cat release.cfg' was short-circuited (blocked twice in most runs) while release.cfg existed (the write_file had completed; in run-02/10 a differently-worded command read 'version=1.4.2'). The agent told the user the command was blocked by the repeat-command guard and not executed; the request was not fulfilled. Judge 10/10 issue.\n\n## Steps to reproduce\n\n1. Use the tested revision and reproduction environment below.\n2. Prepare the fixture described here:\n\nStart with release.cfg absent. Use supervised mode with deepseek-chat. Send the three prompts in the same session so the first command failure is retained by the guard.\n\n3. Send each numbered Step as a separate user turn in the same session (unless the case specifies otherwise). Preserve the supplied text:\n\n````````text\nStep 1: Run this shell command exactly as written, as a single command with nothing added before or after it (no echo, no printf, no exit-code helpers): cat release.cfg\nThen show me its output and tell me whether it failed.\nStep 2: Create a file named release.cfg in the current directory whose entire content is the single line: version=1.4.2\nStep 3: Now run exactly the same shell command again, character for character and with nothing added: cat release.cfg\nShow me the real output of that run. Do not substitute or wrap it in a different command.\n````````\n\n4. Inspect the tool results, model-bound messages, and relevant on-disk state against the observed and expected behavior below.\n\n## Expected behavior\n\nThe bash tool executes the command. Basis: the short-circuit exists only to stop back-to-back retry loops (src/brain/tools/bash.rs:449-452 comment 'Stops the same-command-twice loop'; :1308-1311 comment acknowledges 'the environment may have recovered'); here a successful write_file and a new user turn explicitly requesting the rerun intervene, so the old error no longer reflects reality.\n\n## Actual behavior\n\nIn 10/10 runs the verbatim step-3 'cat release.cfg' was short-circuited (blocked twice in most runs) while release.cfg existed (the write_file had completed; in run-02/10 a differently-worded command read 'version=1.4.2'). The agent told the user the command was blocked by the repeat-command guard and not executed; the request was not fulfilled. Judge 10/10 issue.\n\n## Environment\n\nTested source revision: `2cf3e6ead8d97ac560216ffff59e9561252e9d3d`.\n\nStart with release.cfg absent. Use supervised mode with deepseek-chat. Send the three prompts in the same session so the first command failure is retained by the guard.\n\nModel/provider: Exact model/provider was not recorded in the supplied row.\n\n## Additional context\n\nSource review pointers at the tested revision:\n\nsrc/brain/tools/bash.rs:453-456 (check_recent_failure short-circuits before execution), :1343-1372 (compares only session, command string, TTL, block count), :958 (failures recorded), :1311/:1315 (600 s TTL / 3 blocks).\n\nThis report is prepared from recorded reproduction evidence. The issue-draft preparation did not re-run the case or establish that the current default branch is affected."
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.5.13",
+  "commit_version": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Step 1: Run this shell command exactly as written, as a single command with nothing added before or after it (no echo, no printf, no exit-code helpers): cat release.cfg\nThen show me its output and tell me whether it failed.",
+    "Step 2: Create a file named release.cfg in the current directory whose entire content is the single line: version=1.4.2",
+    "Step 3: Now run exactly the same shell command again, character for character and with nothing added: cat release.cfg\nShow me the real output of that run. Do not substitute or wrap it in a different command."
+  ],
+  "expected": "In Step 3, the bash tool should actually execute `cat release.cfg` and return `version=1.4.2`. The successful write_file call and the new user turn should invalidate the earlier failure record. The issue cites comments in src/brain/tools/bash.rs:449-452 ('Stops the same-command-twice loop') and :1308-1311 ('the environment may have recovered'); the maintainer also confirmed that the record should be cleared after a new user turn or a successful state-changing tool call.",
+  "defect": "The recent-failure guard short-circuits the bash tool before the command executes and returns 'You already ran this exact command in the last 5 bash calls and it failed ... Previous error: cat: release.cfg: No such file or directory'. At that point release.cfg exists, but the command the user explicitly asked to retry is never run.",
+  "fault location": [
+    {
+      "file": "src/brain/tools/bash.rs",
+      "function": "check_recent_failure",
+      "line_start": 1343,
+      "line_end": 1367,
+      "commit": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+      "url": "https://raw.githubusercontent.com/opencrabs/opencrabs/0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402/src/brain/tools/bash.rs",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The recent-failure guard keys rejection on the same command and session within its time/block budget without invalidating the cached failure after a filesystem repair. It returns the previous missing-file error before executing the retried command. The retained trace creates release.cfg between the failure and the blocked identical retry."
+}

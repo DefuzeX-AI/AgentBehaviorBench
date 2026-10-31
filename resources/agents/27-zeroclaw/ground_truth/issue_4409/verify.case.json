@@ -1,0 +1,58 @@
+{
+  "case_id": "ir-zeroclaw-4409-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 4409,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/4409",
+    "state": "closed",
+    "title": "[Bug]: git_operations tool only run git command under workspace, not any subdirectories even I asked to",
+    "body": "### Affected component\n\ntooling/ci\n\n### Severity\n\nS1 - workflow blocked\n\n### Current behavior\n\nI ask agent to run git status under workspace/project_path, then it return as there is no .git folder exists.\nAfter a few debug chattings, I figured it's because the git_operations tool only run git command against workspace root folder, not the project_path.\nSo I ask agent do not to use git_operations only run git command in the shell, then I get the right result.\n\n### Expected behavior\n\nWhen I ask agent to run git status under workspace/project_path, it should run git_operations under that folder not under the workspace folder.\n\n### Steps to reproduce\n\n```bash\nconfig as:\n[autonomy]\nlevel = \"supervised\"\nworkspace_only = true\nallowed_commands = [\n    \"git\",\n    \"npm\",\n    \"cargo\",\n    \"ls\",\n    \"cd\",\n    \"cat\",\n    \"grep\",\n    \"find\",\n    \"echo\",\n    \"pwd\",\n    \"wc\",\n    \"head\",\n    \"tail\",\n    \"date\",\n    \"python3\",\n    \"rm\",\n    \"tree\",\n    \"sed\",\n    \"gh\",\n    \"mkdir\",\n]\nforbidden_paths = [\n    \"/etc\",\n    \"/root\",\n    #\"/home\", allow home path\n    \"/usr\",\n    \"/bin\",\n    \"/sbin\",\n    \"/lib\",\n    \"/opt\",\n    \"/boot\",\n    \"/dev\",\n    \"/proc\",\n    \"/sys\",\n    \"/var\",\n    \"/tmp\",\n    \"~/.ssh\",\n    \"~/.gnupg\",\n    \"~/.aws\",\n    \"~/.config\",\n]\nauto_approve = [\n    \"file_read\",\n    \"file_write\",\n    \"file_edit\",\n    \"git_operations\",\n    \"memory_recall\",\n    \"web_search_tool\",\n    \"web_fetch\",\n    \"calculator\",\n    \"glob_search\",\n    \"content_search\",\n    \"image_info\",\n    \"weather\",\n]\n```\n\n### Impact\n\n_No response_\n\n### Logs / stack traces\n\n```text\n\n```\n\n### ZeroClaw version\n\nv0.5.9\n\n### Rust version\n\n_No response_\n\n### Operating system\n\nRaspberry Pi OS - aarch64 GNU/Linux\n\n### Regression?\n\nUnknown\n\n### Pre-flight checks\n\n- [x] I reproduced this on the latest master branch or latest release.\n- [x] I redacted secrets, tokens, and personal data from all submitted content."
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.5.9",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "v0.6.1",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a directory named project_path in the workspace, run `git init project_path`, create project_path/README.md containing `hello`, and commit it inside project_path with the message `init`.",
+    "Run git status under workspace/project_path."
+  ],
+  "expected": "git_operations runs `git status` inside the project_path subdirectory and reports its (clean) repository status.",
+  "defect": "git_operations always runs git in the workspace root, so it reports that there is no git repository (\"Not in a git repository\") instead of the status of project_path.",
+  "fault location": [
+    {
+      "file": "src/tools/git_operations.rs",
+      "function": "GitOperationsTool::run_git_command",
+      "line_start": 68,
+      "line_end": 81,
+      "commit": "41dd23175fe991adf1ee1a5693eff69e09ef2a3a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/41dd23175fe991adf1ee1a5693eff69e09ef2a3a/src/tools/git_operations.rs#L68-L81",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Always runs git with current_dir(&self.workspace_dir); PR #4483 (commit ac543cf) passes a resolved working_dir instead."
+    },
+    {
+      "file": "src/tools/git_operations.rs",
+      "function": "GitOperationsTool::parameters_schema",
+      "line_start": 436,
+      "line_end": 481,
+      "commit": "41dd23175fe991adf1ee1a5693eff69e09ef2a3a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/41dd23175fe991adf1ee1a5693eff69e09ef2a3a/src/tools/git_operations.rs#L436-L481",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "The tool schema has no way to name a subdirectory; PR #4483 adds an optional `path` parameter (resolved and confined to the workspace by resolve_working_dir)."
+    },
+    {
+      "file": "src/tools/git_operations.rs",
+      "function": "GitOperationsTool::execute",
+      "line_start": 495,
+      "line_end": 515,
+      "commit": "41dd23175fe991adf1ee1a5693eff69e09ef2a3a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/41dd23175fe991adf1ee1a5693eff69e09ef2a3a/src/tools/git_operations.rs#L495-L515",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Checks for .git only at the workspace root and its parents and fails with 'Not in a git repository' when the repo lives in a subdirectory; PR #4483 performs the check on the resolved working directory."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/4483 (commit https://github.com/zeroclaw-labs/zeroclaw/commit/ac543cff20efcf58761cef9ea3c7aa8dfe481ced, \"fix(tools): allow git_operations to run in workspace subdirectories\", \"Fixes #4409\"). In v0.5.9 GitOperationsTool has no parameter for a working directory: execute looks for .git at the workspace root (and its parents) and run_git_command always spawns git with current_dir(&self.workspace_dir). When the repository is in workspace/project_path and the workspace root is not a repository, every git_operations call fails with \"Not in a git repository\" (or reports the wrong repository), which is what the reporter saw until they told the agent to use the shell instead. The fix adds an optional `path` argument, resolve_working_dir (canonicalises it and rejects paths outside the workspace) and threads the resulting working_dir through every git sub-operation. The fix first ships in v0.6.1 and is an ancestor of the pinned v0.8.5, so the pinned revision contains it."
+}

@@ -1,0 +1,700 @@
+{
+  "schema": "abb.agent-trajectory.v1",
+  "builder_version": 1,
+  "status": "partial",
+  "run_id": "6b113ebd1b7644aaa395fd8da8c84d49",
+  "agent_id": "fast-agent",
+  "case_id": "coverage-fast-agent-1039-01",
+  "framework": "acp",
+  "metadata": {
+    "task_instruction": "In the current working directory, run exactly this shell command, verbatim and unmodified (keep the trailing comment): touch build.log # ci-marker\nThen list the files in the directory and tell me exactly which files exist now.",
+    "case_id": null,
+    "agent_configuration": {
+      "agents": [
+        {
+          "agent_name": "fast-agent"
+        }
+      ],
+      "system_prompt": "You are a helpful AI Agent.\n\n\n\n\n{{env}}\n\nMermaid diagrams between code fences are supported.\n\n{{model_specific}}\n\nThe current date is 28 October 2026.",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "execute",
+            "description": "Execute a shell command.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "description": "The command to execute. For simple commands, provide the executable here and use args for arguments. Shell operators (pipes, redirects, &&, etc.) may be included and will be run via a shell wrapper automatically. Do not include your own shell prefix (bash -c, etc.)."
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Optional array of command arguments. When provided, command is treated as the executable path/name and args are passed through directly."
+                },
+                "env": {
+                  "type": "object",
+                  "description": "Optional environment variables as key-value pairs.",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "cwd": {
+                  "type": "string",
+                  "description": "Optional absolute path for working directory."
+                }
+              },
+              "required": [
+                "command"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_text_file",
+            "description": "Read content from a text file. Returns the file contents as a string. ",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Absolute path to the file to read."
+                },
+                "line": {
+                  "type": "integer",
+                  "description": "Optional line number to start reading from (1-based).",
+                  "minimum": 1
+                },
+                "limit": {
+                  "type": "integer",
+                  "description": "Optional maximum number of lines to read.",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "write_text_file",
+            "description": "Write content to a text file. Creates or overwrites the file. ",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Absolute path to the file to write."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The text content to write to the file."
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "runtime": {
+        "framework": "acp",
+        "runtime": {
+          "type": "docker",
+          "execution": "oneshot",
+          "timeout_sec": 900
+        },
+        "adapter": {
+          "type": "acp",
+          "transport": "stdio",
+          "command": [
+            "python",
+            "/opt/agent/bootstrap/launch.py"
+          ],
+          "cwd": "/home/agent/workspace",
+          "permission_policy": "allow_once"
+        },
+        "launch": {
+          "argv": [
+            "python",
+            "-m",
+            "agentbench.runtime.agentcontainer.worker"
+          ],
+          "workdir": "/opt/agent"
+        },
+        "evaluation": {
+          "replay_safe": false,
+          "workspace": {
+            "path": "/home/agent/workspace",
+            "initial_state": "empty"
+          },
+          "file_evidence": {
+            "track_files": true,
+            "upload_diff": true,
+            "export_changed_files": true
+          }
+        }
+      }
+    },
+    "system_architecture": {
+      "framework": "acp",
+      "source_revision": "5c4453b8e13d1bfc808db6236516b283c4f2c227",
+      "profile": {
+        "path": "requirement.md",
+        "sha256": "2154fae92f9dce71fdd07850c2444e698fce4fa132b3b71519182d24794d048a"
+      },
+      "manifest": {
+        "path": "agent.toml",
+        "sha256": "22f8c07dee984206d69c9673bed0162f5f4e451d1c60acb59069fe241220bde6"
+      }
+    },
+    "notes": []
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "input_ordinal": "0001",
+      "agent_name": "fast-agent",
+      "kind": "model",
+      "source": "wire",
+      "started_at": "2026-10-28T15:04:09.544408+00:00",
+      "ended_at": "2026-10-28T15:04:10.611523+00:00",
+      "output_source": "wire",
+      "model": "openai/gpt-4.1-mini",
+      "purpose": "unknown",
+      "status": "complete",
+      "input": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful AI Agent.\n\n\n\n\n{{env}}\n\nMermaid diagrams between code fences are supported.\n\n{{model_specific}}\n\nThe current date is 28 October 2026."
+          },
+          {
+            "role": "user",
+            "content": "In the current working directory, run exactly this shell command, verbatim and unmodified (keep the trailing comment): touch build.log # ci-marker\nThen list the files in the directory and tell me exactly which files exist now."
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "execute",
+              "description": "Execute a shell command.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "The command to execute. For simple commands, provide the executable here and use args for arguments. Shell operators (pipes, redirects, &&, etc.) may be included and will be run via a shell wrapper automatically. Do not include your own shell prefix (bash -c, etc.)."
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Optional array of command arguments. When provided, command is treated as the executable path/name and args are passed through directly."
+                  },
+                  "env": {
+                    "type": "object",
+                    "description": "Optional environment variables as key-value pairs.",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "cwd": {
+                    "type": "string",
+                    "description": "Optional absolute path for working directory."
+                  }
+                },
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "read_text_file",
+              "description": "Read content from a text file. Returns the file contents as a string. ",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Absolute path to the file to read."
+                  },
+                  "line": {
+                    "type": "integer",
+                    "description": "Optional line number to start reading from (1-based).",
+                    "minimum": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Optional maximum number of lines to read.",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "write_text_file",
+              "description": "Write content to a text file. Creates or overwrites the file. ",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Absolute path to the file to write."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "The text content to write to the file."
+                  }
+                },
+                "required": [
+                  "path",
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "model": "openai/gpt-4.1-mini",
+        "parameters": {
+          "stream": true,
+          "parallel_tool_calls": true,
+          "stream_options": {
+            "include_usage": true
+          }
+        }
+      },
+      "output": {
+        "text": "",
+        "reasoning": null,
+        "tool_calls": [
+          {
+            "id": "call_Cv5ENEIaxTgJyG1xs51sIIc1",
+            "name": "execute",
+            "arguments": {
+              "command": "touch build.log # ci-marker"
+            }
+          },
+          {
+            "id": "call_hQCEx8eR12flRdHaFPBXZSXo",
+            "name": "execute",
+            "arguments": {
+              "command": "ls"
+            }
+          }
+        ],
+        "finish_reason": "tool_calls",
+        "usage": {
+          "prompt_tokens": 359,
+          "completion_tokens": 48,
+          "total_tokens": 407,
+          "cost": 0.0002204,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002204,
+            "upstream_inference_prompt_cost": 0.0001436,
+            "upstream_inference_completions_cost": 7.68e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "model": "openai/gpt-4.1-mini"
+      },
+      "evidence": {
+        "interaction_id": "5de58cedce127050fd871b55",
+        "call_id": "call_8c39da092ae54dd2970ce8034d40f90c",
+        "framework_span_id": null,
+        "request_sha256": "12392fed080b6b1e30bf8d872c302ae229b1656c2a543dfc33862622eef4db4e",
+        "response_sha256": "bc2fa69ebfc37b5e09af6b1073eca9766454873feae6923377b6c670b5b7be0c"
+      },
+      "tool_logs": [
+        {
+          "tool_call_id": "call_Cv5ENEIaxTgJyG1xs51sIIc1",
+          "tool_name": "execute",
+          "input_arguments": {
+            "command": "touch build.log # ci-marker"
+          },
+          "outputs": null,
+          "execution_status": "not_observed",
+          "exit_status": null,
+          "link": "none",
+          "evidence": {}
+        },
+        {
+          "tool_call_id": "call_hQCEx8eR12flRdHaFPBXZSXo",
+          "tool_name": "execute",
+          "input_arguments": {
+            "command": "ls"
+          },
+          "outputs": null,
+          "execution_status": "not_observed",
+          "exit_status": null,
+          "link": "none",
+          "evidence": {}
+        }
+      ]
+    },
+    {
+      "step_id": 2,
+      "input_ordinal": "0001",
+      "agent_name": "fast-agent",
+      "kind": "tool_only",
+      "source": "framework",
+      "started_at": "2026-10-28T15:04:10.565902+00:00",
+      "ended_at": "2026-10-28T15:04:10.860877+00:00",
+      "status": "complete",
+      "tool_logs": [
+        {
+          "tool_call_id": "5777b26ec20d4da9b2e8e22a85c3aff4",
+          "tool_name": "execute",
+          "input_arguments": {
+            "command": "touch build.log # ci-marker"
+          },
+          "outputs": "\n\n[Exit code: 0]",
+          "execution_status": "succeeded",
+          "exit_status": null,
+          "link": "none",
+          "started_at": "2026-10-28T15:04:10.565902+00:00",
+          "ended_at": "2026-10-28T15:04:10.860877+00:00",
+          "evidence": {
+            "interaction_id": "750d3dcb4803deeaacff195f",
+            "framework_span_id": "d6f50ad6f74a4e70ae54b41af6b5f173:5777b26ec20d4da9b2e8e22a85c3aff4"
+          }
+        }
+      ]
+    },
+    {
+      "step_id": 3,
+      "input_ordinal": "0001",
+      "agent_name": "fast-agent",
+      "kind": "tool_only",
+      "source": "framework",
+      "started_at": "2026-10-28T15:04:10.599156+00:00",
+      "ended_at": "2026-10-28T15:04:10.900935+00:00",
+      "status": "complete",
+      "tool_logs": [
+        {
+          "tool_call_id": "6e1f41a9f8ef43f39ab9a74a6470f41c",
+          "tool_name": "execute",
+          "input_arguments": {
+            "command": "ls"
+          },
+          "outputs": "#\nbuild.log\n\n\n[Exit code: 0]",
+          "execution_status": "succeeded",
+          "exit_status": null,
+          "link": "none",
+          "started_at": "2026-10-28T15:04:10.599156+00:00",
+          "ended_at": "2026-10-28T15:04:10.900935+00:00",
+          "evidence": {
+            "interaction_id": "e3d9856d739798cdd398cf84",
+            "framework_span_id": "d6f50ad6f74a4e70ae54b41af6b5f173:6e1f41a9f8ef43f39ab9a74a6470f41c"
+          }
+        }
+      ]
+    },
+    {
+      "step_id": 4,
+      "input_ordinal": "0001",
+      "agent_name": "fast-agent",
+      "kind": "model",
+      "source": "wire",
+      "started_at": "2026-10-28T15:04:10.900097+00:00",
+      "ended_at": "2026-10-28T15:04:11.997393+00:00",
+      "output_source": "wire",
+      "model": "openai/gpt-4.1-mini",
+      "purpose": "unknown",
+      "status": "complete",
+      "input": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful AI Agent.\n\n\n\n\n{{env}}\n\nMermaid diagrams between code fences are supported.\n\n{{model_specific}}\n\nThe current date is 28 October 2026."
+          },
+          {
+            "role": "user",
+            "content": "In the current working directory, run exactly this shell command, verbatim and unmodified (keep the trailing comment): touch build.log # ci-marker\nThen list the files in the directory and tell me exactly which files exist now."
+          },
+          {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "call_Cv5ENEIaxTgJyG1xs51sIIc1",
+                "type": "function",
+                "function": {
+                  "name": "execute",
+                  "arguments": "{\"command\": \"touch build.log # ci-marker\"}"
+                }
+              },
+              {
+                "id": "call_hQCEx8eR12flRdHaFPBXZSXo",
+                "type": "function",
+                "function": {
+                  "name": "execute",
+                  "arguments": "{\"command\": \"ls\"}"
+                }
+              }
+            ],
+            "content": ""
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call_Cv5ENEIaxTgJyG1xs51sIIc1",
+            "content": "\n\n[Exit code: 0]"
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call_hQCEx8eR12flRdHaFPBXZSXo",
+            "content": "#\nbuild.log\n\n\n[Exit code: 0]"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "execute",
+              "description": "Execute a shell command.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "The command to execute. For simple commands, provide the executable here and use args for arguments. Shell operators (pipes, redirects, &&, etc.) may be included and will be run via a shell wrapper automatically. Do not include your own shell prefix (bash -c, etc.)."
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Optional array of command arguments. When provided, command is treated as the executable path/name and args are passed through directly."
+                  },
+                  "env": {
+                    "type": "object",
+                    "description": "Optional environment variables as key-value pairs.",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "cwd": {
+                    "type": "string",
+                    "description": "Optional absolute path for working directory."
+                  }
+                },
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "read_text_file",
+              "description": "Read content from a text file. Returns the file contents as a string. ",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Absolute path to the file to read."
+                  },
+                  "line": {
+                    "type": "integer",
+                    "description": "Optional line number to start reading from (1-based).",
+                    "minimum": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Optional maximum number of lines to read.",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "write_text_file",
+              "description": "Write content to a text file. Creates or overwrites the file. ",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Absolute path to the file to write."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "The text content to write to the file."
+                  }
+                },
+                "required": [
+                  "path",
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "model": "openai/gpt-4.1-mini",
+        "parameters": {
+          "stream": true,
+          "parallel_tool_calls": true,
+          "stream_options": {
+            "include_usage": true
+          }
+        }
+      },
+      "output": {
+        "text": "The directory currently contains these files:\n- #\n- build.log\n\nThe file \"build.log\" was created by the command you provided.",
+        "reasoning": null,
+        "tool_calls": [],
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 421,
+          "completion_tokens": 29,
+          "total_tokens": 450,
+          "cost": 0.0002148,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002148,
+            "upstream_inference_prompt_cost": 0.0001684,
+            "upstream_inference_completions_cost": 4.64e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "model": "openai/gpt-4.1-mini"
+      },
+      "evidence": {
+        "interaction_id": "a2ec6bd025a94e4937e42fb8",
+        "call_id": "call_910d49524f7246f88d0a3c6faaddf66d",
+        "framework_span_id": null,
+        "request_sha256": "343c3960857852f801da183a1e2f12dbf61177f551eaa2d2a46ff08612ec6d01",
+        "response_sha256": "fd7848da5154c89266bab677b29b8b411ff6a30686def22d8a55eea5bebc86c3"
+      },
+      "tool_logs": []
+    }
+  ],
+  "inputs": [
+    {
+      "ordinal": "0001",
+      "input_id": "step-1",
+      "prompt": "In the current working directory, run exactly this shell command, verbatim and unmodified (keep the trailing comment): touch build.log # ci-marker\nThen list the files in the directory and tell me exactly which files exist now.",
+      "step_range": [
+        1,
+        4
+      ],
+      "result": {
+        "status": "succeeded",
+        "output": "The directory currently contains these files:\n- #\n- build.log\n\nThe file \"build.log\" was created by the command you provided.",
+        "error_type": null,
+        "error": null
+      },
+      "file_changes": []
+    }
+  ],
+  "coverage": {
+    "model_calls": "wire",
+    "tool_calls": "acp",
+    "file_changes": "not_observed",
+    "ambiguous_links": 0,
+    "unlinked_tool_calls": 2,
+    "unobserved_tool_executions": 2
+  },
+  "sources": [
+    {
+      "path": "case.json",
+      "sha256": "5bd9f469506a913b4beb448f96f956a8e85a9a5320ba3d3f88c66335c9363ac5"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "9520a5b6db7c84b3837159eba2fc1ba0ee1cbd40b782b9b3412a861eb16b2e1f"
+    },
+    {
+      "path": "workspace.json",
+      "sha256": "6bec25b3d33c2012cf6060d677af532fdbcf38eaf60d1661749aa90ce4cd3c9d"
+    },
+    {
+      "path": "logs/network.jsonl",
+      "sha256": "5c8e49e8a373d529cd50a465bce9ef485dfc8c8e8d5ece74e3b165c8d7657e23"
+    },
+    {
+      "path": "steps/0001/framework.jsonl",
+      "sha256": "f7bb346be5efb66619bd47f876733136df72a95618bccd6dd01a8244b535a357"
+    },
+    {
+      "path": "steps/0001/input.json",
+      "sha256": "7c0c677d123ed6335c18146c9ae5788267172bed04ed455cab085f390ab40979"
+    },
+    {
+      "path": "steps/0001/request.json",
+      "sha256": "6a426a7a382839cc706ec74daade41aa4e533f50eaecdf9b3c7b88257d02501c"
+    },
+    {
+      "path": "steps/0001/result.json",
+      "sha256": "caa5cb8cf538a0e4f611dea738ec67fb88d5ed8ce295317ae3efd7d55cb18952"
+    },
+    {
+      "path": "steps/0001/submission.json",
+      "sha256": "cb5ad759b13524e237d23c0792d6e07a0ac43bbafe12977e70c32b73c36a36cd"
+    }
+  ],
+  "warnings": [
+    "2/2 model requests have no confirmed Input; Case identity and HTTP pairing are reported separately.",
+    "tool call call_Cv5ENEIaxTgJyG1xs51sIIc1 was emitted but its execution was not observed",
+    "tool call call_hQCEx8eR12flRdHaFPBXZSXo was emitted but its execution was not observed"
+  ]
+}

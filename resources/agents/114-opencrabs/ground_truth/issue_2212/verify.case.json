@@ -1,0 +1,37 @@
+{
+  "case_id": "ir-opencrabs-2212-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 2212,
+    "url": "https://github.com/opencrabs/opencrabs/issues/2212",
+    "state": "closed",
+    "title": "fix(tools): edit_file fuzzy fallback converts unrelated CRLF line endings to LF",
+    "body": "## Description\n\nFor a multi-line replace on a CRLF file whose old_text uses LF (read_file shows the model CR-stripped text), exact matching fails and fuzzy_replace_once rebuilds the entire file with lines() + join(\"\\n\"), stripping \\r from untouched lines too (61 -> 54 bytes).\n\nObserved behavior:\nIn all 5 runs that reached this path (batch run-03/04/08/09/10, plus the exploratory run) the od -c check after the edit showed \\r gone from the whole file; in most of them the agent noticed and restored it with sed -i 's/$/\\r/'. The 4 non-hit valid runs did not reach the path (old_text included \\r\\n, or hashline_edit was used).\n\n## Steps to reproduce\n\n1. Use the tested revision and reproduction environment below.\n2. Prepare the fixture described here:\n\nUse an empty workspace, supervised mode, and deepseek-chat. The first prompt creates CRLF bytes. This report concerns the fuzzy edit fallback, not calls that include CRLF in old_text or use hashline_edit.\n\n3. Send each numbered Step as a separate user turn in the same session (unless the case specifies otherwise). Preserve the supplied text:\n\n````````text\nStep 1: Run exactly this shell command in the current directory to create a Windows-style (CRLF) config file, then confirm it ran: printf 'name=demo\\r\\nhost=localhost\\r\\nport=8080\\r\\ndebug=false\\r\\nlog=info\\r\\n' > app.ini\nStep 2: In app.ini, replace the two consecutive lines\nhost=localhost\nport=8080\nwith these two lines\nhost=0.0.0.0\nport=9090\nDo it as one targeted edit of that two-line block with your file edit tool; do not rewrite the whole file and do not touch any other line.\nStep 3: Run exactly this shell command and show me its full output: od -c app.ini\n````````\n\n4. Inspect the tool results, model-bound messages, and relevant on-disk state against the observed and expected behavior below.\n\n## Expected behavior\n\nOnly the targeted two-line block changes; other lines keep CRLF. Basis: edit_file describes itself as 'Intelligently modify portions of files'; the user explicitly asks not to touch any other line.\n\n## Actual behavior\n\nIn all 5 runs that reached this path (batch run-03/04/08/09/10, plus the exploratory run) the od -c check after the edit showed \\r gone from the whole file; in most of them the agent noticed and restored it with sed -i 's/$/\\r/'. The 4 non-hit valid runs did not reach the path (old_text included \\r\\n, or hashline_edit was used).\n\n## Environment\n\nTested source revision: `2cf3e6ead8d97ac560216ffff59e9561252e9d3d`.\n\nUse an empty workspace, supervised mode, and deepseek-chat. The first prompt creates CRLF bytes. This report concerns the fuzzy edit fallback, not calls that include CRLF in old_text or use hashline_edit.\n\nModel/provider: Exact model/provider was not recorded in the supplied row.\n\n## Additional context\n\nThis case did not pass the original 7-of-10 reproduction gate: five batch runs exercised the fuzzy fallback and showed conversion. Other valid runs used different edit paths. A deterministic direct-tool reproduction would strengthen this report.\n\nSource review pointers at the tested revision:\n\nsrc/brain/tools/fuzzy.rs:89-119 (fuzzy_replace_once rebuilds with lines()/join(\"\\n\")); src/brain/tools/edit.rs:243-256; src/brain/tools/read.rs:215-266 (display text strips \\r via lines()).\n\nThis report is prepared from recorded reproduction evidence. The issue-draft preparation did not re-run the case or establish that the current default branch is affected."
+  },
+  "version_choice": "historical:0.5.12",
+  "reported_version": "0.5.12",
+  "commit_version": "2cf3e6ead8d97ac560216ffff59e9561252e9d3d",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Run exactly this shell command in the current directory to create a Windows-style (CRLF) config file, then confirm it ran: printf 'name=demo\\r\\nhost=localhost\\r\\nport=8080\\r\\ndebug=false\\r\\nlog=info\\r\\n' > app.ini",
+    "In app.ini, replace the two consecutive lines\nhost=localhost\nport=8080\nwith these two lines\nhost=0.0.0.0\nport=9090\nDo it as one targeted edit of that two-line block with your file edit tool; do not rewrite the whole file and do not touch any other line.",
+    "Run exactly this shell command and show me its full output: od -c app.ini"
+  ],
+  "expected": "A targeted multiline edit should preserve untouched CRLF line endings.",
+  "defect": "The edit_file fuzzy fallback converts unrelated CRLF line endings to LF.",
+  "fault location": [
+    {
+      "file": "src/brain/tools/fuzzy.rs",
+      "function": "multiline replacement reconstruction",
+      "line_start": 89,
+      "line_end": 119,
+      "commit": "2cf3e6ead8d97ac560216ffff59e9561252e9d3d",
+      "url": "https://github.com/opencrabs/opencrabs/blob/2cf3e6ead8d97ac560216ffff59e9561252e9d3d/src/brain/tools/fuzzy.rs#L89-L119",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Full-file lines() followed by join(\"\\n\") loses CRLF outside the edited block."
+    }
+  ],
+  "Root cause": "Source confirmed: the multiline fallback splits the entire content with lines(), reconstructs the complete file and joins using LF. This removes CR from untouched lines. Archived analysis reports five hits among ten attempts, with one infrastructure failure and other runs using alternate paths; this did not pass the archived seven-of-ten threshold. Later model repairs can restore CRLF, so inspect the immediate edit result rather than only the final file. No fresh runtime reproduction was performed during this organization. Exact first fixing commit has not been established. Root steps describe the selected original case; other run-local cases can differ. Retained observations are not automatically independent same-prompt trials."
+}

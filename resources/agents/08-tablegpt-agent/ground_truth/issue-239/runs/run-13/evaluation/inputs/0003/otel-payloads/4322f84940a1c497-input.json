@@ -1,3 +1,0 @@
-{
-  "query": "import os, glob\nimport pandas as pd\n\ncandidates = []\nfor root in [\".\", \"/mnt/data\", \"/content\", \"data\", \"/home\", \"/tmp\"]:\n    if os.path.exists(root):\n        for p in glob.glob(os.path.join(root, \"**\", \"*\"), recursive=True):\n            if os.path.isfile(p) and os.path.splitext(p)[1].lower() in {\n                \".csv\",\".tsv\",\".json\",\".jsonl\",\".parquet\",\".xlsx\",\".xls\",\".feather\",\".orc\",\".txt\",\".yaml\",\".yml\"}:\n                candidates.append(p)\n\nprint(\"Data files:\", sorted(set(candidates)) or \"NONE\")\nprint(\"DataFrames:\", {k: v.shape for k, v in globals().items() if isinstance(v, pd.DataFrame)} or \"NONE\")\nprint(\"Sidecars/schema docs: NONE\")"
-}

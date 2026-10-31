@@ -1,5 +1,5 @@
 export const DEFAULT_CASE_TAB = 'judge';
-export const CASE_TABS = ['judge', 'overview', 'timing', 'replay', 'conversation', 'generation', 'tools', 'json'];
+export const CASE_TABS = ['judge', 'overview', 'timing', 'replay', 'conversation', 'trajectory', 'generation', 'tools', 'json'];
 
 export function normalizeCaseTab(tab) {
   if (tab === 'trace') return 'timing';

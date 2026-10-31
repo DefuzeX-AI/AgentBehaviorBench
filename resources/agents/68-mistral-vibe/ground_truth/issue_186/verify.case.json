@@ -1,0 +1,66 @@
+{
+  "case_id": "ir-mistral-vibe-186-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 186,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/186",
+    "state": "closed",
+    "title": "The bash() tool call uses sh instead of bash",
+    "body": "As part of its task, my vibe called bash:\n\n```\nbash(command='cd /home/tyl/llm/index-benchmark && source .venv/bin/activate && python retriever/luxical/index.py dataset/documents > test_luxical_index.jsonl 2>&1 | head -20', timeout=None)\nError: bash failed: Command failed: 'cd /home/tyl/llm/index-benchmark && source .venv/bin/activate && python retriever/luxical/index.py dataset/documents > test_luxical_index.jsonl 2>&1 | head -20'\nReturn code: 127\nStderr: /bin/sh: 1: source: not found\n```\n\n`source`, of course, is [part of bash's built-ins](https://man7.org/linux/man-pages/man1/bash.1.html#SHELL_BUILTIN_COMMANDS) to load shell code from a file. Shouldn't the bash tool support it?\n\nSadly, [vibe's bash tool call runs](https://github.com/mistralai/mistral-vibe/blob/402e898f391f65c447cfe061a5fee47a0b50cce7/vibe/core/tools/builtins/bash.py#L240-L248) `asyncio.create_subprocess_shell()` which [uses](https://github.com/python/cpython/blob/4ea3c1a04747978361b497798428423cbb6a7146/Lib/asyncio/unix_events.py#L844-L846) `subprocess.Popen()` [which runs](https://github.com/python/cpython/blob/4ea3c1a04747978361b497798428423cbb6a7146/Lib/subprocess.py#L1845-L1851) `/bin/sh`, not bash.\n\nI can certainly understand why my dear devstral model would confuse the bash tool for running bash rather than sh.\nShall we have it run bash?\n\nI believe the trick is to pass `executable=\"/bin/bash\"` as kwargs to `asyncio.create_subprocess_shell()`."
+  },
+  "version_choice": "historical:1.3.5",
+  "reported_version": "1.2.1",
+  "commit_version": "79f215d91cf8ca7c8970d9d81470b76199fecc43",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a Python virtual environment in the workspace: run `python3 -m venv .venv` with the bash tool, then confirm `.venv/bin/activate` exists.",
+    "Activate that virtual environment and print the active interpreter in a single shell command: `source .venv/bin/activate && which python`."
+  ],
+  "expected": "The bash tool should run the command through a shell so the `source` builtin works and the command succeeds (per the issue discussion the tool is expected to execute bash/shell semantics).",
+  "defect": "The command string is handed to the ACP terminal without a shell, so `source` is treated as a program and the step fails with a 'not found' / 'Failed to create terminal' style error instead of activating the venv.",
+  "fault location": [
+    {
+      "file": "vibe/acp/tools/builtins/bash.py",
+      "function": "Bash._parse_command",
+      "line_start": 80,
+      "line_end": 97,
+      "commit": "79f215d91cf8ca7c8970d9d81470b76199fecc43",
+      "url": "https://raw.githubusercontent.com/mistralai/mistral-vibe/79f215d91cf8ca7c8970d9d81470b76199fecc43/vibe/acp/tools/builtins/bash.py",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "vibe/acp/tools/builtins/bash.py",
+      "function": "Bash.run",
+      "line_start": 35,
+      "line_end": 54,
+      "commit": "79f215d91cf8ca7c8970d9d81470b76199fecc43",
+      "url": "https://raw.githubusercontent.com/mistralai/mistral-vibe/79f215d91cf8ca7c8970d9d81470b76199fecc43/vibe/acp/tools/builtins/bash.py",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "vibe/core/tools/builtins/bash.py",
+      "function": "Bash.run",
+      "line_start": 263,
+      "line_end": 282,
+      "commit": "79f215d91cf8ca7c8970d9d81470b76199fecc43",
+      "url": "https://raw.githubusercontent.com/mistralai/mistral-vibe/79f215d91cf8ca7c8970d9d81470b76199fecc43/vibe/core/tools/builtins/bash.py",
+      "role": "original_issue_CLI_path_independently_tested",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The ACP Bash implementation tokenizes commands with shlex.split and sends an executable plus literal arguments to terminal/create without a shell. A shell builtin such as source therefore becomes an executable lookup and shell operators are not interpreted. This is the path exercised by the archived ACP case. The standalone CLI /bin/sh compatibility issue is a separate path.",
+  "reference_refresh": {
+    "date": "2026-10-29",
+    "role": "supplemental evidence capture",
+    "selected_attempt": "dbb9445948cb424bbcf60260e212a266",
+    "prior_validation": "Existing ten-run validation is retained as reported by the authors. This refresh replaces the representative evidence only.",
+    "archive": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\archived-references\\mistral-vibe-186",
+    "source_run": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\mistral-vibe-186\\execution\\agents\\mistral-vibe\\cases\\9ee4251add6554e2b56ac167ebe1b38a\\attempts\\dbb9445948cb424bbcf60260e212a266"
+  }
+}

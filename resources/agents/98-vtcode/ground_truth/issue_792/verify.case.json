@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-vtcode-792-v1",
+  "issue": {
+    "repository": "vinhnx/VTCode",
+    "number": 792,
+    "url": "https://github.com/vinhnx/VTCode/issues/792",
+    "state": "closed",
+    "title": "[Bug]: ACP PTY execution reports success without command output or exit status",
+    "body": "## Description\n\nWhen the ACP client advertises the terminal capability, VT Code forwards an exec_command call with tty=true (or mode=pty) to terminal/create and immediately returns status success with {terminal_id, mode:'pty', command}. It never reads terminal output or waits for exit, so the model receives no output and no exit status; a command that exits 3 is reported as success, and write_stdin on the returned id fails with 'exec session not found'.\n\nObserved behavior:\nIn 10/10 runs the tool call completed as success with rawOutput {status:success, result:{terminal_id, mode:'pty', command, working_dir:null}}, no output and no exit_code; follow-up write_stdin calls failed; the agent told the user it could not obtain the output or exit code.\n\n## Steps to Reproduce\n\n1. Use the tested revision and reproduction environment below.\n2. Prepare the fixture described here:\n\nUse ACP with a client advertising terminal capability and an empty workspace. Call exec_command with tty=true or PTY mode, and preserve the command's exit status 3.\n\n3. Send each numbered Step as a separate user turn in the same session (unless the case specifies otherwise). Preserve the supplied text:\n\n````````text\nStep 1: I need to check how a small script behaves when it is attached to a terminal. Use your exec_command tool with tty set to true (PTY mode) to run exactly this command once:\nsh -c 'if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3'\nThen tell me exactly what it printed and what its exit code was. If you did not receive the output or the exit code from the tool, say so explicitly instead of guessing.\n````````\n\n4. Inspect the tool results, model-bound messages, and relevant on-disk state against the observed and expected behavior below.\n\n## Expected Behavior\n\nexec_command returns the command's output and exit status (schema: 'Wait before returning output (ms)... response includes a session_id for write_stdin'; tty documented as 'Run the command in PTY mode for interactive or terminal-sensitive commands'); a non-zero exit is not reported as success.\n\n## Actual Behavior\n\nIn 10/10 runs the tool call completed as success with rawOutput {status:success, result:{terminal_id, mode:'pty', command, working_dir:null}}, no output and no exit_code; follow-up write_stdin calls failed; the agent told the user it could not obtain the output or exit code.\n\n## Screenshots\n\nNo screenshot is attached. The observation is based on the recorded tool/model outputs and file evidence.\n\n## Environment\n\nTested source revision: `bf19e49b1891184fe88b4266636bd41251f9d900`.\n\nUse ACP with a client advertising terminal capability and an empty workspace. Call exec_command with tty=true or PTY mode, and preserve the command's exit status 3.\n\nModel/provider: Exact model/provider was not recorded in the supplied row.\n\n## Configuration\n\nUse ACP with a client advertising terminal capability and an empty workspace. Call exec_command with tty=true or PTY mode, and preserve the command's exit status 3.\n\n## Log/Output\n\nRecorded observation (summary, not a full raw log):\n\nIn 10/10 runs the tool call completed as success with rawOutput {status:success, result:{terminal_id, mode:'pty', command, working_dir:null}}, no output and no exit_code; follow-up write_stdin calls failed; the agent told the user it could not obtain the output or exit code.\n\n## Additional Context\n\nSource review pointers at the tested revision:\n\ncrates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs (execute_descriptor, should_route_terminal_via_client, execute_terminal_via_client, launch_client_terminal); crates/codegen/vtcode-acp/src/zed/agent/tool_config.rs:104-122 (requested_terminal_mode)\n\nThis report is prepared from recorded reproduction evidence. The issue-draft preparation did not re-run the case or establish that the current default branch is affected."
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.180.5",
+  "commit_version": "ea28d48590cf98958885b3c420c5d22d8af82a68",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Step 1: I need to check how a small script behaves when it is attached to a terminal. Use your exec_command tool with tty set to true (PTY mode) to run exactly this command once:\nsh -c 'if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3'\nThen tell me exactly what it printed and what its exit code was. If you did not receive the output or the exit code from the tool, say so explicitly instead of guessing."
+  ],
+  "expected": "exec_command with tty=true runs the command in a real PTY session and returns its captured output and exit status, so the agent reports that the script printed TTY_YES and MARKER_7319 and that it exited with status 3 (a non-zero exit reported as a failed tool call with output and exit_code preserved) - per the issue's Expected Behavior and the tool schema ('Run the command in PTY mode for interactive or terminal-sensitive commands').",
+  "defect": "When the ACP client advertises the terminal capability, exec_command with tty=true is forwarded to the client's terminal/create and returns immediate success carrying only {status:success, result:{terminal_id, mode:'pty', command, working_dir:null}} - no command output and no exit_code - so the command that exits 3 is reported as a success the model learns nothing from (and a follow-up write_stdin on that id fails with 'exec session not found').",
+  "fault location": [
+    {
+      "file": "crates/codegen/vtcode-acp/src/zed/agent/tool_config.rs",
+      "function": "ZedAgent::requested_terminal_mode",
+      "line_start": 107,
+      "line_end": 122,
+      "commit": "ea28d48590cf98958885b3c420c5d22d8af82a68",
+      "url": "https://raw.githubusercontent.com/vinhnx/VTCode/ea28d48590cf98958885b3c420c5d22d8af82a68/crates/codegen/vtcode-acp/src/zed/agent/tool_config.rs",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs",
+      "function": "ZedAgent::execute_descriptor",
+      "line_start": 202,
+      "line_end": 220,
+      "commit": "ea28d48590cf98958885b3c420c5d22d8af82a68",
+      "url": "https://raw.githubusercontent.com/vinhnx/VTCode/ea28d48590cf98958885b3c420c5d22d8af82a68/crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs",
+      "function": "ZedAgent::launch_client_terminal",
+      "line_start": 285,
+      "line_end": 316,
+      "commit": "ea28d48590cf98958885b3c420c5d22d8af82a68",
+      "url": "https://raw.githubusercontent.com/vinhnx/VTCode/ea28d48590cf98958885b3c420c5d22d8af82a68/crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "With client terminal capability and PTY mode, execution delegates to terminal/create and immediately returns a successful terminal descriptor. It does not collect output or wait for the exit status, and the returned client terminal identifier is not a local exec-session identifier usable by write_stdin. The retained answer reports the descriptor without command output or exit status. The causal path was inspected at this case's recorded revision, rather than assuming earlier archived line numbers still apply."
+}

@@ -160,7 +160,7 @@ agentbench certify AGENT_ID [OPTIONS]
 | `--case-retries N` | 安全可恢复的 Case 失败最多自动追加的尝试次数；非负整数，默认 2，0 表示禁用自动重试。 | `--case-retries 0` |
 | `--retry-delay SECONDS` | 首次重试的等待秒数；有限非负数，默认 5；后续等待按重试策略增长。 | `--retry-delay 5` |
 | `--no-view` | 保存结果但不启动网页；默认启动或复用查看器，需要已构建的网页资源。 | `--no-view` |
-| `AGENT_ID` | 必填的已启用注册 Agent 精确 ID；认证 adapting Agent，ready Agent 直接返回，不再次执行。 | `folder-mover-agent` |
+| `AGENT_ID` | 必填的已启用注册 Agent 精确 ID；认证 adapting Agent，ready Agent 直接返回，不再次执行。 | `deer-flow` |
 | `--env-file PATH` | 指定环境文件；默认读取项目 .env，Shell 已导出的变量优先。 | `--env-file .env.testing` |
 | `--results-dir DIR` | 指定 ABB 结果根目录，不存在时创建；在仓库根目录运行时默认为 results/。事件保存在 DIR/suites/SUITE_ID/events.json，与旧结果位置参数互斥。 | `--results-dir results/my-run` |
 | `--output PATH` | 旧 ABB 结果位置参数；文件路径仅选择父目录，不创建该文件，建议用 --results-dir。在仓库根目录运行时，默认结果根目录为 results/。 | `--output results/legacy.json` |

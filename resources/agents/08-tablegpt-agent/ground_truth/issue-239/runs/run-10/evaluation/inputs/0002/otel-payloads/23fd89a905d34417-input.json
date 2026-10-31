@@ -1,3 +1,0 @@
-{
-  "query": "import os\n\n# Read the IPython startup scripts to understand the environment\nbase = \"abb-tablegpt-5utytjj_/profile/startup\"\nfor fn in [\"00-pandas.py\", \"98-udfs.py\", \"99-cfont.py\"]:\n    p = os.path.join(base, fn)\n    print(f\"===== {fn} =====\")\n    try:\n        with open(p, \"r\", errors=\"replace\") as fh:\n            content = fh.read()\n        # show first ~2500 chars to keep it digestible\n        print(content[:2500] + (\"\\n...[truncated]...\" if len(content) > 2500 else \"\"))\n    except Exception as e:\n        print(\"  unreadable:\", e)\n    print()"
-}

@@ -1,4 +1,0 @@
-{
-  "error": null,
-  "output": "exit code: 1\n----- captured output -----\nSimulating deadlock on /home/agent/workspace/migration.db (sleep=0.1s)\n[A] BEGIN; updating account 1\n[B] BEGIN; updating account 2\n[B] DEADLOCK: no such table: accounts\n[A] DEADLOCK: no such table: accounts\nTraceback (most recent call last):\n  File \"/home/agent/workspace/deadlock_sim.py\", line 115, in <module>\n    sys.exit(main(sys.argv))\n             ^^^^^^^^^^^^^^\n  File \"/home/agent/workspace/deadlock_sim.py\", line 103, in main\n    for row in sqlite3.connect(db_path).execute(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nsqlite3.OperationalError: no such table: accounts\n----- files -----\n-rw-r--r-- 1 agent agent 0 Oct  7 05:25 /home/agent/workspace/migration.db\n"
-}

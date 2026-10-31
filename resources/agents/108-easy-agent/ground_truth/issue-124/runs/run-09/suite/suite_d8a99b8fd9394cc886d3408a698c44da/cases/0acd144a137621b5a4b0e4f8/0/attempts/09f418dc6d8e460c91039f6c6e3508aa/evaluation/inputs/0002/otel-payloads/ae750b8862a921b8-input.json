@@ -1,3 +1,0 @@
-{
-  "command": "cd /workspace/project && python3 - <<'PY'\np='split_lines.sh'\ns=open(p).read()\nbad=\"IFS=$\\n\\\\n'\\nread -r -a parts <<< \\\"$1\\\"\\nfor p in \\\"${parts[@]}\\\"; do\\n  echo \\\"[$p]\\\"\\ndone\"\ngood=\"IFS=$'\\\\n'\\nread -r -a parts <<< \\\"$1\\\"\\nfor p in \\\"${parts[@]}\\\"; do\\n  echo \\\"[$p]\\\"\\ndone\"\nassert bad in s, \"pattern not found\"\nopen(p,'w').write(s.replace(bad,good))\nPY\ncat -A split_lines.sh"
-}

@@ -1,0 +1,24 @@
+{
+  "case_id": "ir-llxprt-code-3786-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3786,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3786",
+    "state": "open",
+    "title": "replace tool converts TypeScript string escape sequences into literal newlines",
+    "body": "During #3781 work, the built-in `replace` tool received `new_string` containing TypeScript `.join('\\n\\n')` and `.split('\\n')` code (backslash-n characters within single quotes). It reported successful replacements but the resulting file contained actual line breaks between the single quotes. Bun and tsc failed with `Unterminated string literal` at scripts/pr-review-walkthrough.ts:279,282,302,320. Reading the file confirmed the escaped sequences had become physical newlines.\n\nThe same code supplied through `apply_patch` preserved the backslash-n sequences. Logs: `tmp/verify3781-next/green-stages.log` and `types-initial.log` in branch-6.\n\nExpected: replace preserves literal `old_string`/`new_string` content, including source-code escapes, as its tool contract describes. This creates invalid source from valid tool input and forces patch-based recovery."
+  },
+  "version_choice": "pinned",
+  "reported_version": "unknown",
+  "commit_version": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create sample.ts with exactly this one-line TypeScript source and a final newline: const value = \"old\";. Read it with read_file.",
+    "Use the built-in replace tool to replace the complete source line with exactly the following text (backslashes are literal source characters):\nconst value = ['a', 'b'].join('\\n\\n');\nThen inspect the actual file bytes."
+  ],
+  "expected": "Exact replacement preserves literal source-code escape sequences after JSON decoding.",
+  "defect": "replace writes physical newline/CR control characters where new_string contained literal backslash escape sequences, corrupting source code.",
+  "fault location": [],
+  "Root cause": "The observed behavior is consistent with an additional escape-normalization step after JSON decoding, which makes literal backslash-n indistinguishable from an actual newline. The reports do not identify a confirmed implementation line; do not label an arbitrary edit helper as the root cause."
+}

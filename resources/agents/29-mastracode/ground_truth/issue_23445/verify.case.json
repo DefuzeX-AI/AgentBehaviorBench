@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-mastracode-23445-v1",
+  "issue": {
+    "repository": "mastra-ai/mastra",
+    "number": 23445,
+    "url": "https://github.com/mastra-ai/mastra/issues/23445",
+    "state": "closed",
+    "title": "[BUG] applyTail reports a fractional line count, so the truncation notice disagrees with the lines returned",
+    "body": "### Describe the Bug\n\n`applyTail` reports a fractional line count in its truncation notice, so the model is told the output was cut at a line boundary that cannot exist and the count it reads does not match the number of lines it receives.\n\nThe helper derives one value and uses it for two different purposes:\n\n```ts\n// packages/core/src/workspace/tools/output-helpers.ts:63\nconst n = Math.abs(tail ?? DEFAULT_TAIL_LINES);\nif (n === 0) return output; // 0 = no limit\n// Strip trailing newline before splitting so it doesn't count as a line\nconst trailingNewline = output.endsWith('\\n');\nconst lines = (trailingNewline ? output.slice(0, -1) : output).split('\\n');\nif (lines.length <= n) return output;\nconst sliced = lines.slice(-n).join('\\n');\nconst body = trailingNewline ? sliced + '\\n' : sliced;\nreturn `[showing last ${n} of ${lines.length} lines]\\n${body}`;\n```\n\nhttps://github.com/mastra-ai/mastra/blob/2efa6bab6dde4e77e21adf1a9d59e8e44710194b/packages/core/src/workspace/tools/output-helpers.ts#L61-L71\n\n`n` is passed to `Array.prototype.slice`, which truncates a fractional count toward zero, and it is also interpolated into the notice unchanged. When `n` is not an integer the two disagree: `slice(-2.5)` keeps 2 lines, while the notice claims 2.5.\n\n### Why the value reaches the helper\n\nThe `tail` parameter is typed `z.number()` with no integer constraint on both tools that call this path:\n\n- https://github.com/mastra-ai/mastra/blob/2efa6bab6dde4e77e21adf1a9d59e8e44710194b/packages/core/src/workspace/tools/execute-command.ts#L23-L28 (`execute_command`)\n- https://github.com/mastra-ai/mastra/blob/2efa6bab6dde4e77e21adf1a9d59e8e44710194b/packages/core/src/workspace/tools/get-process-output.ts#L18-L23 (`get_process_output`)\n\nThe preprocessor in front of them accepts decimal strings by design, so `\"2.5\"` is coerced to the number `2.5` and then passes `z.number()`:\n\n```ts\n// packages/core/src/workspace/tools/helpers.ts:16\nconst NUMERIC_STRING_REGEX = /^-?\\d+(?:\\.\\d+)?$/;\n```\n\nhttps://github.com/mastra-ai/mastra/blob/2efa6bab6dde4e77e21adf1a9d59e8e44710194b/packages/core/src/workspace/tools/helpers.ts#L16\n\nSo both a JSON number `2.5` and the string `\"2.5\"` reach `applyTail` unchanged. No validation rejects them, and nothing downstream rounds the value before it is printed.\n\n### What the user sees\n\nThe truncation notice is the only signal the model has about what was removed from the output. With a fractional `tail` it receives a header describing an impossible cut, and a line count that does not match the body it was given:\n\n```\n[showing last 2.5 of 10 lines]\nline 9\nline 10\n```\n\nA model that trusts the header can conclude a partial line was included, or that one more line exists than actually does. Because `tail` is model-supplied on a tool the model calls directly, this is reachable without any unusual configuration.\n\n### Steps To Reproduce\n\nAdd this to the existing `packages/core/src/workspace/tools/output-helpers.test.ts` and run it against `main`:\n\n```ts\nit('keeps exactly as many lines as the notice claims when tail is fractional', () => {\n  const makeLines = (n: number) => Array.from({ length: n }, (_, i) => `line ${i + 1}`).join('\\n');\n  const result = applyTail(makeLines(10), 2.5);\n  const [notice, ...body] = result.split('\\n');\n  const claimed = Number(/last (\\S+) of/.exec(notice)![1]);\n  expect(body).toHaveLength(claimed);\n});\n```\n\nIt fails on `main` with:\n\n```\nAssertionError: expected [ 'line 9', 'line 10' ] to have a length of 2.5 but got 2\n\n- Expected\n+ Received\n\n- 2.5\n+ 2\n```\n\nReaching it through a tool call rather than the helper directly: call `execute_command` with `tail: 2.5` (or `tail: \"2.5\"`) on any command producing more than three lines of output, and read the header on the returned text.\n\n### Expected Behavior\n\n- The truncation notice always reports a whole number of lines.\n- The count in the notice always equals the number of lines actually returned.\n- A fractional `tail` is rejected by the tool's input schema rather than silently reshaping the output, since `tail` is a line count.\n- `tail: 0` (no limit) and negative values keep their currently documented meaning.\n\n### Environment Information\n\n```text\n@mastra/core: reproduced against main @ 2efa6bab6dde4e77e21adf1a9d59e8e44710194b\nAffected: packages/core/src/workspace/tools/output-helpers.ts (applyTail)\nCallers: execute_command, get_process_output (via truncateOutput)\nNode: 24.x\nOS: Windows 11 (logic is platform-independent)\n```\n\n### Related issues (searched, not duplicates)\n\n- #23392 — also concerns workspace tool output truncation, but a different function and mechanism: `applyTokenLimit` splitting a UTF-16 surrogate pair via `sliceByTokens`. No overlap with the line-count path or the notice text.\n- #18006 — added the original unit tests for `output-helpers`; the fractional case was not covered.\n\n### Verification\n\n- [x] I have searched the existing issues to make sure this is not a duplicate\n- [x] I have included sufficient information for the team to reproduce and understand the issue\n\nI have a branch with a fix and a regression test, and will open a PR referencing this issue.\n"
+  },
+  "version_choice": "historical:mastracode@0.39.1",
+  "reported_version": "mastracode@0.39.1",
+  "commit_version": "cbd18af524e1f336fc7a7803d870b2f98b106f75",
+  "fixed_in": "mastracode@0.40.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Use execute_command to run a command that prints 10 lines (e.g. seq 10) with tail set to 2.5, and show me the returned output header."
+  ],
+  "expected": "The truncation notice states the same whole number of lines that is actually returned (or the fractional tail is rejected).",
+  "defect": "The tool returns `[showing last 2.5 of 10 lines]` followed by only 2 lines, so the notice disagrees with the body.",
+  "fault location": [
+    {
+      "file": "packages/core/src/workspace/tools/output-helpers.ts",
+      "function": "applyTail",
+      "line_start": 61,
+      "line_end": 72,
+      "commit": "cbd18af524e1f336fc7a7803d870b2f98b106f75",
+      "url": "https://github.com/mastra-ai/mastra/blob/cbd18af524e1f336fc7a7803d870b2f98b106f75/packages/core/src/workspace/tools/output-helpers.ts#L61-L72",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Uses n = Math.abs(tail ?? DEFAULT_TAIL_LINES) both for lines.slice(-n), which truncates 2.5 to 2, and verbatim in the `[showing last ${n} of ...]` notice; PR #23570 (commit 44057ea) wraps it in Math.floor so the notice and the slice agree."
+    },
+    {
+      "file": "packages/core/src/workspace/tools/execute-command.ts",
+      "function": "<module> (executeCommandInputSchema)",
+      "line_start": 23,
+      "line_end": 28,
+      "commit": "cbd18af524e1f336fc7a7803d870b2f98b106f75",
+      "url": "https://github.com/mastra-ai/mastra/blob/cbd18af524e1f336fc7a7803d870b2f98b106f75/packages/core/src/workspace/tools/execute-command.ts#L23-L28",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The tail parameter is z.preprocess(coerceNumericString, z.number()) with no integer constraint, so a fractional 2.5 (or \"2.5\") reaches applyTail; PR #23570 changes it to z.number().int()."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/mastra-ai/mastra/pull/23570 (commit 44057eac6fd048100574bf71c6dc095f769a6d63). The execute_command (and get_process_output) input schema accepts tail as any number, and coerceNumericString also turns decimal strings into numbers, so a model-supplied tail of 2.5 reaches applyTail in packages/core/src/workspace/tools/output-helpers.ts unchanged. applyTail uses the same value n for Array.prototype.slice(-n), which truncates 2.5 toward zero and keeps 2 lines, and for the notice `[showing last ${n} of ${lines.length} lines]`, which prints 2.5, so the model is told about an impossible cut. The fix floors n in applyTail (treating |tail| < 1 as no limit) and constrains tail to integers with z.number().int() in execute-command.ts and get-process-output.ts. The fix is first released in mastracode@0.40.0 (@mastra/core@1.67.0); the pinned mastracode@0.41.0 already contains it, so the case is tested at mastracode@0.39.1, the last release before the fix and the latest release when the issue was opened, which provides the ACP entry and still has the faulty code."
+}

@@ -1,0 +1,47 @@
+{
+  "case_id": "ir-llxprt-code-2719-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 2719,
+    "url": "https://github.com/vybestack/llxprt-code/issues/2719",
+    "state": "closed",
+    "title": "fh files interpreted as images",
+    "body": "on 0.10.0 gpt-5.6-sol tried to read various .fh files (on windows) which are apaprently text or some kind of source code but llxprt kept interpreting them as iamges and the api was returning this:  [API Error: Client error: The image data you provided does not represent a valid image. Please check your input and try again with one of thesupported image formats: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']. (Status: 400)] \ntheser have something to do with shaders. The model ended up just cating them with the shell tool but that shouldn't be necessary we should interpret them correctly.\n\n"
+  },
+  "version_choice": "historical:v0.10.0",
+  "reported_version": "0.10.0",
+  "commit_version": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+  "fixed_in": "v0.11.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a file named shader.fh containing these three lines:\n// fragment shader\nuniform vec4 color;\nvoid main() { gl_FragColor = color; }",
+    "Read shader.fh with read_file and tell me what it does."
+  ],
+  "expected": "read_file treats shader.fh as text and returns its source lines to the model.",
+  "defect": "read_file classifies the .fh file as an image and sends it as inline image data; the API answers \"The image data you provided does not represent a valid image... (Status: 400)\" and the model falls back to cat via the shell.",
+  "fault location": [
+    {
+      "file": "packages/tools/src/utils/fileUtils.ts",
+      "function": "detectFileType",
+      "line_start": 225,
+      "line_end": 227,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/utils/fileUtils.ts#L225-L227",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Trusts mime.lookup(), which maps .fh to image/x-freehand, and returns 'image' before any content sniffing; PR #2726 excludes the FreeHand extensions (.fh, .fh4, .fh5, .fh7, .fhc) from this short-circuit."
+    },
+    {
+      "file": "packages/core/src/utils/fileUtils.ts",
+      "function": "detectFileType",
+      "line_start": 272,
+      "line_end": 275,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/core/src/utils/fileUtils.ts#L272-L275",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Same mime-type short-circuit in the core copy of detectFileType; PR #2726 applies the same exclusion."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2726. read_file decides how to read a file with detectFileType, which in v0.10.0 first asks mime.lookup() for the extension and returns 'image' for any image/* type. mime-db maps the FreeHand family (.fh and variants) to image/x-freehand, so plain-text shader sources with a .fh extension are base64-encoded and sent to the model as an image part, which the provider rejects with a 400 'not a valid image' error. Commit e83eb8f (PR #2726, 'Stop classifying .fh-family files as images') excludes .fh, .fh4, .fh5, .fh7 and .fhc from the mime short-circuit in both the tools and core copies so they fall through to content-based text/binary detection. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0, the version named in the issue."
+}

@@ -1,3 +1,0 @@
-{
-  "query": "import os\nimport pandas as pd\n\n# Attempt to locate and load the dataset\ncandidates = []\nfor base in ['/tmp', '/home', '/mnt', '/data', '/workspace', os.getcwd()]:\n    if os.path.exists(base):\n        for root, dirs, files in os.walk(base):\n            for f in files:\n                if f.lower().endswith(('.csv', '.tsv', '.xlsx', '.parquet')):\n                    candidates.append(os.path.join(root, f))\n\nprint(\"Candidate data files found:\", candidates)\n\ndf = None\npath = '/tmp/synthetic_survey.csv'\nif os.path.exists(path):\n    df = read_df(path)\n    print(\"Loaded:\", path)\n    print(\"Shape:\", df.shape)\n    print(\"Columns:\", list(df.columns))\n    print(df.head())\nelse:\n    print(\"File still not present at\", path)"
-}

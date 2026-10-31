@@ -1,4 +1,0 @@
-{
-  "content": "import sqlite3\n\n\ndef main():\n    with sqlite3.connect(\"inventory.db\") as connection:\n        connection.execute(\"BEGIN\")\n        try:\n            connection.execute(\n                \"UPDATE products SET quantity = ? WHERE name = ?\",\n                (8, \"Widget\"),\n            )\n            connection.execute(\n                \"INSERT INTO products (id, name, quantity) VALUES (?, ?, ?)\",\n                (4, \"Doodad\", 3),\n            )\n            connection.execute(\"DELETE FROM products\")\n            connection.commit()\n        except Exception:\n            connection.rollback()\n            raise\n        products = connection.execute(\n            \"SELECT id, name, quantity FROM products ORDER BY id\"\n        ).fetchall()\n        print(*products, sep=\"\\n\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
-  "encoding": "utf-8"
-}

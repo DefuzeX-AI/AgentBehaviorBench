@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-gptme-1290-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 1290,
+    "url": "https://github.com/gptme/gptme/issues/1290",
+    "state": "closed",
+    "title": "bug: acp in zed: acp protocol flow error after first 'hello' message from user to agent",
+    "body": "@TimeToBuildBob : \n\nThis is a follow up on https://github.com/gptme/gptme/issues/1268, \na next step in making gptme-acp work inside zed.\n\n\n1. after upgrade:\n```bash\n[user0@work4 ~]$ uv tool install --force --upgrade \"git+https://github.com/gptme/gptme.git@master[acp]\"\nInstalled 1 package in 12ms\n ~ gptme==0.31.0 (from git+https://github.com/gptme/gptme.git@2f390bdc5e60b15c44e8dca1e288686353700c11)\n ```\n\n2. when the users sends a\n    'hello' prompt to gptme-acp via zed console\n\n3. zed reports error in zed acp console:\n```log\n‘TextContentBlock’ object has no attribute ‘get’\n```\n\n4. zed reports error in zed.log:\n```log\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: 2026-02-18 07:49:18,216 - root - ERROR - Background task failed\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: Traceback (most recent call last):\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: File \"/home/user0/.local/share/uv/tools/gptme/lib/python3.13/site-packages/acp/task/supervisor.py\", line 51, in _on_done\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: task.result()\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: ~~~~~~~~~~~^^\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: File \"/home/user0/.local/share/uv/tools/gptme/lib/python3.13/site-packages/acp/task/dispatcher.py\", line 81, in runner\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: result = await self._request_runner(message)\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: File \"/home/user0/.local/share/uv/tools/gptme/lib/python3.13/site-packages/acp/connection.py\", line 237, in _run_request\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: raise err from None\n2026-02-18T07:49:18-05:00 WARN  [agent_servers::acp] agent stderr: acp.exceptions.RequestError: Internal error\n```\n \n5. attached integration test reports 2 new errors (post-1268):\n* session_id change\n* acp/sdk protocol flow\n \n[verify_gptme.log](https://github.com/user-attachments/files/25391383/verify_gptme.log)\n[verify_gptme.py](https://github.com/user-attachments/files/25391382/verify_gptme.py)\n\n6. perhaps it is a good time now to write your own integration tests for acp based on `verify_gptme.py`?\n\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.31.0 (git 2f390bdc5e60b15c44e8dca1e288686353700c11)",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.32.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "hello"
+  ],
+  "expected": "gptme-acp replies to the first prompt normally.",
+  "defect": "The first session/prompt fails with ACP `Internal error`; the client shows `'TextContentBlock' object has no attribute 'get'`.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/1291 (commit c30f86e4cf4e9ecd67053acc429382f845e6ed6a), followed by https://github.com/gptme/gptme/pull/1293 and https://github.com/gptme/gptme/pull/1300. Newer agent-client-protocol SDKs deliver prompt content as Pydantic models (TextContentBlock) instead of dicts, but gptme/acp/adapter.py acp_content_to_gptme_message called `c.get(\"type\")` on each block, raising AttributeError that the SDK turned into 'Internal error' on the very first prompt (agent.py also used dict access on RequestPermissionResponse and an invalid stop_reason 'error'). PR #1291 accepts both dicts and Pydantic objects; #1293 and #1300 fix the next failures on the same path ('No model loaded') by propagating ContextVars into the executor thread and re-setting the default model/tools in each ACP handler. All three ship in v0.32.0; the pinned revision contains them."
+}

@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-claurst-442-v1",
+  "issue": {
+    "repository": "Kuberwastaken/claurst",
+    "number": 442,
+    "url": "https://github.com/Kuberwastaken/claurst/issues/442",
+    "state": "closed",
+    "title": "Bash tool runtime: multibyte truncation panic, 2 MB reader stall, no PAGER, spill large output to a file",
+    "body": "Found in the 2026-10-14 pi-vs-claurst and codex-vs-claurst audits (refs/audit, gitignored).\n\n- Output truncation slices by byte offset (`crates/tools/src/pty_bash.rs` ~701-719) and can panic on a non-char boundary with multibyte output.\n- The reader has a head-only 2 MB cap after which it stops reading, so a chatty command fills the pipe, the child blocks, and the call times out with output lost.\n- No `PAGER=cat` / `GIT_PAGER=cat` in the child env, so `git log`, `git diff`, `man` etc. can hang in `less`.\n- The Monitor path is unbounded.\n\nSpec:\n- Keep a rolling tail (last ~2000 lines / 50 KB) plus a head window instead of a head-only cap; never stop draining the pty.\n- Truncate on char boundaries (`is_char_boundary` back-off) everywhere output is cut.\n- When output exceeds the cap, write the full output to a 0600 spill file under the claurst home (e.g. `<home>/tool-output/<id>.txt`) and append `Full output: <path>` to the tool result; the model can Read it with offset.\n- Set `PAGER=cat`, `GIT_PAGER=cat`, `TERM` sensibly, and `GIT_TERMINAL_PROMPT=0` in the child env (codex and pi both do); keep existing env handling otherwise.\n- Apply the same tail/spill bound to the Monitor path.\n- Tests: multibyte output at the cut point does not panic; 10 MB of output completes and yields head+tail plus a spill path; the spill file is 0600."
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.1.7",
+  "commit_version": "0f5d970bd78738434afb0c7abae3350d03246938",
+  "fixed_in": "0.2.0 (approx: first release after fix)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Run this exact command with your Bash tool, without pipes or redirections: seq 1 2000000\nThen tell me the exit code, how many lines of output came back, and whether any of the output was trimmed or lost."
+  ],
+  "expected": "The Bash tool should complete `seq 1 2000000` (about 15 MB of output), return a head-and-tail summary, save the full output to a mode-0600 spill file under the claurst home directory (for example, <home>/tool-output/<id>.txt), and include `Full output: <path>` in the tool result. The PTY must keep draining so the process does not stall, time out, or lose output. This is the behavior specified in the issue and implemented by fix PR #455.",
+  "defect": "According to the issue, the PTY reader keeps only the first 2 MB of output and stops draining after reaching that limit. The child process can then block when the PTY buffer fills, leaving the Bash call hanging until it times out and losing output. No spill file or `Full output:` path is returned to the model.",
+  "fault location": [
+    {
+      "file": "src-rust/crates/tools/src/pty_bash.rs",
+      "line_start": 496,
+      "line_end": 523,
+      "function": "PTY output reader",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "0f5d970bd78738434afb0c7abae3350d03246938",
+      "url": "https://raw.githubusercontent.com/Kuberwastaken/claurst/0f5d970bd78738434afb0c7abae3350d03246938/src-rust/crates/tools/src/pty_bash.rs"
+    }
+  ],
+  "Root cause": "The PTY reader stops draining after total bytes exceed 2 MiB, retaining only the captured prefix. The later output formatter truncates again without a durable full-output retrieval handle. This causes output loss and can impose backpressure on a still-running writer. The retained answer reports unavailable/truncated output, but does not establish that this particular child process hung; the hang consequence remains conditional."
+}

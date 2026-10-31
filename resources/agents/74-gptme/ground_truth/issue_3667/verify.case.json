@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-gptme-3667-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 3667,
+    "url": "https://github.com/gptme/gptme/issues/3667",
+    "state": "closed",
+    "title": "shell tool: background command handling is fragile (ampersand mangled; no wait/poll primitive)",
+    "body": "## Summary\n\nThe `shell` tool's handling of background commands is fragile, and the primitives for interacting with background jobs are too limited for long-running tasks.\n\n## Repro (all observed in one session)\n\n1. **`&` in a compound command gets mangled into `bg`**\n\n   ```shell\n   cd /tmp && nohup python3 script.py > /tmp/log 2>&1 & echo \"pid $!\"\n   ```\n\n   ```\n   bash: line 35: bg: no job control\n   ```\n\n   Something in the tool rewrites/intercepts `&` and emits `bg`, which fails in the non-interactive shell. Same result with a plain `nohup ... &`.\n\n   Meta-proof: attempting to file this issue via `gh issue create --body \"...&...\"` triggered the same mangle (`Shell syntax error: unexpected token '&'`), so the issue body had to be written to a file first.\n\n2. **Syntax errors when combining `&` with variable assignment**\n\n   ```shell\n   VENV=$(poetry env info --path); nohup \"$VENV/bin/python\" script.py > log 2>&1 & echo started pid $!\n   ```\n\n   ```\n   Shell syntax error: unexpected token ')' (position 57)\n   ```\n\n   The tool appears to parse the command string itself before passing it to bash, and its parser chokes on constructs that are perfectly valid bash.\n\n3. **The explicit `bg <command>` escape hatch works** and returns a job id with `jobs` / `output <id>` / `kill <id>` — good! — but there is **no wait/poll primitive**:\n\n   - No `wait <id> [timeout]` or `output <id> --wait --timeout 60s`\n   - The only way to wait is `sleep N; jobs` in the *foreground* shell, which blocks the tool call for the whole sleep (and if the user interrupts it, the poll is lost without output)\n\n## Proposal\n\nCompare with Claude Code's background shell implementation, which works well:\n\n- Backgrounded commands return a task/shell id immediately\n- **Output retrieval is non-blocking** and can be polled incrementally (only new output since last read)\n- **Waiting is a first-class primitive**: wait on a task with a timeout, or block on completion with a deadline\n- A `sleep` in the foreground shell is never needed to poll a background task\n\nSuggested primitives for gptme's shell tool:\n\n- Fix the `&` mangling: either pass the command through to bash untouched, or cleanly detect backgrounding without rewriting the command line\n- Add `wait <job-id> [timeout]` — returns when the job exits or the timeout hits, with final output\n- Add incremental output reads (`output <id>` showing only new content since last call, or a `--tail` / `--since` flag)\n- Document that `&` inside a command string triggers the background path (or support both)\n\n## Context\n\nHit while rendering a ~80-frame zoom animation (~15 min runtime) in an interactive session: getting the long-running python script into the background took 4 attempts (2 mangled commands, 1 wrong-interpreter failure, then `bg`). Polling then required interruptible `sleep` calls in the foreground shell.\n"
+  },
+  "version_choice": "historical:v0.33.0",
+  "reported_version": "v0.33.0",
+  "commit_version": "eb5b671bd997804794d6b3b02ebc72ba525dc790",
+  "fixed_in": "v0.34.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Use the shell tool to run `cd /tmp && nohup python3 -c \"import time; time.sleep(5)\" > /tmp/log 2>&1 & echo \"pid $!\"`."
+  ],
+  "expected": "The command starts the Python process in the background and prints `pid <number>` without errors.",
+  "defect": "The background command is mangled: the tool reports `bash: line 35: bg: no job control` (or `Shell syntax error: unexpected token ...` for the VAR=$(...) variant) instead of starting the job.",
+  "fault location": [
+    {
+      "file": "gptme/tools/shell.py",
+      "function": "ShellSession._run_pipe",
+      "line_start": 491,
+      "line_end": 493,
+      "commit": "eb5b671bd997804794d6b3b02ebc72ba525dc790",
+      "url": "https://github.com/gptme/gptme/blob/eb5b671bd997804794d6b3b02ebc72ba525dc790/gptme/tools/shell.py#L491-L493",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "For a command without a pipe the tool blindly appends ` < /dev/null` after the whole line, so a `cmd & echo ...` list leaves the backgrounded process attached to the persistent shell's stdin pipe; PR #3673 adds _redirect_background_stdin, which inserts `< /dev/null` before every unquoted `&` operator."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/3673 (commit 01b6ad50a5b195b1b21b1f15a9960e285282e258). gptme runs every command inside one persistent bash process fed through a stdin pipe, and ShellSession._run_pipe (v0.33.0 lines 491-493) appends ` < /dev/null` to the end of any pipe-free command. For `... nohup python3 script.py > log 2>&1 & echo \"pid $!\"` the redirect only applies to the trailing `echo`; the backgrounded job keeps the shell's stdin pipe and can consume the tool's subsequent input, which corrupts the command/marker stream (the commit message says the background process 'can consume subsequent tool commands'). PR #3673 adds _redirect_background_stdin(), which uses bashlex to insert `< /dev/null` before every unquoted `&`, and adds `wait <id>` / `output <id> --new` primitives. Speculation: the exact `bg: no job control` text is plausibly produced when consumed/split input reaches bash; the `Shell syntax error: unexpected token ')'` variant comes from bashlex in split_commands (v0.33.0 lines 1975-1998) and is not changed by #3673. The fix ships in v0.34.0; the pinned revision contains it, so the case is tested at v0.33.0."
+}

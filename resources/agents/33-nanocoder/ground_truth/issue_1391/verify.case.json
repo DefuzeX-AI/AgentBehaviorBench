@@ -1,0 +1,44 @@
+{
+  "case_id": "ir-nanocoder-1391-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1391,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1391",
+    "state": "closed",
+    "title": "[Bug] processToolUse never sets isError for a non-zero shell exit, so --json and ACP report failed commands as successful",
+    "body": "## Description\n\n`processToolUse` sets `ToolResult.isError` in only two places: a blocked pre-tool-use gate and the `catch` for a thrown handler. A shell command that runs and exits non-zero returns *normally* from `execute_bash` as a plain string, so `isError` stays `undefined` and the result is byte-for-byte indistinguishable from a clean run.\n\nThis is the same root cause as #1371, but on a different path. #1371's fix (#1390) sets `isError` in the streamed bash runner, which `executeApprovedTool` only uses when a live display area exists (`tool-executor.tsx:104`). Every other surface goes through `processToolUse` and is still affected.\n\n## Steps to Reproduce\n\n```ts\nconst tm = new ToolManager();\nsetToolRegistryGetter(() => tm.getToolRegistry());\n\nconst result = await processToolUse({\n  id: 'c1',\n  function: {name: 'execute_bash', arguments: '{\"command\":\"exit 7\"}'},\n});\n```\n\n## Expected Behavior\n\n`result.isError === true` for a command that exited non-zero.\n\n## Actual Behavior\n\n```\nisError            = undefined\nstarts with Error: = false\ncontent            = \"EXIT_CODE: 7\\n\"\nclean run isError  = undefined\n```\n\n## Impact\n\n**`--plain` / `--json`** `plain/conversation.ts:712` counts a failed command as a successful lifecycle tool, and `:729` files its output under `result` instead of `error` in the JSON report. A CI consumer parsing that output cannot tell a passing build from a failing one.\n\n**ACP** `acp-conversation.ts:726` derives the tool-call status directly from `result.isError`, so a client like Zed shows a failed build as `completed`.\n\n(The subagent executor doesn't special-case bash or sniff `Error: `; it likely needs the same treatment but I haven't confirmed it.)\n\n## Root Cause\n\n`execute_bash`'s handler returns a `string`, so the exit code never reaches the `ToolResult` that `processToolUse` builds. The exit code is present in the content as `EXIT_CODE: n`, but parsing it back out would just be more of the string-sniffing #1371 set out to remove.\n\n## Suggested Fix\n\nLet a handler report failure without throwing, by widening the structured-output contract in `types/core.ts`:\n\n```ts\nexport interface StructuredToolOutput {\n\tllmContent: string;\n\tstructured?: JSONValue;   // now optional\n\tisError?: boolean;        // new\n}\n```\n\n`processToolUse` propagates it alongside `structuredContent`, and `execute_bash`'s handler returns `{llmContent, isError: bashRunFailed(result)}` reusing the predicate #1390 adds.\n\nNote the cost, which is why this was split out of #1390 rather than folded in: changing that handler's return type from `string` to an object breaks 17 tests in `execute-bash.spec.tsx`, including one named `execute_bash returns plain string not JSON` whose premise is the contract being changed. The model still receives plain text either way, since `processToolUse` unwraps `llmContent` — but the assertions need rewriting at the `ToolResult` level, and that deserves its own review.\n\n## Additional Context\n\nBlocked on / follows #1390."
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Use your shell tool to run the command `exit 7` exactly, then tell me the exit code."
+  ],
+  "expected": "The execute_bash tool call for `exit 7` should be marked as failed (result.isError === true), and therefore the ACP tool-call status should be failed rather than completed; the issue explicitly expects result.isError === true and states acp-conversation.ts derives status from isError.",
+  "defect": "The execute_bash tool call for `exit 7` is reported as completed (isError stays undefined), so a command that exited 7 is indistinguishable from a clean successful run in the ACP trace.",
+  "fault location": [
+    {
+      "file": "source/acp/acp-conversation.ts",
+      "line_start": 459,
+      "line_end": 469,
+      "function": "tool completion status mapping",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/acp/acp-conversation.ts"
+    },
+    {
+      "file": "source/tools/execute-bash.tsx",
+      "line_start": 34,
+      "line_end": 47,
+      "function": "formatBashResultForLLM",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/tools/execute-bash.tsx"
+    }
+  ],
+  "Root cause": "The ACP conversation layer derives tool failure from whether the returned text begins with Error. execute_bash formats a nonzero command exit as EXIT_CODE: 7, so the prefix check marks the call completed. The retained protocol update contains status=completed with rawOutput=EXIT_CODE: 7. The model correctly reports the exit code; the fault is loss of failure semantics in the protocol status."
+}

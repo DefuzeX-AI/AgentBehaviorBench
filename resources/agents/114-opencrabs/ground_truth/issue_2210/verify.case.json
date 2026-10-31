@@ -1,0 +1,37 @@
+{
+  "case_id": "ir-opencrabs-2210-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 2210,
+    "url": "https://github.com/opencrabs/opencrabs/issues/2210",
+    "state": "closed",
+    "title": "fix(tools): edit_file leaves stale version tracking and makes the next write_file fail",
+    "body": "## Description\n\nAfter the agent itself edits a file with edit_file, a user-requested whole-file write_file in the same session is refused with 'it changed on disk after you read it. Another agent is working in this directory.', although only this agent is present.\n\nObserved behavior:\nStep-3 write_file fails with 'Refusing to overwrite .../inventory.txt: it changed on disk after you read it. Another agent is working in this directory. ...'. In 4 of 7 hits (run-01/04/07/09) the file still had the old content at the end of step 3 and the agent stopped to ask the user; in the other 3 the agent re-read and rewrote successfully. Every hit run relayed 'another agent is working in this directory' to the user.\n\n## Steps to reproduce\n\n1. Use the tested revision and reproduction environment below.\n2. Prepare the fixture described here:\n\nUse an empty workspace, the custom deepseek-chat provider, and supervised mode with permission policy allow_once. Send all three prompts in the same session without another reader or writer touching inventory.txt.\n\n3. Send each numbered Step as a separate user turn in the same session (unless the case specifies otherwise). Preserve the supplied text:\n\n````````text\nStep 1: In the current working directory, create a file named inventory.txt containing exactly these four lines:\napples=3\nbananas=5\ncherries=7\ndates=9\nThen confirm it was created.\nStep 2: In inventory.txt, change only the bananas line so that it reads bananas=6. Make a targeted edit of that one line; do not rewrite the whole file.\nStep 3: Now replace the entire contents of inventory.txt with exactly these two lines:\nkiwis=1\nlemons=2\nYou already have the complete new content from me, so do not read the file again first: make one write_file call with overwrite_read_confirm set to true (I confirm the blind replace). Then tell me whether that write succeeded on the first attempt, and if it was refused, quote the exact reason you were given.\n````````\n\n4. Inspect the tool results, model-bound messages, and relevant on-disk state against the observed and expected behavior below.\n\n## Expected behavior\n\nwrite_file overwrites the file. Basis: write_file description 'Creates the file if it doesn't exist, overwrites if it does'; overwrite_read_confirm 'Confirms you intend a blind replace.'; the stale-write guard's own doc in src/brain/tools/file_versions.rs:48-50: 'Record what this session now knows the file to contain. Called after a read and after a successful write, so the writer's own output is not mistaken for someone else's change on the next write.'\n\n## Actual behavior\n\nStep-3 write_file fails with 'Refusing to overwrite .../inventory.txt: it changed on disk after you read it. Another agent is working in this directory. ...'. In 4 of 7 hits (run-01/04/07/09) the file still had the old content at the end of step 3 and the agent stopped to ask the user; in the other 3 the agent re-read and rewrote successfully. Every hit run relayed 'another agent is working in this directory' to the user.\n\n## Environment\n\nTested source revision: `2cf3e6ead8d97ac560216ffff59e9561252e9d3d`.\n\nUse an empty workspace, the custom deepseek-chat provider, and supervised mode with permission policy allow_once. Send all three prompts in the same session without another reader or writer touching inventory.txt.\n\nModel/provider: deepseek-chat via the recorded test harness.\n\n## Additional context\n\nSource review pointers at the tested revision:\n\nsrc/brain/tools/edit.rs:365 (no file_versions::record after atomic_write); src/brain/tools/write.rs:207-216 (is_stale_write -> refusal_message), :231 (record after write); src/brain/tools/read.rs:238 (record after full read); src/brain/tools/file_versions.rs:15-16, 48-53, 67-78. hashline_edit also does not record (untested).\n\nThis report is prepared from recorded reproduction evidence. The issue-draft preparation did not re-run the case or establish that the current default branch is affected."
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.5.13",
+  "commit_version": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Step 1: In the current working directory, create a file named inventory.txt containing exactly these four lines:\napples=3\nbananas=5\ncherries=7\ndates=9\nThen confirm it was created.",
+    "Step 2: In inventory.txt, change only the bananas line so that it reads bananas=6. Make a targeted edit of that one line; do not rewrite the whole file.",
+    "Step 3: Now replace the entire contents of inventory.txt with exactly these two lines:\nkiwis=1\nlemons=2\nYou already have the complete new content from me, so do not read the file again first: make one write_file call with overwrite_read_confirm set to true (I confirm the blind replace). Then tell me whether that write succeeded on the first attempt, and if it was refused, quote the exact reason you were given."
+  ],
+  "expected": "The single step-3 write_file call with overwrite_read_confirm=true overwrites inventory.txt with 'kiwis=1\\nlemons=2' without any refusal, because write_file 'overwrites if it does [exist]' and overwrite_read_confirm 'Confirms you intend a blind replace', and the successful edit_file should have recorded the post-edit content in file_versions (module doc: record 'after a read and after a successful write, so the writer's own output is not mistaken for someone else's change on the next write').",
+  "defect": "The step-3 write_file is refused with 'Refusing to overwrite .../inventory.txt: it changed on disk after you read it. Another agent is working in this directory.' because edit_file wrote the file without calling file_versions::record, leaving a stale expected version; the file keeps the old content unless the agent re-reads it, and the false 'another agent' explanation is relayed to the user.",
+  "fault location": [
+    {
+      "file": "src/brain/tools/edit.rs",
+      "function": "successful edit bookkeeping",
+      "line_start": 363,
+      "line_end": 373,
+      "commit": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+      "url": "https://raw.githubusercontent.com/opencrabs/opencrabs/0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402/src/brain/tools/edit.rs",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The successful edit path atomically writes new file content but only tracks the path in the session; it does not refresh the file-version observation used by the next write guard. A subsequent confirmed overwrite is compared with stale pre-edit state and falsely rejected as another agent changing the file. The retained third turn quotes this exact refusal."
+}

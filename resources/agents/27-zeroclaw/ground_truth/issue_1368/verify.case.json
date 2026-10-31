@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-zeroclaw-1368-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 1368,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/1368",
+    "state": "closed",
+    "title": "[Bug]: Shell variable expansion blocked inside single quotes",
+    "body": "### Summary\n\n`is_command_allowed()` blocks `$(` and `${` via `.contains()` even when they appear inside single quotes, where POSIX shells would treat them as literals\n\n### Affected component\n\nsecurity/sandbox\n\n### Severity\n\nS2 - degraded behavior\n\n### Current behavior\n\nCommands like `echo '$(date)'` are rejected because `is_command_allowed()` uses `command.contains(\"$(\")` which matches the literal characters inside single quotes. The function does have a quote-aware `contains_unquoted_shell_variable_expansion()` for `$VAR` patterns, but the `$(` and `${` checks at lines 706-713 of policy.rs use simple `.contains()` with no quote awareness.\n\n### Expected behavior\n\n`$(` and `${` inside single quotes should be treated as literal text and not trigger the command injection block, matching POSIX shell semantics where single quotes prevent all expansion.\n\n### Steps to reproduce\n\n```bash\n1. Configure `allowed_commands` to include `echo`.\n2. Send a message asking the agent to run `echo '$(hello)'`.\n3. The command is rejected by `is_command_allowed()`.\n```\n\n### Impact\n\nAffected users: any deployment using shell tool.\nFrequency: whenever commands contain `$` characters in string literals.\nConsequence: agent cannot use commands that include literal dollar signs in quoted strings, limiting utility for text processing and scripting.\n\n### ZeroClaw version\n\nv0.1.6\n\n### Rust version\n\nstable (exact version not relevant — this is a logic issue)\n\n### Operating system\n\nNixOS 26.05\n\n### Regression?\n\nUnknown\n\n### Pre-flight checks\n\n- [x] I reproduced this on the latest main branch or latest release.\n- [x] I redacted secrets/tokens from logs.\n- [x] I removed personal identifiers and replaced identity-specific data with neutral placeholders."
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.1.6",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "v0.1.7",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run the command echo '$(hello)'."
+  ],
+  "expected": "The command is allowed and prints the literal text $(hello), since single quotes prevent all shell expansion.",
+  "defect": "is_command_allowed() rejects `echo '$(hello)'` as command injection because it matches `$(` with a plain `.contains()` even inside single quotes.",
+  "fault location": [
+    {
+      "file": "src/security/policy.rs",
+      "function": "SecurityPolicy::is_command_allowed",
+      "line_start": 706,
+      "line_end": 714,
+      "commit": "a117be64fdaa31779204beadf2942c8aef57d0e5",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/a117be64fdaa31779204beadf2942c8aef57d0e5/src/security/policy.rs#L706-L714",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Rejects any command containing `$(` or `${` via quote-blind `command.contains`, even though the following quote-aware contains_unquoted_shell_variable_expansion already ignores single-quoted text; commit 05e88f8 (PR #1505) deletes the two `.contains` checks."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/1505 (policy change landed as commit https://github.com/zeroclaw-labs/zeroclaw/commit/05e88f81ea4ab6b2aef670d1605a49ad63424add, \"fix: improve tool-call parsing and shell expansion checks\"). In v0.1.6 SecurityPolicy::is_command_allowed blocks subshell/expansion operators with `command.contains(\"$(\") || command.contains(\"${\")` before calling the quote-aware contains_unquoted_shell_variable_expansion. The plain substring test also fires inside single quotes, where POSIX shells treat `$(` literally, so `echo '$(hello)'` is rejected and the shell tool reports a security-policy block. The fix removes the two raw `.contains` checks and relies on contains_unquoted_shell_variable_expansion, which skips single-quoted text and also matches `$(`/`${` when unquoted; it adds tests for `echo '$(cat /etc/passwd)'` and `echo '${HOME}'`. The fix first ships in v0.1.7; the pinned v0.8.5 (crates/zeroclaw-config/src/policy.rs L2539-2545) has only the quote-aware helper, so it contains the fix."
+}

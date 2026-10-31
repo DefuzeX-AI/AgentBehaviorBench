@@ -1,0 +1,36 @@
+{
+  "case_id": "ir-opencrabs-1932-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 1932,
+    "url": "https://github.com/opencrabs/opencrabs/issues/1932",
+    "state": "closed",
+    "title": "bug(plan): the trailing-task auto-complete is positional — a pending verification task is archived as done without evidence",
+    "body": "## Observed\n\nA live 4-task plan (`c42b1d54-3f0f-46a7-a48c-ae14fdf357d4`, \"Fork artifact publisher\", session `0117dd29`) had tasks 1–3 completed and **task 4 Pending**:\n\n> 4. Verify the publisher end to end once the publish step lands\n\nTask 4's acceptance criterion could **not** be met at the time — it required a real deploy to run new code, and no such deploy had happened. The turn then delivered its report and settled. On settle the harness **auto-completed task 4** and **archived the plan 4/4**, marking an unverified task as done.\n\n## Evidence (all read live)\n\n- Daemon log `2026-10-04T22:48:42.527288Z`: `tool_loop.rs:8673: Plan: auto-completed trailing delivery task at turn settle`\n- Daemon log `2026-10-04T22:48:59.805429Z`: `plan_card.rs:1652: Telegram plan card finalized ... completed card posted (MessageId(91159))`\n- The plan JSON was archived (removed from the session dir); `plan show_plan` then returned \"No active plan for this session.\"\n- The completed card carried no evidence for task 4 — because none existed.\n\n## Root cause\n\n`complete_trailing_delivery_task()` (`src/tui/plan.rs:492`) is **positional**, not delivery-shaped:\n\n```rust\nlet last = self.tasks.len() - 1;\nlet head_resolved = self.tasks[..last].iter()\n    .all(|t| matches!(t.status, Completed | Skipped));\nif head_resolved && matches!(self.tasks[last].status, Pending) {\n    self.tasks[last].complete(Some(\"Auto-completed at turn settle: ... (#737)\"));\n}\n```\n\nIt completes the last task whenever every earlier task is resolved and the last is Pending. It was introduced by `ede0763be` (\"fix(plan): auto-complete the trailing delivery task at turn settle\"), whose issue #737 describes that trailing task as *\"a 'deliver the verdict / audit' step\"* — i.e. the design intent is a **delivery** step. The implementation does not check for that; it fires on any pending last task.\n\n## Impact\n\nAny plan whose last task legitimately spans turns — a verification pending an external event, a wait, an observation — is silently marked done and archived the moment a turn settles with tasks `1..n-1` resolved. This fabricates a completed task with an **unmet acceptance criterion**, breaking the checklist's \"a completed box means verified-done\" contract and leaving a false durable record. It also makes multi-turn plans structurally impossible in that shape: you cannot carry a single trailing pending task across a turn boundary.\n\n## Repro\n\n1. Create a 2-task checklist plan.\n2. `complete` task 1.\n3. End the turn (deliver any non-empty text) with task 2 still Pending.\n4. Task 2 is auto-completed and the plan archives — regardless of whether task 2's work was done.\n\n## Possible direction (not a prescription)\n\nScope the auto-complete to a delivery-shaped trailing task, and/or do not archive when the trailing task was auto-completed without any evidence. The plan tool's own description says nothing about the last task being special, so the constraint is currently undocumented for users and agents alike.\n"
+  },
+  "version_choice": "historical:v0.5.4",
+  "reported_version": "unknown",
+  "commit_version": "212e13467769180c664e983ca372fe0694c55850",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a two-task plan. Task 1: write summary.txt containing draft complete. Task 2: verify the published artifact after I give you a deployment receipt; its acceptance criterion is an actual successful deployment receipt, which I have not supplied. Complete task 1, keep task 2 pending, and report current progress.",
+    "Show the current plan and task statuses."
+  ],
+  "expected": "The verification task remains pending across the turn until its acceptance criterion is satisfied.",
+  "defect": "Settling the first turn automatically completes the trailing verification task and archives the entire plan.",
+  "fault location": [
+    {
+      "file": "src/tui/plan.rs",
+      "function": "PlanDocument.complete_trailing_delivery_task",
+      "line_start": 481,
+      "line_end": 494,
+      "commit": "212e13467769180c664e983ca372fe0694c55850",
+      "url": "https://github.com/opencrabs/opencrabs/blob/212e13467769180c664e983ca372fe0694c55850/src/tui/plan.rs#L481-L494",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "complete_trailing_delivery_task checks position and head completion, not whether the trailing task is only delivery or has unresolved acceptance criteria. e8751b70 scopes this to delivery-shaped tasks without criteria."
+    }
+  ],
+  "Root cause": "complete_trailing_delivery_task checks position and head completion, not whether the trailing task is only delivery or has unresolved acceptance criteria. e8751b70 scopes this to delivery-shaped tasks without criteria."
+}

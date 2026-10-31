@@ -1,0 +1,47 @@
+{
+ "case_id": "ir-llxprt-code-3599-v1",
+ "issue": {
+  "repository": "vybestack/llxprt-code",
+  "number": 3599,
+  "url": "https://github.com/vybestack/llxprt-code/issues/3599",
+  "state": "closed",
+  "title": "Dogfood: read_file truncates a single-line JSON result and suggests unusable line pagination",
+  "body": "## Observed workload\n\nDuring Rust-CLI dogfooding orchestration on Darwin on 2026-09-07, the TS driver's built-in `read_file` returned a truncated result for a worker's single-line JSON envelope. The response said:\n\n```text\nIMPORTANT: The file content has been truncated.\nStatus: Showing lines 1-1 of 1 total lines.\nAction: ... read the next section ... offset: 1\n```\n\nThe displayed JSON ended inside its `summary` string. The omitted tail contains completion and verification evidence. With one physical line, line offset 1 is after the only line and cannot retrieve that tail. The exposed tool parameters offer line offsets and line counts, not byte/character continuation within a line.\n\nThis occurred for both `tmp/batch4/b4-astra-repair183-a1.out` and `tmp/batch4/b4-astra-ocr445-a2.out` under `/Users/acoliver/projects/llxprt/agent/branch-3`. These are ordinary single-envelope worker outputs, not provider streaming logs or binary files. No credentials are needed to reproduce the shape.\n\n## Expected behavior\n\nWhen truncation occurs within one line, return a usable continuation mechanism or actionable guidance that can recover the omitted text. Do not claim line pagination can retrieve a single-line tail. If the active output limit itself is the cause, disclose the relevant limit and a supported way to request the rest.\n\n## Scope and evidence limits\n\nObserved tool response only; no TS implementation diagnosis or source fix attempted. Installed-driver version and effective output-limit configuration were not captured, so this report does not establish a current-main regression. Search for an existing `read_file` single-line truncation issue did not find a matching open report."
+ },
+ "version_choice": "pinned",
+ "reported_version": "v0.11.0",
+ "commit_version": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+ "fixed_in": "unreleased:2306637e7a40",
+ "pinned_contains_fix": false,
+ "steps": [
+  "With a Python script, create tmp/batch4/b4-astra-repair183-a1.out containing one single-line JSON object (no newline inside it) with the keys status set to \"ok\", summary set to the text `step completed; ` repeated 400 times, and verification set to \"VERIFIED-END-MARKER\".",
+  "Use read_file to read tmp/batch4/b4-astra-repair183-a1.out and recover its full summary."
+ ],
+ "expected": "When the single line is truncated, read_file offers a working way to read the rest of that line (or states the limit and how to get the tail).",
+ "defect": "read_file truncates the single line (\"Showing lines 1-1 of 1 total lines\") and suggests `offset: 1`, which is past the only line, so the tail of the JSON cannot be recovered with read_file.",
+ "fault location": [
+  {
+   "file": "packages/tools/src/utils/fileUtils.ts",
+   "function": "processTextFile",
+   "line_start": 757,
+   "line_end": 764,
+   "commit": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+   "url": "https://github.com/vybestack/llxprt-code/blob/5400f65a6c7eef52844697c8f8c85390df29eea1/packages/tools/src/utils/fileUtils.ts#L757-L764",
+   "role": "upstream_fix",
+   "verification": "fix_diff_mapped_to_tested_revision",
+   "explanation": "Cuts every line longer than MAX_LINE_LENGTH_TEXT_FILE (2000) and appends '... [truncated]' with no continuation position; PR #3855 adds column windows (clipLineContinuable) that record where the next window starts."
+  },
+  {
+   "file": "packages/tools/src/tools/read-file.ts",
+   "function": "ReadFileToolInvocation.buildTruncatedLlmContent",
+   "line_start": 226,
+   "line_end": 252,
+   "commit": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+   "url": "https://github.com/vybestack/llxprt-code/blob/5400f65a6c7eef52844697c8f8c85390df29eea1/packages/tools/src/tools/read-file.ts#L226-L252",
+   "role": "upstream_fix",
+   "verification": "fix_diff_mapped_to_tested_revision",
+   "explanation": "Always tells the model to page with offset/limit (offset: end) even when the truncation is within one line; PR #3855 adds a column_offset parameter and emits clipped-line guidance only when it can continue the line."
+  }
+ ],
+ "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3855. In v0.11.0, read_file's text path (processTextFile) clips every line to MAX_LINE_LENGTH_TEXT_FILE (2000 characters) and appends '... [truncated]', setting isTruncated without recording where the clipped line continues. buildTruncatedLlmContent then always renders 'Showing lines X-Y of N total lines' and 'Action: ... use offset: <end>', i.e. line pagination. For a file consisting of one long JSON line, the only advice is offset: 1, which lies after the single line, and the tool exposes no character/column parameter, so the truncated tail cannot be read with read_file. Commit 2306637 (PR #3855, 'make clipped file lines recoverable') adds a column_offset parameter, windowed line clipping that reports the next column offset, and guidance text naming the exact read_file call that continues the clipped line. The fix is merged on main after v0.11.0 and is not in any full release yet (it is in v0.12.0-nightly.261019 and later), so the pinned version is tested."
+}

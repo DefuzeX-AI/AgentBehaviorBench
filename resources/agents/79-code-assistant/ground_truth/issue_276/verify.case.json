@@ -1,0 +1,47 @@
+{
+  "case_id": "ir-code-assistant-276-v1",
+  "issue": {
+    "repository": "stippi/code-assistant",
+    "number": 276,
+    "url": "https://github.com/stippi/code-assistant/issues/276",
+    "state": "open",
+    "title": "edit strips trailing whitespace from new_text but reports success",
+    "body": "**What happens**\n\nIf the file being edited has no trailing whitespace, `edit` also strips trailing whitespace from the replacement text, then reports success. So an edit that adds Markdown hard line breaks (two trailing spaces) silently loses them.\n\n**Environment**\n\ncode-assistant v0.2.16 (`b942737b`), Linux, ACP mode, DeepSeek `deepseek-v4-flash`. Same code on current main.\n\n**Steps to reproduce**\n\n1. Create a `README.md` with no trailing whitespace, ending with a few contact lines.\n2. Ask: add two trailing spaces to the first two contact lines as Markdown hard line breaks.\n3. The `edit` call has `new_text` like `Payments Team␠␠\\nBuilding 4, Floor 2␠␠\\n…` and returns success, but the written file has no trailing spaces on those lines.\n\nIn our run the agent checked with `cat -A`, said \"The `edit` tool stripped the trailing spaces\", and fell back to `perl -i`.\n\n**Cause**\n\n`apply_matches` in `crates/fs_explorer/src/file_updater.rs` runs `normalize(&replacement.replace, preserve_trailing_ws)` on the replacement too. `preserve_trailing_ws` comes from whether the original file already has trailing whitespace, so when it doesn't, `normalize_content` trims every line of the new text.\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.2.16",
+  "commit_version": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a file README.md in the current directory with exactly the following content (no trailing whitespace on any line):\n\n# Project\n\nInternal billing tools.\n\n## Contact\n\nPayments Team\nBuilding 4, Floor 2\npayments@example.com\n",
+    "Add two trailing spaces to the first two contact lines of README.md as Markdown hard line breaks."
+  ],
+  "expected": "The edit tool should write the replacement text as given, so the lines 'Payments Team' and 'Building 4, Floor 2' end with two trailing spaces in README.md.",
+  "defect": "Because the file has no trailing whitespace, the edit tool also trims trailing whitespace from new_text and still reports success, so the written file has no trailing spaces on those lines (the agent noticed via `cat -A` that \"The `edit` tool stripped the trailing spaces\").",
+  "fault location": [
+    {
+      "file": "crates/fs_explorer/src/file_updater.rs",
+      "function": "apply_matches",
+      "line_start": 165,
+      "line_end": 170,
+      "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+      "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/fs_explorer/src/file_updater.rs#L165-L170",
+      "role": "static_analysis",
+      "verification": "local_regression_and_ABB_before_after_verified",
+      "explanation": "The replacement text is passed through normalize(&replacement.replace, preserve_trailing_ws); when the original file has no trailing whitespace this trims every line of new_text, silently dropping intended trailing spaces."
+    },
+    {
+      "file": "crates/fs_explorer/src/file_updater.rs",
+      "function": "normalize",
+      "line_start": 8,
+      "line_end": 14,
+      "commit": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+      "url": "https://github.com/stippi/code-assistant/blob/b942737b7360de9608f2f84f28bf9a463d7a5bc1/crates/fs_explorer/src/file_updater.rs#L8-L14",
+      "role": "static_analysis",
+      "verification": "local_regression_and_ABB_before_after_verified",
+      "explanation": "With preserve_trailing_ws=false this helper calls encoding::normalize_content, which strips trailing whitespace; it is meant for matching the search text but is reused for the replacement."
+    }
+  ],
+  "Root cause": "Confirmed at the selected historical commit by local regression tests and fresh ABB before/after runs. The original file has no trailing whitespace, so preserve_trailing_ws is false. apply_matches applies normalize() to replacement text as well as search/content; normalize_content trims every line of new_text. Consequently edit reports success but discards explicitly requested Markdown hard-break spaces. The local patch normalizes replacement line endings only, preserving requested trailing spaces while keeping existing search matching. Validation includes a controlled native-edit-only task and raw file bytes, because the original task can be completed by a shell workaround. This is a locally validated repair, not an upstream merged fix."
+}

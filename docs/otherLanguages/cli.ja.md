@@ -160,7 +160,7 @@ agentbench certify AGENT_ID [OPTIONS]
 | `--case-retries N` | 安全に復旧可能な Case 失敗への追加自動試行回数です。0 以上の整数、既定は 2。0 で自動再試行を無効にします。 | `--case-retries 0` |
 | `--retry-delay SECONDS` | 最初の再試行までの待機秒数です。有限の非負数、既定は 5。その後の待機時間は再試行方針に従って増えます。 | `--retry-delay 5` |
 | `--no-view` | 結果を保存し、ビューアーを起動しません。既定では起動または再利用するため、ビルド済みの Web リソースが必要です。 | `--no-view` |
-| `AGENT_ID` | 有効かつ登録済み Agent の正確な ID を指定します。adapting を認証し、ready は再実行せず終了します。 | `folder-mover-agent` |
+| `AGENT_ID` | 有効かつ登録済み Agent の正確な ID を指定します。adapting を認証し、ready は再実行せず終了します。 | `deer-flow` |
 | `--env-file PATH` | 環境ファイルを指定します。既定はプロジェクトの .env で、シェルの環境変数が優先されます。 | `--env-file .env.testing` |
 | `--results-dir DIR` | ABB の結果ルートを指定し、なければ作成します。リポジトリルートでの既定は results/ です。イベントは DIR/suites/SUITE_ID/events.json に保存されます。旧保存先オプションとは併用できません。 | `--results-dir results/my-run` |
 | `--output PATH` | 旧 ABB 保存先です。ファイル名を指定しても親ディレクトリを選ぶだけで、そのファイルは作成しません。--results-dir を推奨します。リポジトリルートでは既定は results/ です。 | `--output results/legacy.json` |

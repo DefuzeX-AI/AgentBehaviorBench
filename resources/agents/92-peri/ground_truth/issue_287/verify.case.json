@@ -1,0 +1,36 @@
+{
+  "case_id": "ir-peri-287-v1",
+  "issue": {
+    "repository": "KonghaYao/peri",
+    "number": 287,
+    "url": "https://github.com/KonghaYao/peri/issues/287",
+    "state": "open",
+    "title": "Read: truncation hint points to the wrong line when a single line exceeds 5000 bytes",
+    "body": "**What happens**\n\nWhen the first line returned by Read is longer than `MAX_OUTPUT_BYTES` (5000), Read returns the first 5000 bytes of that line and says:\n\n```\n[Output truncated: <N> bytes total; line 2 exceeds the output limit; use offset=2 to read the rest of the file]\n```\n\nFor a one-line file (e.g. minified JSON) there is no line 2. The line that exceeds the limit is line 1, and following the hint skips the rest of it. Since offset/limit are line-based, the rest of that line can't be read with Read at all.\n\n**Environment**\n\nperi agent-v4.3.0 (`e598d178`), Linux, `peri acp`. Same code on current main (`mcp-packages/workspace/src/filesystem/read.rs`, the `kept_lines == 0` branch sets `next_offset = start + 2`).\n\n**Steps to reproduce**\n\n1. `python3 -c \"import json; print(json.dumps({'k%d' % i: 'v' * 40 for i in range(160)}), end='')\" > config.json` (one ~7 KB line)\n2. Ask peri to read `config.json` with the Read tool and report the last key.\n3. Read returns the first 5000 bytes plus the hint above.\n\nHappened in both of our runs; the agent then fell back to python to read the file.\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "4.3.0",
+  "commit_version": "e598d17872bce487355e1bfa70f077743984760f",
+  "fixed_in": "4.3.2 (approx: first release after fix)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Run this command in the workspace:\n\npython3 -c \"import json; print(json.dumps({'k%d' % i: 'v' * 40 for i in range(160)}), end='')\" > config.json",
+    "Read `config.json` with the Read tool and report the last key."
+  ],
+  "expected": "The Read tool reads config.json (one ~7KB line), truncates at MAX_OUTPUT_BYTES=5000, and the truncation notice must name the line that actually exceeds the limit (line 1) instead of instructing the user to skip to a nonexistent line 2 with offset=2; following the hint must not silently discard the remainder of line 1 (issue #287, fixed in 4.3.2 by PR #288).",
+  "defect": "Read returns the first 5000 bytes of the single-line file plus '[Output truncated: <N> bytes total; line 2 exceeds the output limit; use offset=2 to read the rest of the file]' — the hint points to a nonexistent line 2, so following it skips the rest of line 1, which offset/limit cannot reach at all.",
+  "fault location": [
+    {
+      "file": "mcp-packages/workspace/src/filesystem/read.rs",
+      "function": "oversized first-line branch",
+      "line_start": 294,
+      "line_end": 300,
+      "commit": "e598d17872bce487355e1bfa70f077743984760f",
+      "url": "https://raw.githubusercontent.com/KonghaYao/peri/e598d17872bce487355e1bfa70f077743984760f/mcp-packages/workspace/src/filesystem/read.rs",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "When the first selected line alone exceeds the byte cap, Read truncates that line but sets next_offset to the following line. For a single-line file there is no next line and the omitted suffix cannot be retrieved through line-based pagination. The retained answer obtains the last key through a workaround and explicitly reports the Read limitation."
+}

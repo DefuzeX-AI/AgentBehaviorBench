@@ -1,0 +1,36 @@
+{
+  "case_id": "ir-opencrabs-2227-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 2227,
+    "url": "https://github.com/opencrabs/opencrabs/issues/2227",
+    "state": "closed",
+    "title": "fix(tool): edit_file line operations drop the final newline and convert CRLF files to LF",
+    "body": "### Duplicate check\n\n- [x] I searched open and closed issues and pull requests for this defect.\n- [x] I am filing from my own GitHub account, not an agent or bot account.\n\n### What happens, and what should happen instead\n\n`edit_file`'s line operations (`replace_lines`, `insert_line`, `delete_lines`) rewrite the whole file. They rebuild it with `content.lines()` and `join(\"\\n\")`, so besides the requested change they:\n\n- drop the file's final newline;\n- turn every `\\r\\n` into `\\n` (a CRLF file becomes LF).\n\nThe tool result only lists the changed lines, so none of this is visible. Deleting one line from a Windows file changes every line in the file.\n\nExpected: only the requested lines change. The rest of the bytes, including line endings and the final newline, stay as they were. `replace` (exact text) already behaves this way.\n\n### Steps to reproduce\n\n1. `python3 -c \"open('settings.ini','wb').write(b'[app]\\r\\nname = demo\\r\\nmode = debug\\r\\nport = 8080\\r\\nworkers = 4\\r\\n')\"`\n2. Ask OpenCrabs to remove the `mode = debug` line with `edit_file`'s `delete_lines` (start_line=2, end_line=2).\n3. The result says `Lines: 5 → 4` and shows `- mode = debug`. The file is now `[app]\\nname = demo\\nport = 8080\\nworkers = 4`: LF endings and no final newline.\n\nThe same happens on a plain LF file: `delete_lines` on a 6-line file ending in `\\n` leaves no final newline.\n\n### How are you running OpenCrabs\n\nPrebuilt release binary\n\n### OpenCrabs version\n\n0.5.13\n\n### Platform and Rust version\n\nLinux x86_64 (Ubuntu 26.04 container), prebuilt binary\n\n### Provider and model\n\nCustom OpenAI-compatible provider, DeepSeek `deepseek-v4-flash`\n\n### Logs and tool output\n\n```\nSuccessfully edited settings.ini. Lines: 5 → 4\n- mode = debug\n```\n\nIn one run the agent itself noticed afterwards: \"The edit_file tool deleted the line correctly but silently rewrote the whole file with Unix \\n endings and dropped the trailing newline\". It then restored the bytes by hand.\n\n### Source pointers\n\n`src/brain/tools/edit.rs`: the `ReplaceLines`, `InsertLine` and `DeleteLines` arms each do `let lines: Vec<&str> = content.lines().collect();` … `new_lines.join(\"\\n\")` (L268-289, L293-306, L313-333 at v0.5.13; unchanged on main). Keeping the detected line ending and the final newline would fix all three.\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.5.13",
+  "commit_version": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Run this exact command in the workspace: python3 -c \"open('settings.ini','wb').write(b'[app]\\r\\nname = demo\\r\\nmode = debug\\r\\nport = 8080\\r\\nworkers = 4\\r\\n')\"",
+    "Remove the `mode = debug` line from `settings.ini` using `edit_file`'s `delete_lines` (start_line=2, end_line=2)."
+  ],
+  "expected": "Only the requested line (mode = debug) is removed; all other bytes, including CRLF line endings and the final newline, remain unchanged, as the issue states replace (exact text) already does.",
+  "defect": "delete_lines rebuilds the file with content.lines() and join(\"\\n\"), silently converting CRLF to LF and dropping the final newline while the tool result only lists the changed line.",
+  "fault location": [
+    {
+      "file": "src/brain/tools/edit.rs",
+      "function": "EditTool::execute ReplaceLines",
+      "line_start": 268,
+      "line_end": 289,
+      "commit": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+      "url": "https://raw.githubusercontent.com/opencrabs/opencrabs/0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402/src/brain/tools/edit.rs",
+      "role": "source_review",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "Line-based edit operations split with content.lines() and reconstruct using LF joins. This discards CRLF delimiters and the original final-newline state across the whole file, even when only one line is removed. The case supplies an explicit CRLF byte fixture and uses delete_lines, making byte preservation the relevant oracle."
+}

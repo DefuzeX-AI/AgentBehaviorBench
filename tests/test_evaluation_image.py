@@ -55,6 +55,20 @@ def test_unrelated_sdk_only_supplies_dependencies_and_entrypoint(tmp_path):
         assert (agent.path / name).read_bytes() == content
 
 
+def test_historical_recipe_receives_controller_overlay(tmp_path):
+    agent, requirements = make_unit(tmp_path)
+    (agent.path / 'historical').mkdir()
+    (agent.path / 'historical/Dockerfile').write_text('FROM python:3.13\nUSER 10001\n')
+    path = agent.path / 'agent.toml'
+    path.write_text(path.read_text().replace('path = "/workspace"', 'path = "/workspace/task"')
+                    + '\n[build]\ncontext="."\ndockerfile="historical/Dockerfile"\n')
+    with evaluation_image(agent, requirements=requirements, worker_module='example.worker') as staged:
+        selected = (staged.path / 'historical/Dockerfile').read_text()
+        assert 'FROM python:3.13' in selected
+        assert 'COPY .abb-sdk/' in selected
+        assert 'COPY .abb-sdk/' not in (staged.path / 'Dockerfile').read_text()
+
+
 def test_controller_settings_and_documents_belong_to_the_calling_sdk(tmp_path):
     agent, requirements = make_unit(tmp_path)
     (agent.path / 'sdk-profile.txt').write_text('Independent SDK profile')

@@ -1,0 +1,23 @@
+{
+  "case_id": "ir-reasonix-9995-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 9995,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9995",
+    "state": "closed",
+    "title": "[Bug]: 编辑文件后同一轮内 bash 写命令被 read-evidence 守卫持续拦截，且无任何手段可解除（含只读 git 命令）",
+    "body": "### Version line\n\nv2 — Go rewrite (1.x), main-v2 (active development)\n\n### Exact version\n\nDesktop 1.38.3\n\n### What happened?\n\n同一轮内，只要某个文件上出现过「被 read-evidence 拒绝的编辑」，该文件即进入 outstanding 状态：\n\n- 本轮内所有**未被判定为只读白名单**的 `bash` 命令都会被拒绝——包括纯只读的 `git --no-pager diff --stat`；\n- `read_file` full **有时能清除**该状态（「被拒的编辑」之后没有再成功编辑该文件时），**有时无法清除**：\n  - 同一文件上第 2 次出现「被拒的编辑 + 重读后重试成功」之后；\n  - 或 200 行的探针文件在第 1 次该序列之后就进入不可清除状态；\n- 进入不可清除状态后，`write_file` 覆写、`additional_write_dirs`、`run_in_background` 均无效，只有新的用户消息才能恢复。\n\n同时 `read_file` 会报告 \"requirement already satisfied\"，与 bash 的 outstanding 判断直接矛盾。\n\n### Steps to reproduce\n\n1. `write_file` 新建 `x.txt`：\n\n   ```\n   alpha\n   beta\n   ```\n\n2. `read_file(x.txt, intent=full)`（必须在**之前的 provider round**；同一批次读取不算）\n3. `edit_file`：`alpha` → `alpha_edited` → **成功**\n4. `bash`: `touch y.txt` → **通过**（成功编辑本身不触发拦截）\n5. `edit_file`：`beta` → `beta_edited`（不重读）→ **被拦**：\n\n   ```\n   blocked: [evidence required] edit_file targets C:\\...\\x.txt,\n   but the model has not seen its current content (missing lines 2-2);\n   read ... in a previous provider round, then retry; reads from the same batch do not count\n   ```\n\n6. `read_file(x.txt, intent=full)` → 成功\n7. 重试步骤 5 → **成功**\n8. `bash`: `touch y2.txt` → **被拦**：\n\n   ```\n   blocked: [evidence required] bash cannot declare which files it changes while a\n   read-evidence requirement is outstanding (C:\\...\\x.txt); use the exact file tool for those paths\n   ```\n\n9. `read_file(x.txt, intent=full)` → 成功\n10. 重试 `bash`: `touch y2.txt` → **通过**（第 1 次序列后，重读仍可清除）\n11. 再重复一次步骤 5–7：`edit_file`：`alpha_edited` → `alpha_x` → 成功；`edit_file`：`beta_edited` → `beta_x` → **被拦**；`read_file` full；重试 → **成功**\n12. `bash`: `touch y3.txt` → **被拦**\n13. `read_file(x.txt, intent=full)` → 成功\n14. 重试 `bash`: `touch y3.txt` → **仍被拦**（进入持久态，重读无效）\n\n### OS / platform\n\nWindows 11\n\n### Relevant logs or output\n\n```shell\n\n```"
+  },
+  "version_choice": "historical:v1.38.3",
+  "reported_version": "Desktop 1.38.3",
+  "commit_version": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "fixed_in": "1.x v1.38.8",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "In this one user turn, create x.txt with alpha and beta on separate lines using write_file. Read it in full in a completed tool round, then edit alpha to alpha_edited. Without another read, edit beta to beta_edited. If the real tool asks for a fresh read, read the whole file and retry that same edit. Run touch y2.txt with bash. Read x.txt in full again and retry touch y2.txt if necessary. Repeat the read/edit cycle once more, changing alpha_edited to alpha_x and beta_edited to beta_x, then run touch y3.txt. If requested, read x.txt in full and retry the same touch once. Report real results."
+  ],
+  "expected": "A fresh full read clears outstanding evidence requirements after each legitimate edit/retry cycle.",
+  "defect": "After repeated successful read/edit recovery, unrelated bash writes remain blocked even after another full read.",
+  "fault location": [],
+  "Root cause": "The stored evidence debt outlives the file version that created it and is not reliably cleared by successful exact-file reads and edits. #10223 replaces persistent debt with live observations."
+}

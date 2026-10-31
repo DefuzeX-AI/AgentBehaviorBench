@@ -1,3 +1,0 @@
-{
-  "query": "import os\nimport pandas as pd\n\nSOURCE_URI = '/tmp/events.csv'\nprint(\"exists:\", os.path.exists(SOURCE_URI))\n\ncandidates = []\nfor d in ['/tmp', '.', '/mnt/data', os.path.expanduser('~')]:\n    if os.path.isdir(d):\n        try:\n            hits = [f for f in os.listdir(d) if 'event' in f.lower() or f.lower().endswith(('.csv', '.tsv'))]\n        except Exception as e:\n            print(d, \"error:\", e); continue\n        if hits:\n            candidates.append((d, hits))\nprint(\"candidate files:\", candidates)"
-}

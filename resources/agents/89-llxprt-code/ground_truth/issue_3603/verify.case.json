@@ -1,0 +1,24 @@
+{
+  "case_id": "ir-llxprt-code-3603-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3603,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3603",
+    "state": "open",
+    "title": "replace tool normalizes literal backslash-n into a newline in Rust source",
+    "body": "Observed while implementing UQM S4 evidence validation with LLxprt Code on macOS.\n\nThe `replace` tool changed a replacement containing a Rust byte literal for newline into a physical newline inside the literal. A follow-up call supplying two different strings, one containing the physical newline and one containing the literal backslash followed by `n`, returned `No changes to apply. The new content is identical to the current content`.\n\nExpected: exact text replacement should distinguish a physical newline from a literal backslash plus `n`. JSON transport escaping should not cause an additional unescape pass in the replacement text.\n\nObserved source after replacement:\n```rust\nassert_eq!(bytes.pop(), Some(b'\n'));\n```\nIntended source:\n```rust\nassert_eq!(bytes.pop(), Some(b'\\n'));\n```\n\nThis caused a Rust compiler error: `byte constant must be escaped: \\n` at `rust/xtask/src/ci/evidence.rs:14203`. The subsequent unified-diff tool preserved the intended literal. No LLxprt source changes were made.\n\nLocal evidence in the UQM checkout: `tmp/issue34-astra-s4-v2/session-20260907-s4-5163/red-trace-newline.log`. The corrected behavioral RED run is separately retained in `red-trace-newline-corrected.log`; the first log records the tool-induced source error, not the intended regression failure."
+  },
+  "version_choice": "pinned",
+  "reported_version": "unknown",
+  "commit_version": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create sample.rs with exactly this one-line Rust source and a final newline: fn main() { let x = 0; }. Read it with read_file.",
+    "Use the built-in replace tool to replace the complete source line with exactly the following text (backslashes are literal source characters):\nfn main() { let x = b'\\n'; }\nThen inspect the actual file bytes."
+  ],
+  "expected": "Exact replacement preserves literal source-code escape sequences after JSON decoding.",
+  "defect": "replace writes physical newline/CR control characters where new_string contained literal backslash escape sequences, corrupting source code.",
+  "fault location": [],
+  "Root cause": "The observed behavior is consistent with an additional escape-normalization step after JSON decoding, which makes literal backslash-n indistinguishable from an actual newline. The reports do not identify a confirmed implementation line; do not label an arbitrary edit helper as the root cause."
+}

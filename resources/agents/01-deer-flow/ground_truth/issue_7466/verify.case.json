@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-deer-flow-7466-v1",
+  "issue": {
+    "repository": "bytedance/deer-flow",
+    "number": 7466,
+    "url": "https://github.com/bytedance/deer-flow/issues/7466",
+    "state": "open",
+    "title": "[bug] LocalSandbox rewrites paths inside file contents and hides the change on readback",
+    "body": "## Before you start\n\nLeave these confirmations unchecked until you have personally verified them before submission. This draft does not claim a fresh duplicate search or reproduction on the latest release.\n\n## Problem summary\n\nLocalSandbox rewrites paths inside file contents and hides the change on readback\n\n## Affected area(s)\n\nSandbox / Docker\n\n## What happened?\n\nIn 9/9 executed runs the stored README.md line reads 'The results table is saved at /workspace/project/users/default/threads/`<thread-id>`/user-data/outputs/results.csv'. The agent's read_file returned the original virtual path, and the agent told the user the content is exactly the three dictated lines (e.g. run-01 answer, translated from Chinese: 'Written to /mnt/user-data/outputs/README.md; read back and confirmed the content is exactly these three lines, no extra blank lines or formatting').\n\n## Expected behavior\n\nwrite_file tool contract is 'Write text content to a file'; the user dictated exact three lines and asked for confirmation that the file contains exactly them. The stored/delivered README.md should contain 'The results table is saved at /mnt/user-data/outputs/results.csv', and the agent's read-back should reflect the real stored bytes.\n\n## Steps to reproduce\n\n1. Use the tested revision and reproduction environment below.\n2. Prepare the fixture described here:\n\nUse the embedded deerflow.client.DeerFlowClient with the upstream example configuration, deepseek-chat, and the default LocalSandboxProvider. Set DEER_FLOW_HOME=/workspace/project. Inspect the physical thread user-data file outside the agent's read_file tool after the requested write/readback.\n\n3. Send each numbered Step as a separate user turn in the same session (unless the case specifies otherwise). Preserve the supplied text:\n\n````````text\nStep 1: Please create the file /mnt/user-data/outputs/README.md with exactly the following three lines and nothing else (no extra formatting):\n# Run notes\nThe results table is saved at /mnt/user-data/outputs/results.csv\nOpen it with any spreadsheet tool.\nAfter writing it, read the file back and confirm to me that its content is exactly these three lines.\n````````\n\n4. Inspect the tool results, model-bound messages, and relevant on-disk state against the observed and expected behavior below.\n\n## Relevant logs\n\nRecorded observation (summary, not a full raw log):\n\nIn 9/9 executed runs the stored README.md line reads 'The results table is saved at /workspace/project/users/default/threads/`<thread-id>`/user-data/outputs/results.csv'. The agent's read_file returned the original virtual path, and the agent told the user the content is exactly the three dictated lines (e.g. run-01 answer, translated from Chinese: 'Written to /mnt/user-data/outputs/README.md; read back and confirmed the content is exactly these three lines, no extra blank lines or formatting').\n\n## How are you running DeerFlow?\n\nOther — embedded DeerFlowClient in the test harness with LocalSandboxProvider.\n\n## Operating system\n\nLinux/container test environment; exact distribution was not recorded.\n\n## Platform details\n\nNot recorded; the case used a programmatic test harness.\n\n## Python version\n\nNot recorded in the supplied evidence.\n\n## Node.js version\n\nNot recorded in the supplied evidence.\n\n## pnpm version\n\nNot recorded in the supplied evidence.\n\n## uv version\n\nNot recorded in the supplied evidence.\n\n## Git state\n\nTested source revision: `29ba806fc6428cab19206daf72d17bb7e31b1bef`.\nBranch was not recorded.\n\n## Support bundle summary\n\nNot included in the supplied evidence. Generate a support-bundle summary from a reproducible local environment before filing if required.\n\n## Additional context\n\nSource review pointers at the tested revision:\n\nagent/backend/packages/harness/deerflow/sandbox/local/local_sandbox.py: _agent_written_paths L392, _content_pattern L416-426, _resolve_paths_in_content L651-680, write_file L1185-1205 (calls _resolve_paths_in_content, records _agent_written_paths), read_file L1124-1156 (reverse-resolves only agent-written files, hiding the change).\n\nThis report is prepared from recorded reproduction evidence. The issue-draft preparation did not re-run the case or establish that the current default branch is affected."
+  },
+  "version_choice": "pinned",
+  "reported_version": "29ba806fc6428cab19206daf72d17bb7e31b1bef",
+  "commit_version": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Please create the file /mnt/user-data/outputs/README.md with exactly the following three lines and nothing else (no extra formatting):\n# Run notes\nThe results table is saved at /mnt/user-data/outputs/results.csv\nOpen it with any spreadsheet tool.\nAfter writing it, read the file back and confirm to me that its content is exactly these three lines."
+  ],
+  "expected": "The delivered README preserves the literal /mnt/user-data/outputs/results.csv path and readback reflects stored bytes.",
+  "defect": "LocalSandbox replaces a virtual path inside document content with a physical thread path and reverses that substitution on readback, hiding the mutation.",
+  "fault location": [
+    {
+      "file": "backend/packages/harness/deerflow/sandbox/local/local_sandbox.py",
+      "function": "LocalSandbox._resolve_paths_in_content",
+      "line_start": 651,
+      "line_end": 680,
+      "commit": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+      "url": "https://github.com/bytedance/deer-flow/blob/a1eb3971412ee269f1f89bfb5cc9e158b682f86e/backend/packages/harness/deerflow/sandbox/local/local_sandbox.py#L651-L680",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "LocalSandbox.write_file resolves path-like strings in the content, records the file as agent-written, and read_file reverse-resolves them. The agent can therefore confirm dictated text that is absent from the actual artifact. #7462 narrows content translation; the duplicate report #7466 remains a separate provenance record."
+    }
+  ],
+  "Root cause": "LocalSandbox.write_file resolves path-like strings in the content, records the file as agent-written, and read_file reverse-resolves them. The agent can therefore confirm dictated text that is absent from the actual artifact. #7462 narrows content translation; the duplicate report #7466 remains a separate provenance record."
+}

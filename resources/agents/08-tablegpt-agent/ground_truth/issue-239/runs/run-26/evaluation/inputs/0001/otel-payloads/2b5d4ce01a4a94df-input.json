@@ -1,3 +1,0 @@
-{
-  "query": "import os\n\n# List files in the current working directory\ncwd = os.getcwd()\nprint(\"Current working directory:\", cwd)\nprint(\"\\nFiles in current directory:\")\nfor f in os.listdir(cwd):\n    print(\" -\", f)\n\n# Search for the file recursively (in case it's in a subfolder)\nprint(\"\\nSearching for 'synthetic_survey.csv' recursively:\")\nmatches = []\nfor root, dirs, files in os.walk(cwd):\n    for f in files:\n        if 'synthetic' in f.lower() and f.lower().endswith('.csv'):\n            matches.append(os.path.join(root, f))\nprint(matches if matches else \"No matching files found.\")"
-}
