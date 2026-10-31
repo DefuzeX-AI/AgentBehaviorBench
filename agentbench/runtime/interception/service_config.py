@@ -5,7 +5,8 @@ from .target_routing import resolve_target_routing
 
 
 def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_dir,
-                           secret_resolver, environ, model_provider=None, egress_proxy=None):
+                           secret_resolver, environ, model_provider=None, egress_proxy=None,
+                           redaction_values=()):
     """Return service JSON data and explicitly declared Agent credential env.
 
     Observe never resolves a model target, reads a replacement secret or creates
@@ -21,6 +22,14 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
             'routes': [_route_data(r) for r in interception.routes],
             'tool_routes': [asdict(r) for r in interception.tool_routes],
             'token_counting': dict(interception.token_counting)}
+    redaction_files = []
+    for index, value in enumerate(dict.fromkeys(
+        item for item in redaction_values if isinstance(item, str) and item
+    )):
+        filename = f'redaction-{index}.secret'
+        (secret_dir / filename).write_text(value, encoding='utf-8')
+        redaction_files.append(f'/run/secrets/{filename}')
+    data['redaction_secret_files'] = redaction_files
     if egress_proxy is not None:
         data['egress_proxy'] = {'host': egress_proxy[0], 'port': egress_proxy[1]}
     token_environment = {}

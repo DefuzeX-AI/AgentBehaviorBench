@@ -310,15 +310,17 @@ class BenchmarkRunner:
                 else:
                     invocation = await running.ainvoke(test_input.payload, run_config=run_config)
             except Exception as exc:
+                redaction_secrets = getattr(observation, 'redaction_secrets', ()) if observation else ()
                 if on_step_failure is not None:
                     on_step_failure(
                         registration.agent_id,
-                        _step_failure(test_input.input_id, test_input.payload, exc),
+                        _step_failure(test_input.input_id, test_input.payload, exc,
+                                      secrets=redaction_secrets),
                     )
                 self._record_failed_submission(sdk_run, exc)
                 raise AgentInvocationError(
                     f"Agent {registration.agent_id!r} failed for "
-                    f"SDK Input {test_input.input_id!r}: {_error_detail(exc)}"
+                    f"SDK Input {test_input.input_id!r}: {_error_detail(exc, redaction_secrets)}"
                 ) from exc
 
             step = BenchmarkStepResult(
@@ -338,6 +340,7 @@ class BenchmarkRunner:
                             exc,
                             output=invocation.output,
                             raw_output=invocation.raw_output,
+                            secrets=getattr(observation, 'redaction_secrets', ()) if observation else (),
                         ),
                     )
                 raise
@@ -371,13 +374,13 @@ class BenchmarkRunner:
             pass
 
 
-def _error_message(exc: Exception) -> str:
+def _error_message(exc: Exception, secrets=()) -> str:
     from agentbench.observe.store import environment_secrets, redact
-    return redact(str(exc), environment_secrets())
+    return redact(str(exc), tuple(dict.fromkeys((*environment_secrets(), *secrets))))
 
 
-def _error_detail(exc: Exception) -> str:
-    message = _error_message(exc).strip()
+def _error_detail(exc: Exception, secrets=()) -> str:
+    message = _error_message(exc, secrets).strip()
     return type(exc).__name__ if not message else f"{type(exc).__name__}: {message}"
 
 
@@ -388,6 +391,7 @@ def _step_failure(
     *,
     output: object | None = None,
     raw_output: object | None = None,
+    secrets=(),
 ) -> BenchmarkStepFailure:
     return BenchmarkStepFailure(
         input_id=input_id,
@@ -395,7 +399,7 @@ def _step_failure(
         output=output,
         raw_output=raw_output,
         error_type=type(exc).__name__,
-        error_message=_error_message(exc),
+        error_message=_error_message(exc, secrets),
     )
 
 

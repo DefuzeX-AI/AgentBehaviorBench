@@ -13,12 +13,21 @@ ACP evidence; missing fields stay missing. This is not itself a certified Agent
 unit. The generic worker build overlay installs the adapter requirements file.
 
 ```toml
+[runtime]
+secret_env_keys = ["SEARCH_API_KEY"]
+
 [adapter]
 type = "acp"
 transport = "stdio"
 command = ["mcode", "acp"]
 cwd = "/workspace"
 permission_policy = "allow_once"
+
+[[adapter.mcp_servers]]
+name = "search"
+command = "/opt/agent/bin/search-mcp"
+args = ["--stdio"]
+env_keys = ["SEARCH_API_KEY"]
 ```
 
 `command` is an argv array, not shell text. `cwd` must exist at execution time.
@@ -26,6 +35,28 @@ permission_policy = "allow_once"
 forwarding includes runtime-declared keys, intercepted surrogate credentials,
 process basics and CA/proxy settings; additional Agent settings use `env_keys`.
 Credentials belong in the runtime's declared environment, never command arguments.
+
+`[[adapter.mcp_servers]]` adds MCP servers to each new ACP session. The first
+version supports stdio only. Each entry requires a unique `name` and an absolute
+container `command`; `args` and `env_keys` default to empty arrays. `env_keys`
+contains environment variable names, not values. Each name must also be declared
+by the unit's runtime or adapter environment settings. ABB resolves the values
+when starting the session and sends ACP v1's `env` array of `{name, value}`
+objects. A declared but unset key fails before the ACP Agent starts. Secret values
+are registered with redactors before the Agent starts. ABB redacts matching values
+from observation artifacts, intercepted network evidence, host run reports, failure
+events, and the invocation output submitted to the evaluation SDK. Docker runs need
+each MCP environment value available through runtime environment settings so ABB can
+register it with the interceptor redactor. With interception enabled, an MCP key
+available only through adapter settings fails before the Agent container starts.
+Without interception, ACP session setup reads adapter environment keys inside the
+container and detects a missing value before the ACP Agent starts. Values are never
+stored in `agent.toml` or the interceptor JSON configuration.
+
+Do not set a `type` or `transport` field on an MCP entry: ACP v1 stdio server
+objects have no discriminator. HTTP and SSE MCP servers are rejected explicitly;
+HTTP needs capability negotiation, while SSE is deprecated. Entries without
+`mcp_servers` continue to open sessions with an empty server list.
 
 The adapter owns one event-loop thread for both sync and async calls. It starts the
 Agent lazily, retains its session across inputs, rejects overlapping prompts and

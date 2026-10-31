@@ -32,6 +32,21 @@ class InvocationObservation:
             config['callbacks'] = callbacks
         return config
 
+    def add_secrets(self, secrets):
+        values = tuple(value for value in secrets if isinstance(value, str) and value)
+        if not values:
+            return
+        self.store.add_secrets(values)
+        for handler in self.callbacks:
+            register = getattr(handler, 'add_secrets', None)
+            if callable(register):
+                register(values)
+
+    @property
+    def redaction_secrets(self):
+        base = getattr(self.store, 'store', self.store)
+        return base._secrets
+
     def close(self):
         if hasattr(self.store, 'close'):
             self.store.close()

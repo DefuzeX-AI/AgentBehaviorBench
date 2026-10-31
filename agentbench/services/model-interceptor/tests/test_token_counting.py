@@ -14,6 +14,13 @@ OPTIONS = {'mode': 'local_estimate', 'models': {'test/model': 'o200k_base'}}
 BODY = {'model': 'native-alias', 'input': [{'role': 'user', 'content': 'Hello 你好'}]}
 
 
+class _TestEncoding:
+    """Deterministic stand-in; production images preload vocab files at build time."""
+    def encode(self, text, disallowed_special=()):
+        assert disallowed_special == ()
+        return list(text.encode('utf-8'))
+
+
 class LocalCountingTest(unittest.TestCase):
     def setUp(self):
         self.events = []
@@ -21,6 +28,9 @@ class LocalCountingTest(unittest.TestCase):
                   side_effect=lambda name, **data: self.events.append({'event': name, **data}))
         p.start()
         self.addCleanup(p.stop)
+        encodings = patch('tiktoken.get_encoding', return_value=_TestEncoding())
+        encodings.start()
+        self.addCleanup(encodings.stop)
 
     def request(self, addon, body=BODY, token='openai-run-token'):
         request = flow('https://api.openai.com/v1/responses/input_tokens', json.dumps(body).encode(),
