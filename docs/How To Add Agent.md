@@ -12,7 +12,7 @@ Install Git and Python 3.10+, then complete the startup guide linked above. Dock
 
 ```bash
 python -m pip install -e .
-python -m pip install "kuma-defuzex[otel]>=0.3.3"
+python -m pip install "kuma-defuzex[otel]>=0.3.8"
 git --version
 agentbench --help
 agentbench sdk list

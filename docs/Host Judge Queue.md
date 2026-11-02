@@ -29,7 +29,7 @@ existing local Judge flow.
 Install the host KUMA dependency as well as the container dependency:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install --upgrade "kuma-defuzex[otel]>=0.3.3"
+.\.venv\Scripts\python.exe -m pip install --upgrade "kuma-defuzex[otel]>=0.3.8"
 python -m agentbench run
 ```
 
@@ -100,3 +100,39 @@ image build and older SDK container test were skipped in the regression batch;
 the new handoff was separately verified in a cached Docker image with KUMA 0.3.3.
 The raw Windows SIGINT integration test was excluded; cooperative cancellation,
 pending-ticket retention and accepted-request recovery were verified separately.
+
+## Claim-review evidence and limitations
+
+KUMA evaluation requires `kuma-defuzex[otel]>=0.3.8` on the host and in the SDK
+image. Both the ordinary KUMA dialogue and native-Case KUMA Judge paths forward
+captured public text and explicitly attribute nonempty completed return values to
+the isolated target invocation. They use the official SDK's message validation,
+assessment envelope and upload provenance binding. No actor is inferred for
+internal model/tool spans, quoted speakers or setup/reviewer work.
+
+ACP captures its actual public text protocol stream; cancellation/failure,
+non-text content and credential redaction prevent complete text coverage. Other
+adapters may supply the same optional `AdapterInvocation.public_messages`
+contract. Without that capture (including the generic LangGraph adapter), KUMA
+receives an honest empty/incomplete message bundle plus eligible output
+attribution. This enables the service to consider attributable final output for
+partial claim review; it does not guarantee that the service will do so or make
+an entire conversation complete. Native graph state and tool/model logs are not
+silently converted into a complete public transcript.
+
+Inspect the saved report's `extensions.assessment.claim_coverage` and
+`extensions.claim_coverage_notice`, even for a pass. The native Judge envelope
+preserves these fields. A pass with partial/unavailable claim review does not
+verify all claims or resolve independently observed discrepancies. A service
+without the required assessment support fails before upload rather than silently
+dropping supplied message evidence. Historical requests, evidence and reports
+remain unchanged; changed evidence requires a separate assessment, not recovery
+of an already accepted operation.
+
+`tests/test_kuma_assessment.py` exercises real SDK submission, persisted-context
+restoration, redaction, exact uploaded-output provenance and unsupported-service
+rejection offline. `tests/sdk_fixtures/kuma_assessment_acceptance.py` runs a real
+deterministic ACP target, ABB worker and local assertion Judge inside a prepared
+container with networking disabled. Preserve its Case, Agent outputs and Judge
+report; this fixture is not an official KUMA service judgment or an Agent model
+acceptance result.

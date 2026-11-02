@@ -20,6 +20,9 @@ class AdapterInvocation:
 
     output: object
     raw_output: object
+    # Optional observed public text stream, separate from internal model/tool state.
+    # {messages: [{content: str}], complete: bool}; None means not captured.
+    public_messages: object | None = None
 
 
 @runtime_checkable
