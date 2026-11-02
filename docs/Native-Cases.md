@@ -131,11 +131,17 @@ or use the existing model-provider configuration. Local means locally controlled
 assessment; the configured model endpoint may be remote and charge for tokens.
 Credentials stay on the host. KUMA is never a fallback.
 
-The provider assesses ordered inputs, outputs and transported trace contents.
-It records its model, endpoint, prompt and raw reply beside the protocol result.
-Execution/evidence failures are inconclusive rather than automatically labeled
-Agent defects. Evidence larger than `ABB_LOCAL_JUDGE_MAX_CHARS` (default 120000 characters) is explicitly inconclusive,
-not silently truncated. Findings are model assessments, not validated GT.
+The provider assesses ordered inputs, outputs and a bounded projection of verified
+trace contents. It includes tool calls and outcomes, permission decisions, file
+reads/writes and available file evidence, with each event pointing to its original
+attachment and line. Streaming chunks omitted from the model request are counted;
+the original attachments remain intact. The model-facing projection is retained in
+`judge/local-evidence.json` for review. An oversized decision event or a projection
+larger than `ABB_LOCAL_JUDGE_MAX_CHARS` (default 120000 characters) is explicitly
+inconclusive, never silently truncated into a pass. The provider records its model,
+endpoint, prompt and raw reply beside the protocol result. Execution/evidence
+failures are inconclusive rather than automatically labeled Agent defects.
+Findings are model assessments, not validated GT.
 
 Historical local KUMA-worker modules are retained for legacy compatibility;
 they are not used by new `--sdk local` runs. Old result files remain readable.
