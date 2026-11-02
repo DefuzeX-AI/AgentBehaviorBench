@@ -1,3 +1,0 @@
-{
-  "query": "import os, glob\ncandidates = []\nfor pat in ('**/*.csv', '**/*.tsv', '**/*.xlsx', '**/*.json', '**/*.yaml', '**/*.yml'):\n    for p in glob.glob(pat, recursive=True):\n        if any(x in p for x in ('/.cache', 'site-packages', 'abb-tablegpt-mzicjaw5/profile')):\n            continue\n        candidates.append(p)\nprint(\"data-like files:\", candidates or \"NONE\")\nprint(\"\\nall top-level entries:\", sorted(os.listdir('.')))"
-}

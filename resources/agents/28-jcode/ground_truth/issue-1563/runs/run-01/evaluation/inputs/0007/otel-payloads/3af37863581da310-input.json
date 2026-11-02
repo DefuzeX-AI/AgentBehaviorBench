@@ -1,4 +1,0 @@
-{
-  "command": "cd /home/agent/workspace && ls -la sbom.spdx.json && python3 validate_sbom.py sbom.spdx.json && echo \"---\" && python3 -c \"\nimport json\nd = json.load(open('sbom.spdx.json'))\nprint('spdxVersion:', d['spdxVersion'])\nprint('document name:', d['name'])\nprint('package:', d['packages'][0]['name'], d['packages'][0]['versionInfo'])\nprint('verification code:', d['packages'][0]['verificationCode']['packageVerificationCodeValue'][:16] + '...')\nprint('files:', len(d['files']), '| relationships:', len(d['relationships']))\n\" && git status --short",
-  "intent": "Confirm final SBOM exists, validates, and is committed"
-}

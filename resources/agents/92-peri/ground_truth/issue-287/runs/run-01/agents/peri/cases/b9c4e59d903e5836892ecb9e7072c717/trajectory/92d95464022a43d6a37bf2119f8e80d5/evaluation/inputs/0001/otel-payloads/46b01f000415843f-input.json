@@ -1,3 +1,0 @@
-{
-  "command": "cd /tmp && python3 - <<'EOF'\nimport json\nraw=open('gwx/config.json','rb').read()\nprint('bytes',len(raw))\ntry:\n    d=json.loads(raw)\nexcept Exception as e:\n    print('JSON ERROR:',e); raise SystemExit\nprint('top-level keys:',list(d.keys()))\ndef walk(o,p=''):\n    if isinstance(o,dict):\n        for k,v in o.items():\n            np=f'{p}.{k}' if p else k\n            if 'retry' in k.lower(): print('KEY',np,'=',v)\n            walk(v,np)\n    elif isinstance(o,list):\n        for i,v in enumerate(o):\n            walk(v,f'{p}[{i}]')\nwalk(d)\nprint('contains \"retry\" text:', b'retry' in raw)\nprint('route count:', len(d.get('routes',[])))\nEOF"
-}

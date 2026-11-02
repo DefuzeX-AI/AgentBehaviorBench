@@ -1,0 +1,24 @@
+{
+  "case_id": "ir-jcode-979-v1",
+  "issue": {
+    "repository": "1jehuang/jcode",
+    "number": 979,
+    "url": "https://github.com/1jehuang/jcode/issues/979",
+    "state": "closed",
+    "title": "Destructive-command guard false positive: redirects and quoted mentions of /dev/null flagged as destroying a protected path",
+    "body": "**Version:** jcode v0.76.0 (bbef1f6a8)\n\n**What happened**\n\nAn agent (running inside a sandboxed jcode harness) executed an ordinary command that redirected output to `/dev/null`, and the destructive-command guard hard-blocked it:\n\n```\nError: This command is blocked and cannot be confirmed.\n\n- targets a protected system or home path that must never be destroyed (target: /dev/null)\n- targets a protected system or home path that must never be destroyed (target: /dev/null)\n\nIf the user genuinely wants this, they must run it themselves outside the agent.\n```\n\n**Expected**\n\n`>/dev/null` / `2>/dev/null` are write redirects, not destruction. `/dev/null` exists specifically to be written to; it cannot be harmed by writing. The protected-path check should either:\n\n- skip redirect targets entirely (a redirect is a write, not a delete), or\n- special-case `/dev/null` (and friends: /dev/zero, /dev/stdout, /dev/stderr).\n\n**Impact**\n\nLow but noisy. The agent retries with a rephrased command and recovers, but each hit costs a turn round-trip and leaves a scary red error block in the transcript. Since `/dev/null` redirects appear in a large fraction of shell commands agents write, this fires often.\n\n**Bonus repro**\n\nWhile filing THIS issue, the reporter's own agent was blocked for writing a heredoc that merely CONTAINED the string `target: /dev/null` in prose — the guard matches text inside quoted content, not just actual command targets.\n\n**Repro**\n\nAny bash tool call of the form `some-command >/dev/null 2>&1` inside a sandboxed agent session, or any heredoc/quoted string containing the path.\n"
+  },
+  "version_choice": "historical:v0.76.0",
+  "reported_version": "v0.76.0",
+  "commit_version": "bbef1f6a8ebf00c52b25bc41ad5dd5226da9d99d",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create file.txt containing hello and notes.md containing TODO. Keep all fixtures in the current workspace.",
+    "Run exactly this bash command and show its actual result: cat file.txt >/dev/null 2>&1"
+  ],
+  "expected": "A read-only command or discard-device redirect is not classified as catastrophic deletion.",
+  "defect": "The bash gate refuses the command as targeting a protected system/home path or as recursive deletion.",
+  "fault location": [],
+  "Root cause": "The command-risk parser confuses redirects and literal shell content with destructive operands. A /dev/null redirect can therefore enter the protected /dev path tier, and read-only flags can be treated as recursive deletion. Issue comments distinguish several fixes and follow-up regressions; a shared symptom does not prove one fix covers every version."
+}

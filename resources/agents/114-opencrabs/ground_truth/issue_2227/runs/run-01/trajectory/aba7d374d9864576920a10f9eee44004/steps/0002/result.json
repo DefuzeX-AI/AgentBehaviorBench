@@ -1,0 +1,103 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "d012ea74e2b04399aef9add7dd528e7e",
+  "case_id": "ir-opencrabs-2227-v1",
+  "input_id": "step-2",
+  "invocation_id": "d012ea74e2b04399aef9add7dd528e7e",
+  "agent_id": "opencrabs",
+  "status": "succeeded",
+  "output": "Reading the file first to confirm the line layout before deleting:`mode = debug` sits at 0-indexed line 2 — matching the requested parameters. Deleting:Verifying the remaining bytes — the file was created with CRLF endings, and an edit that silently normalized those would be a regression:Done — `mode = debug` is gone (5 → 4 lines). But the byte dump caught a side effect you'll want to know about: **`edit_file` didn't preserve your CRLF endings.**\n\n| | Bytes | Line endings | Trailing newline |\n|---|---|---|---|\n| Expected (pure line delete) | 46 | CRLF (`\\r\\n`) | yes |\n| Actual | 41 | LF only | **no** |\n\n`od -c` confirms every `\\r` was stripped and the final newline was dropped entirely:\n\n```\n[ app ] \\n n a m e = d e m o \\n p o r t = 8 0 8 0 \\n w o r k e r s = 4\n```\n\nSo `delete_lines` did three things, not one: removed the requested line, normalized CRLF → LF, and ate the trailing newline. The line removal itself was surgical — the collateral damage was the file's byte format. That's `edit_file`'s text-normalization behavior, not something my parameters could have prevented.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "delete": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "opencrabs",
+        "version": "0.5.13"
+      },
+      "_meta": {
+        "extensions": [
+          "_opencrabs/set_model",
+          "_opencrabs/compact",
+          "_session/steer"
+        ]
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "9929bb6e-4015-45b7-a810-acd8d5e08965",
+      "modes": {
+        "currentModeId": "supervised",
+        "availableModes": [
+          {
+            "id": "supervised",
+            "name": "Supervised"
+          },
+          {
+            "id": "auto-accept-edits",
+            "name": "Auto-accept edits"
+          },
+          {
+            "id": "auto",
+            "name": "Auto"
+          },
+          {
+            "id": "full-access",
+            "name": "Full access"
+          },
+          {
+            "id": "plan",
+            "name": "Plan (read-only)"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "glm-5.3-flash",
+          "options": [
+            {
+              "group": "abb",
+              "name": "abb",
+              "options": [
+                {
+                  "value": "abb/glm-5.3-flash",
+                  "name": "glm-5.3-flash"
+                }
+              ]
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "description": "Provider and model used for this session",
+          "category": "model",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "9929bb6e-4015-45b7-a810-acd8d5e08965",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

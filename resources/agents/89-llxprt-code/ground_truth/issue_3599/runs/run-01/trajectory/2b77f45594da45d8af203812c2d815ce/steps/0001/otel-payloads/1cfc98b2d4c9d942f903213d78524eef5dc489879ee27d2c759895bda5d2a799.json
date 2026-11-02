@@ -1,0 +1,4 @@
+{
+  "command": "mkdir -p /home/agent/workspace/tmp/batch4 && cat > /home/agent/workspace/tmp/batch4/create_b4_astra_repair183_a1.py <<'PY'\nimport json\nfrom pathlib import Path\n\nout_path = Path(\"/home/agent/workspace/tmp/batch4/b4-astra-repair183-a1.out\")\npayload = {\n    \"status\": \"ok\",\n    \"summary\": \"step completed; \" * 400,\n    \"verification\": \"VERIFIED-END-MARKER\",\n}\nout_path.write_text(json.dumps(payload, ensure_ascii=False), encoding=\"utf-8\")\nprint(f\"wrote {out_path} ({out_path.stat().st_size} bytes)\")\nPY\npython3 /home/agent/workspace/tmp/batch4/create_b4_astra_repair183_a1.py",
+  "description": "Create and run Python script generating the JSON output file"
+}

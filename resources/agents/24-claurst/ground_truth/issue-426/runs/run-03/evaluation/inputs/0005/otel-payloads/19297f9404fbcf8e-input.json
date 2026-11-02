@@ -1,4 +1,0 @@
-{
-  "command": "cd /home/agent/workspace && python3 - <<'EOF'\nimport sqlite3, os\n\nfiles = lambda: [f for f in ('inventory.db-wal', 'inventory.db-shm') if os.path.exists(f)]\n\nprint(\"before any connection:\", files() or \"no sidecars\")\nconn = sqlite3.connect('inventory.db')\nprint(\"mode seen by new connection:\", conn.execute(\"PRAGMA journal_mode\").fetchone()[0])\nprint(\"while connection is open :\", files() or \"no sidecars\")\nconn.close()\nprint(\"after clean close        :\", files() or \"no sidecars\")\nprint()\nprint(\"WAL sidecars exist only while a connection holds the DB open;\")\nprint(\"on the last clean close SQLite checkpoints the WAL into the main\")\nprint(\"file and deletes the sidecars. journal_mode=wal persists in the\")\nprint(\"file header (confirmed above), so this is normal, not an anomaly.\")\nEOF",
-  "description": "Demonstrate WAL sidecars are transient across connection lifecycle"
-}

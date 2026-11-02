@@ -1,0 +1,55 @@
+{
+  "schema": "abb.target.snapshot.v1",
+  "runtime": {
+    "framework": "acp",
+    "runtime": {
+      "type": "docker",
+      "execution": "oneshot",
+      "timeout_sec": 1200,
+      "env_keys": [],
+      "secret_env_keys": []
+    },
+    "adapter": {
+      "type": "acp",
+      "transport": "stdio",
+      "command": [
+        "python",
+        "/opt/agent/bootstrap/launch.py"
+      ],
+      "handshake_timeout": 120,
+      "cwd": "/home/agent/workspace",
+      "permission_policy": "allow_once"
+    },
+    "launch": {
+      "argv": [
+        "python",
+        "-m",
+        "agentbench.runtime.agentcontainer.worker"
+      ],
+      "workdir": "/opt/agent"
+    },
+    "evaluation": {
+      "replay_safe": false,
+      "workspace": {
+        "path": "/home/agent/workspace",
+        "initial_state": "empty"
+      },
+      "file_evidence": {
+        "track_files": true,
+        "upload_diff": true,
+        "export_changed_files": true
+      }
+    }
+  },
+  "architecture": {
+    "source_revision": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+    "profile": {
+      "path": "requirement.md",
+      "sha256": "22c383bd9915f93975466ce2c1dfceba8c5ce59a431f7f9b8de62b589cdf5795"
+    },
+    "manifest": {
+      "path": "agent.toml",
+      "sha256": "e9a103f89f75169649c0bf8cf4a531e1f6056e3cf06782336f4b1cae403d6ad8"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "input_id": "step-1",
+  "result": {
+    "schema": "abb.result.v1",
+    "run_id": "244f9511e15c487bbfec87ece1337f6e",
+    "case_id": "yao-zeroclaw-10912-r01",
+    "input_id": "step-1",
+    "invocation_id": "244f9511e15c487bbfec87ece1337f6e",
+    "agent_id": "zeroclaw",
+    "status": "succeeded",
+    "output": "A native tool-result message is a single JSON object appended to the conversation after the assistant emits a tool call. It carries `\"role\": \"tool\"` so the runtime knows this turn is the tool speaking back, plus two payload keys: `tool_call_id`, which echoes the exact id from the originating call so the response can be matched to it (critical when the model fired several calls in parallel), and `content`, which holds the tool's output as a string — serialized JSON if the tool returned structured data, plain text otherwise. Inline, the shape is `A native tool-result message is just a chat message that reports back what a tool produced. It has `role` set to `\"tool\"`, a `tool_call_id` that must exactly match the id of the call issued in the preceding assistant message (that's how the runtime pairs the answer to the request), and a `content` field holding the tool's output — usually a string, and frequently a JSON-encoded string rather than nested JSON. So the whole object looks likeA native tool-result message is the object your runtime feeds back into the conversation after a tool call completes: it tells the model which call it answers and what came out of it. The `tool_call_id` key holds the identifier copied verbatim from the originating assistant tool call, so the result is matched to exactly one invocation, and the `content` key carries the payload itself — usually a string containing serialized output, though some runtimes allow an array of content parts. In minimal form it looks",
+    "raw_output": {
+      "initialize": {
+        "protocolVersion": 1,
+        "agentCapabilities": {
+          "loadSession": true,
+          "promptCapabilities": {
+            "image": false,
+            "audio": false,
+            "embeddedContext": true
+          },
+          "mcpCapabilities": {
+            "http": false,
+            "sse": false,
+            "acp": false
+          },
+          "sessionCapabilities": {
+            "resume": {},
+            "close": {}
+          },
+          "auth": {}
+        },
+        "authMethods": [],
+        "agentInfo": {
+          "name": "zeroclaw-acp",
+          "title": "ZeroClaw ACP",
+          "version": "0.8.5"
+        },
+        "_meta": {
+          "zeroclaw": {
+            "defaultModel": "deepseek-v4.1-flash",
+            "maxSessions": 10,
+            "sessionTimeoutSecs": 3600
+          }
+        }
+      },
+      "pid": 9,
+      "session": {
+        "sessionId": "c73605df-a2ca-4676-922d-6c5882eb0160"
+      },
+      "session_id": "c73605df-a2ca-4676-922d-6c5882eb0160",
+      "stop_reason": "end_turn",
+      "prompt_response": {
+        "stopReason": "end_turn"
+      }
+    }
+  },
+  "submitted": true
+}

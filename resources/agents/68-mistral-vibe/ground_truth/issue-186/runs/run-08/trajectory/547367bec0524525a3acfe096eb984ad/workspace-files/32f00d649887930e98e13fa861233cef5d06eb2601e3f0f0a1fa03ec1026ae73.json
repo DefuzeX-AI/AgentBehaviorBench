@@ -1,4 +1,0 @@
-{
-  "content": "from dataclasses import dataclass\n\nfrom pip._vendor.packaging.version import Version\nfrom pip._vendor.packaging.version import parse as parse_version\n\nfrom pip._internal.models.link import Link\n\n\n@dataclass(frozen=True, slots=True)\nclass InstallationCandidate:\n    \"\"\"Represents a potential \"candidate\" for installation.\"\"\"\n\n    name: str\n    version: Version\n    link: Link\n    locked: bool\n\n    def __init__(\n        self, name: str, version: str, link: Link, locked: bool = False\n    ) -> None:\n        object.__setattr__(self, \"name\", name)\n        object.__setattr__(self, \"version\", parse_version(version))\n        object.__setattr__(self, \"link\", link)\n        object.__setattr__(self, \"locked\", locked)\n\n    def __str__(self) -> str:\n        return f\"{self.name!r} candidate (version {self.version} at {self.link})\"\n",
-  "encoding": "utf-8"
-}

@@ -1,3 +1,0 @@
-{
-  "query": "import pandas as pd\n\npath = '/opt/abb-sdk-repo/examples/datasets/产品销量表.csv'\ndf = read_df(path, encoding='utf-8-sig')\n\n# 规范化：去空格，便于识别「看似不同实为重复」的行\ndf_norm = df.apply(lambda s: s.astype(str).str.strip())\n\n# 1) 完全重复行（基于全部列）\ndup_full = df_norm.duplicated(keep=False)\nprint('完全重复行数量(含首次出现):', int(dup_full.sum()))\nif dup_full.any():\n    print('完全重复的 CSV 行号:', (df.index[dup_full] + 2).tolist())\n    print(df[dup_full])\nelse:\n    print('=> 不存在完全重复的行。')"
-}

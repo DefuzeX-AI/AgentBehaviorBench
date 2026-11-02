@@ -1,3 +1,0 @@
-{
-  "query": "import sys\n# 1) Any DataFrames already in the session?\ntry:\n    import pandas as pd\n    dfs = {k: v for k, v in globals().items() if isinstance(v, pd.DataFrame)}\n    print(\"DataFrames in globals:\", {k: v.shape for k, v in dfs.items()} or \"none\")\nexcept Exception as e:\n    print(\"pandas check failed:\", e)\n\n# 2) Interesting environment variables\nimport os\nfor k in sorted(os.environ):\n    if any(t in k.lower() for t in [\"data\", \"upload\", \"file\", \"dataset\", \"path\", \"input\", \"work\"]):\n        print(f\"{k} = {os.environ[k]}\")\n\n# 3) Current working directory contents (incl. hidden)\nprint(\"\\nCWD:\", os.getcwd())\nprint(\"Entries:\", os.listdir(\".\"))"
-}

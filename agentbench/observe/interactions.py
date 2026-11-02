@@ -59,12 +59,7 @@ def _files(root):
                 names.add((folder / name).relative_to(root).as_posix())
     for path in list((root / 'workspace-files').glob('*.json')) + list((root / 'evaluation/workspace-files').glob('*.json')):
         names.add('evaluation/workspace-files/' + path.name)
-    from .artifact_paths import archive_manifest, artifact_file
-    archived = archive_manifest(root)
-    if archived:
-        names.update(name for name in archived['files'] if name.startswith('evaluation/inputs/')
-            and Path(name).name in ('framework.jsonl', 'input.json', 'mapped-input.json', 'request.json',
-                                   'result.json', 'submission.json', 'file-evidence.json'))
+    from .artifact_paths import artifact_file
     files = []
     for name in sorted(names):
         candidate = root / name
@@ -375,19 +370,26 @@ class InteractionIndex:
                 'warnings': self.warnings, 'correlation': self.correlation}
 
 
-def interactions(directory, query):
+def load_index(directory):
+    """The cached index for one attempt directory; rebuilt when its files change."""
     root = Path(directory).resolve(strict=True)
     files = _files(root)
     signature = tuple(files)
     with _LOCK:
         cached = _CACHE.get(str(root))
-        if cached is None or cached[0] != signature:
-            cached = (signature, InteractionIndex(root, files))
-            _CACHE[str(root)] = cached
+    if cached is None or cached[0] != signature:
+        # Build outside the lock: one slow attempt must not stall every other viewer request.
+        cached = (signature, InteractionIndex(root, files))
+    with _LOCK:
+        _CACHE[str(root)] = cached
         _CACHE.move_to_end(str(root))
         while len(_CACHE) > 4:
             _CACHE.popitem(last=False)
-    return cached[1].query(query)
+    return cached[1]
+
+
+def interactions(directory, query):
+    return load_index(directory).query(query)
 
 
 if __name__ == '__main__':

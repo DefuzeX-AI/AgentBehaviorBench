@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-mistral-vibe-1337-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 1337,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/1337",
+    "state": "open",
+    "title": "bug: write_file overrides an explicit line-ending conversion with the old file's style",
+    "body": "### Component\n\nCLI\n\n### Summary\n\nWhen write_file overwrites an existing file it converts the given content to the file's previous dominant line ending, so content written with CRLF into an LF file is stored as LF while the tool reports success.\n\nObserved behavior:\nIn 2/10 frozen runs (02, 05) write_file was called with content containing 6 CRLF and deploy.bat stayed LF-only (byte-identical). In the other 8 runs the reported write_file content contained no CR at all, so the frozen rule could not attribute the outcome; the conversion was not achieved in 8/10 runs (2 runs fell back to the shell).\nExpected behavior:\n'Create or overwrite a UTF-8 file': the stored bytes equal the given content, or the tool tells the model it changed them.\n\n\n### Reproduction steps\n\n1. Use the tested revision and reproduction environment below.\n2. Prepare the fixture described here:\n\nRecorded runtime: mistral-vibe==3.0.1 on python:3.12-slim. Prepare deploy.bat using LF line endings. Inspect bytes after the write_file rewrite.\n\n3. Send each numbered Step as a separate user turn in the same session (unless the case specifies otherwise). Preserve the supplied text:\n\n````````text\nStep 1: deploy.bat was saved on Linux, so it has Unix LF line endings, but cmd.exe on our Windows build agent needs CRLF. Please rewrite deploy.bat with CRLF line endings using your file-writing tool (not the shell), keeping the content otherwise unchanged, and tell me when it's done.\n````````\n\n4. Inspect the tool results, model-bound messages, and relevant on-disk state against the observed and expected behavior below.\n\n\n### Versions / environment\n\nTested source revision: `dd2c04ce717c417731ab89c333cd0a72541e33ba`. Recorded installed package: mistral-vibe==3.0.1.\n\n### Logs & screenshots\n\n```shell\nRecorded observation (summary, not a full raw log):\n\nIn 2/10 frozen runs (02, 05) write_file was called with content containing 6 CRLF and deploy.bat stayed LF-only (byte-identical). In the other 8 runs the reported write_file content contained no CR at all, so the frozen rule could not attribute the outcome; the conversion was not achieved in 8/10 runs (2 runs fell back to the shell).\n\n## Additional context\n\nSource review pointers at the tested revision:\n\nharness/runtimes/python/python/mistralai_vibe_local_harness/vibe/_sandbox_helper.py: write_file (l.278-302: newline = _existing_newline(path); content = _from_lf(_to_lf(content), newline)); _existing_newline (l.726)\n\nThis report is prepared from recorded reproduction evidence. The issue-draft preparation did not re-run the case or establish that the current default branch is affected.\n```"
+  },
+  "version_choice": "historical:3.0.1",
+  "reported_version": "3.0.1",
+  "commit_version": "dd2c04ce717c417731ab89c333cd0a72541e33ba",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "deploy.bat was saved on Linux, so it has Unix LF line endings, but cmd.exe on our Windows build agent needs CRLF. Please rewrite deploy.bat with CRLF line endings using your file-writing tool (not the shell), keeping the content otherwise unchanged, and tell me when it's done."
+  ],
+  "expected": "When explicitly asked to rewrite an LF file as CRLF, the native file-writing tool should preserve the supplied CRLF bytes or explicitly disclose that it refuses the conversion.",
+  "defect": "The native write_file tool converts explicitly supplied CRLF back to the existing file's LF style while reporting success. Actual function and disk observations confirmed zero CRLF before the patch and six CRLF after it.",
+  "fault location": [
+    {
+      "file": "harness/runtimes/python/python/mistralai_vibe_local_harness/vibe/_sandbox_helper.py",
+      "function": "write_file",
+      "line_start": 278,
+      "line_end": 302,
+      "commit": "dd2c04ce717c417731ab89c333cd0a72541e33ba",
+      "url": "https://github.com/mistralai/mistral-vibe/blob/dd2c04ce717c417731ab89c333cd0a72541e33ba/harness/runtimes/python/python/mistralai_vibe_local_harness/vibe/_sandbox_helper.py#L278-L302",
+      "role": "newline_rewrite",
+      "verification": "causal_repair_confirmed_by_ABB_function_and_disk_observation",
+      "explanation": "Reads the existing newline style and converts supplied content to that style before writing, even for an explicit conversion request. Actual native write_file execution and disk reads show zero CRLF before and six CRLF after removal of normalization; ACP client file callbacks were disabled in both arms."
+    },
+    {
+      "file": "harness/runtimes/python/python/mistralai_vibe_local_harness/vibe/_sandbox_helper.py",
+      "function": "_existing_newline",
+      "line_start": 726,
+      "line_end": 751,
+      "commit": "dd2c04ce717c417731ab89c333cd0a72541e33ba",
+      "url": "https://github.com/mistralai/mistral-vibe/blob/dd2c04ce717c417731ab89c333cd0a72541e33ba/harness/runtimes/python/python/mistralai_vibe_local_harness/vibe/_sandbox_helper.py#L726-L751",
+      "role": "supporting_newline_detection",
+      "verification": "supporting_newline_detection_source_confirmed",
+      "explanation": "Inspects the existing file to determine the newline style used by write_file. Detection is supporting context; the tested repair removes its use for normalization in write_file rather than changing this detector."
+    }
+  ],
+  "Root cause": "CONFIRMED BY ACTUAL TARGET-FUNCTION EXECUTION AND DISK BYTES AT v3.0.1. write_file reads _existing_newline(path), normalizes the supplied content with _to_lf, and converts it back to the existing file's newline style before writing. Thus an explicit CRLF rewrite of an existing LF file silently restores LF. The test fixture deploy.bat contained six LF-terminated lines: @echo off; set TARGET=staging; echo Deploying to %TARGET%; call build.cmd %TARGET%; if errorlevel 1 exit /b 1; echo Done. The model supplied CRLF after every line. Before the patch, a read-only profile of the actual _sandbox_helper.py write_file return observed 116 bytes, six LF and zero CRLF; an independent disk read agreed. Removing the old-style normalization produced 122 bytes with six CRLF and no lone LF from the same case prompt. The actual patched function and final disk state were both observed. Separate controls confirmed that creating new CRLF files and editing existing CRLF files through search_replace still worked. ABB's default ACP client file callbacks bypass this Vibe implementation, so both comparison arms disabled client filesystem capabilities and used Vibe's native local file tools. That routing condition is required to validate this fault location; default client-side writes cannot prove the fix. The candidate repair passed this controlled before/after comparison. Existing-style preservation is explicitly documented in the original code, so whether the product should adopt exact-content writes remains an unconfirmed upstream policy question. fixed_in remains unknown. pinned_contains_fix=false means the unmodified tested commit retains the observed mechanism. The official 3.0.1 wheel was checksummed and the target Python source matched this commit before patching; native Rust components were not rebuilt. Original prompts were unchanged, and this result does not imply universal model reliability."
+}
