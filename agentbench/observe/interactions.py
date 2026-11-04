@@ -191,6 +191,20 @@ class InteractionIndex:
                 kind = 'sdk'; title = events[0]
             else:
                 kind = 'event'; title = events[0]
+            tool_call_id = request.get('tool_call_id')
+            if kind == 'tool':
+                # The ID may be known only when the framework emits span_end.
+                # Examine top-level protocol fields of this span, never inputs.
+                ids = {d.get('tool_call_id') for r in group
+                       if r['raw'].get('event') in ('span_start', 'span_update', 'span_end',
+                                                    'tool_request', 'tool_response')
+                       for d in [_data(r)]
+                       if isinstance(d.get('tool_call_id'), str) and d.get('tool_call_id')}
+                if len(ids) > 1:
+                    tool_call_id = None
+                    self.warnings.append(f"tool call ID conflict in recorded span {request.get('span_id') or identifier}")
+                else:
+                    tool_call_id = next(iter(ids), None)
             tags = [kind]
             if kind == 'chat' and _contains_tool(response.get('payload')):
                 tags.append('tool_call')
@@ -231,7 +245,7 @@ class InteractionIndex:
                 'call_id': request.get('call_id'), 'framework_span_id': span_id or request.get('span_id'),
                 'parent_span_id': request.get('parent_span_id'), 'invocation_id': request.get('invocation_id'),
                 'native_session_id': request.get('native_session_id'),
-                'tool_call_id': request.get('tool_call_id'), 'purpose': request.get('native_purpose') or request.get('purpose', 'unknown'),
+                'tool_call_id': tool_call_id, 'purpose': request.get('native_purpose') or request.get('purpose', 'unknown'),
                 'purpose_evidence': request.get('purpose_evidence'),
                 'required': request.get('required'),
                 'optional_operation': kind == 'http' and request.get('required') is False,
