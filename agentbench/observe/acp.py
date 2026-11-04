@@ -18,6 +18,14 @@ class ACPObserver:
         self.summary = {'coverage': 'protocol_events', 'internal_model_spans': 'not_observed',
                         'tool_calls': 0, 'incomplete_tools': []}
 
+    def add_secrets(self, secrets):
+        values = tuple(value for value in secrets if isinstance(value, str) and value)
+        if not values:
+            return
+        self.secrets = tuple(dict.fromkeys((*self.secrets, *values)))
+        self.events.add_secrets(values)
+        self.terminals.secrets = self.secrets
+
     def on_acp_event(self, name, data):
         self.events.record(name, **data)
         self.terminals.on_event(name, data)

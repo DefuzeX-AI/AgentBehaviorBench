@@ -195,9 +195,11 @@ def test_slots_exist_before_generation_and_attempts_stay_under_case(tmp_path):
     generation = allocate_run(tmp_path / 'legacy', store, 'agent', {}, (0, 1))
     assert generation.is_dir()
     assert store.case('agent', 1).directory.is_dir()
+    case = store.case('agent', 0)
     attempt = allocate_run(tmp_path / 'legacy', store, 'agent',
                            {'case_index': 0, 'attempt_id': 'attempt-one'})
-    assert attempt == store.case('agent', 0).directory / 'trajectory/attempt-one'
+    assert attempt == case.attempt('attempt-one').directory
+    assert attempt.is_relative_to(case.directory)
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='Controller transport runs in Linux')

@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-from agentbench.observe.store import TraceStore, atomic_json, environment_secrets
+from agentbench.observe.store import TraceStore, atomic_json
 from agentbench.observe.result import sanitize_result
 from agentbench.observe.correlation import model_correlation
 from agentbench.runtime.interception import InterceptionConfig
@@ -74,7 +74,8 @@ def exception_details(exc):
     return details
 
 
-async def execute(root: Path, request: Path, output: Path, *, provider=None, session=None):
+async def execute(root: Path, request: Path, output: Path, *, provider=None, session=None,
+                  observation_secret_sink=None):
     """Execute one current Input, optionally in an existing Case's Agent session.
 
     Args:
@@ -84,6 +85,8 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         provider: Optional shared OpenTelemetry provider.
         session: Case-owned AgentSession reused across Inputs; None creates and
             closes a standalone session for this invocation.
+        observation_secret_sink: Optional callback that registers Agent-derived
+            redaction values with an additional observation transport.
     Returns:
         Zero on successful execution, one on a recorded Agent/runtime failure.
 
@@ -124,6 +127,12 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         store.record("execution_start", input=envelope["input"])
         with span('Load Agent adapter', kind='preparation'):
             adapter = session.load(root, envelope)
+        observe_secrets = getattr(adapter, 'observation_secrets', None)
+        if callable(observe_secrets):
+            secrets = observe_secrets()
+            observed.add_secrets(secrets)
+            if callable(observation_secret_sink):
+                observation_secret_sink(secrets)
         interception = InterceptionConfig.from_agent_dir(root)
         hosts = [host for route in (*interception.routes, *interception.tool_routes)
                  for host in route.host_patterns] if interception else []
@@ -153,7 +162,7 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
                 result["cleanup_error"] = {"type": type(exc).__name__, "message": str(exc)}
                 if result.get("status") == "succeeded":
                     result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
-        result, receipt = sanitize_result(result, environment_secrets())
+        result, receipt = sanitize_result(result, observed.redaction_secrets)
         atomic_json(output / "result-redaction.json", receipt)
         atomic_json(output / "result.json", result)
         if hasattr(store, 'close'):

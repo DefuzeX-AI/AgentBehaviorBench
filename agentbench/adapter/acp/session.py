@@ -3,7 +3,13 @@ import asyncio
 import codecs
 import os
 from acp import PROTOCOL_VERSION, connect_to_agent, text_block
-from acp.schema import ClientCapabilities, FileSystemCapabilities, Implementation
+from acp.schema import (
+    ClientCapabilities,
+    EnvVariable,
+    FileSystemCapabilities,
+    Implementation,
+    McpServerStdio,
+)
 from .client import ACPClient, plain
 from .errors import ACPError, AgentAborted
 from .process import child_environment, terminate_group
@@ -27,6 +33,7 @@ class ACPSession:
             callback.on_acp_event(name, data)
 
     async def start(self):
+        mcp_servers = self._mcp_server_models()
         from .evidence import load_reader
         self.evidence_reader = load_reader(self.config)
         self.process = await asyncio.create_subprocess_exec(
@@ -50,10 +57,31 @@ class ACPSession:
             if self.config.auth_method not in advertised:
                 raise ACPError('Configured authentication method is not advertised', code='auth_required')
             await self.conn.authenticate(method_id=self.config.auth_method)
-        session = await self.conn.new_session(cwd=self.config.cwd, mcp_servers=[])
+        session = await self.conn.new_session(cwd=self.config.cwd, mcp_servers=mcp_servers)
         await self.client.bind_session(session.session_id)
         self.info['session'] = plain(session)
         self.emit('session', self.info['session'])
+
+    def _mcp_server_models(self):
+        servers = []
+        for configured in self.config.mcp_servers:
+            env = []
+            for key in configured.env_keys:
+                try:
+                    value = os.environ[key]
+                except KeyError as exc:
+                    raise ACPError(
+                        f'ACP MCP server {configured.name!r} requires declared environment key {key!r}',
+                        code='mcp_env_missing',
+                    ) from exc
+                env.append(EnvVariable(name=key, value=value))
+            servers.append(McpServerStdio(
+                name=configured.name,
+                command=configured.command,
+                args=list(configured.args),
+                env=env,
+            ))
+        return servers
 
     async def drain_stderr(self):
         decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')

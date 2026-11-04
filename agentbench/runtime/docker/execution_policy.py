@@ -18,7 +18,11 @@ class ControllerExecutionPolicy:
         return (self.storage,)
 
     def shared_directories(self):
-        return tuple(path for _, path in self.publications)
+        # The Agent and trusted controller mount this channel with separate
+        # container users, so the controller runtime must grant group access.
+        channel = ((self.channel.requests, self.channel.responses)
+                   if self.channel is not None else ())
+        return (*channel, *(path for _, path in self.publications))
 
     def run_arguments(self):
         from agentbench.runtime.workspace_replay import REPLAY_MOUNT

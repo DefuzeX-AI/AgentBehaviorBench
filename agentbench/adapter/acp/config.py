@@ -9,6 +9,14 @@ except ModuleNotFoundError:  # Python 3.10
 
 
 @dataclass(frozen=True)
+class ACPMCPServer:
+    name: str
+    command: str
+    args: tuple[str, ...]
+    env_keys: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ACPConfig:
     root: Path
     command: tuple[str, ...]
@@ -22,6 +30,7 @@ class ACPConfig:
     max_output_bytes: int = 8 * 1024 * 1024
     auth_method: str | None = None
     evidence_reader: str | None = None
+    mcp_servers: tuple[ACPMCPServer, ...] = ()
 
     @classmethod
     def from_agent_dir(cls, root):
@@ -30,7 +39,7 @@ class ACPConfig:
         adapter = manifest.get('adapter', {})
         allowed = {'type', 'transport', 'command', 'cwd', 'env_keys', 'input_key',
                    'permission_policy', 'handshake_timeout', 'cleanup_timeout',
-                   'max_output_bytes', 'auth_method', 'evidence_reader'}
+                   'max_output_bytes', 'auth_method', 'evidence_reader', 'mcp_servers'}
         if not isinstance(adapter, dict) or adapter.get('type') != 'acp':
             raise ValueError('ACP requires adapter.type="acp"')
         if set(adapter) - allowed:
@@ -66,12 +75,13 @@ class ACPConfig:
         interception = manifest.get('llm_interception', {})
         keys += tuple(item['agent_env'] for item in interception.get('credentials', [])
                       if isinstance(item, dict) and isinstance(item.get('agent_env'), str))
+        mcp_servers = _mcp_servers(adapter.get('mcp_servers', []), set(keys))
         return cls(root, tuple(command), cwd, tuple(dict.fromkeys(keys)),
                    adapter.get('input_key'), policy,
                    _seconds(runtime.get('timeout_sec', 2400), 'runtime.timeout_sec'),
                    _seconds(adapter.get('handshake_timeout', 30), 'handshake_timeout'),
                    _seconds(adapter.get('cleanup_timeout', 3), 'cleanup_timeout'),
-                   maximum, adapter.get('auth_method'), adapter.get('evidence_reader'))
+                   maximum, adapter.get('auth_method'), adapter.get('evidence_reader'), mcp_servers)
 
     def text_input(self, value):
         if self.input_key is not None:
@@ -83,10 +93,54 @@ class ACPConfig:
         return value
 
 
-def _strings(value, name):
-    if not isinstance(value, list) or any(not isinstance(x, str) or not x.strip() or '\0' in x for x in value):
-        raise ValueError(f'ACP {name} must be an array of non-empty strings')
+def _strings(value, name, *, allow_empty=False):
+    if not isinstance(value, list) or any(
+        not isinstance(x, str) or (not allow_empty and not x.strip()) or '\0' in x for x in value
+    ):
+        requirement = 'strings' if allow_empty else 'non-empty strings'
+        raise ValueError(f'ACP {name} must be an array of {requirement}')
     return value
+
+
+def _mcp_servers(value, declared_env_keys):
+    if not isinstance(value, list):
+        raise ValueError('ACP mcp_servers must be an array of tables')
+    allowed = {'name', 'command', 'args', 'env_keys'}
+    names, servers = set(), []
+    for server in value:
+        if not isinstance(server, dict):
+            raise ValueError('Each ACP mcp_servers entry must be a table')
+        if 'type' in server or 'transport' in server:
+            transport = server.get('type', server.get('transport'))
+            if transport in ('http', 'sse'):
+                raise ValueError('ACP MCP HTTP and SSE transports are not supported; only stdio is supported')
+            raise ValueError('ACP MCP server type/transport fields are not supported; ACP v1 stdio has no type field')
+        unsupported = set(server) - allowed
+        if unsupported:
+            raise ValueError('Unknown ACP MCP server fields: ' + ', '.join(sorted(unsupported)))
+
+        name = server.get('name')
+        if not isinstance(name, str) or not name.strip() or name != name.strip() or '\0' in name:
+            raise ValueError('ACP MCP server name must be a non-empty string')
+        if name in names:
+            raise ValueError(f'ACP MCP server names must be unique: {name!r}')
+        names.add(name)
+
+        command = server.get('command')
+        if (not isinstance(command, str) or not command.strip() or '\0' in command
+                or not PurePosixPath(command).is_absolute()):
+            raise ValueError('ACP MCP server command must be an absolute container path')
+        args = tuple(_strings(server.get('args', []), 'mcp_servers.args', allow_empty=True))
+        env_keys = tuple(_strings(server.get('env_keys', []), 'mcp_servers.env_keys'))
+        if len(env_keys) != len(set(env_keys)):
+            raise ValueError(f'ACP MCP server env_keys must be unique for {name!r}')
+        for key in env_keys:
+            if '=' in key:
+                raise ValueError('ACP MCP server env_keys must be environment variable names')
+            if key not in declared_env_keys:
+                raise ValueError(f'ACP MCP server {name!r} references undeclared environment key {key!r}')
+        servers.append(ACPMCPServer(name, command, args, env_keys))
+    return tuple(servers)
 
 
 def _seconds(value, name):

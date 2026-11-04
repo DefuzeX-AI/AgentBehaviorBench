@@ -261,6 +261,9 @@ class DockerRuntime:
 
         try:
             agent_environment = dict(config.environment)
+            mcp_redaction_values = _prepare_mcp_redaction_values(
+                agent, agent_environment,
+            ) if interception is not None else ()
             network_arguments: list[str]
             if interception is not None:
                 # The interception path records trace state and creates an isolated network.
@@ -285,6 +288,7 @@ class DockerRuntime:
                     network_name=network_name,
                     trace_state=trace_state,
                     deadline=preparation,
+                    redaction_values=mcp_redaction_values,
                     egress_proxy=(
                         (egress_observer.container_name, egress_observer.port)
                         if egress_observer is not None else None
@@ -357,17 +361,17 @@ class DockerRuntime:
                 PYTHONUNBUFFERED="1",
             )
             # Add environment variables, image, and launch command to the container arguments.
-            for key, value in sorted(agent_environment.items()):
-                if key in exclude_environment:
-                    continue
-                command.extend(("--env", f"{key}={value}"))
+            environment_options, command_environment = _container_environment(
+                agent_environment, exclude_environment)
+            command.extend(environment_options)
             command.extend((image, *(config.argv if argv is None else argv)))
 
             # Register and create the Agent container so failures can clean it up reliably.
             self._plan_resource("container", agent_name, "agent", suffix)
             planned_agent = True
             with span("Create Agent container", kind="preparation"):
-                self._create_resource("container", agent_name, command, deadline=preparation)
+                self._create_resource("container", agent_name, command,
+                                      deadline=preparation, command_environ=command_environment)
             preparation.check()
             
             # Start the Agent container and capture stdout and stderr.
@@ -430,6 +434,7 @@ class DockerRuntime:
         deadline: Deadline | None = None,
         egress_proxy: tuple[str, int] | None = None,
         model_provider: ModelTargetProvider | None = None,
+        redaction_values=(),
     ) -> tuple[RunningModelInterceptor, dict[str, str]]:
         if deadline is not None:
             deadline.check()
@@ -450,12 +455,15 @@ class DockerRuntime:
         trace_reader = None
         try:
             ca_dir.mkdir()
-            from agentbench.runtime.interception.service_config import prepare_service_config
+            from agentbench.runtime.interception.service_config import (
+                prepare_service_config, write_mount_file,
+            )
             service_data, token_environment = prepare_service_config(
                 interception, agent_id=agent_id, max_trace_bytes=self._trace_max_bytes,
                 secret_dir=secret_dir, secret_resolver=self._secret_resolver,
-                environ=self._environ, model_provider=model_provider or self._model_provider, egress_proxy=egress_proxy)
-            config_file.write_text(json.dumps(service_data, ensure_ascii=False), encoding='utf-8')
+                environ=self._environ, model_provider=model_provider or self._model_provider,
+                egress_proxy=egress_proxy, redaction_values=redaction_values)
+            write_mount_file(config_file, json.dumps(service_data, ensure_ascii=False))
 
             command = [
                 "run",
@@ -717,7 +725,7 @@ class DockerRuntime:
                 deadline=deadline,
             )
             if state is not None and state.stdout.strip() == "false":
-                detail = logs.stdout.strip() if logs is not None else ""
+                detail = ((logs.stdout + logs.stderr).strip() if logs is not None else "")[-2000:]
                 raise DockerRuntimeError(
                     f"Model interceptor stopped during startup{': ' + detail if detail else ''}"
                 )
@@ -766,8 +774,10 @@ class DockerRuntime:
             detail = result.stderr.strip() if result is not None else "docker not found"
             raise DockerUnavailableError(f"Docker daemon is unavailable: {detail}")
 
-    def _run(self, *args: str, deadline: Deadline | None = None) -> subprocess.CompletedProcess[str]:
-        result = self._run_quiet(*args, capture=True, deadline=deadline)
+    def _run(self, *args: str, deadline: Deadline | None = None,
+             command_environ: Mapping[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+        result = self._run_quiet(*args, capture=True, deadline=deadline,
+                                 command_environ=command_environ)
         if result is None:
             raise DockerRuntimeError("Docker executable was not found")
         if result.returncode != 0:
@@ -779,11 +789,12 @@ class DockerRuntime:
 
     def _run_quiet(
         self, *args: str, capture: bool = False, deadline: Deadline | None = None,
+        command_environ: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str] | None:
         try:
             return self._commands.run(
                 args, control=self.control, timeout=self._limits.command_seconds,
-                deadline=deadline,
+                deadline=deadline, extra_environ=command_environ,
             )
         except FileNotFoundError:
             return None
@@ -806,9 +817,10 @@ class DockerRuntime:
     def _plan_resource(self, kind: str, name: str, role: str, suffix: str) -> None:
         self._resources.plan(kind, name, self._resource_identity(role, suffix))
 
-    def _create_resource(self, kind: str, name: str, arguments: list[str], *, deadline: Deadline | None) -> None:
+    def _create_resource(self, kind: str, name: str, arguments: list[str], *, deadline: Deadline | None,
+                         command_environ: Mapping[str, str] | None = None) -> None:
         try:
-            created = self._run(*arguments, deadline=deadline)
+            created = self._run(*arguments, deadline=deadline, command_environ=command_environ)
         except BaseException as exc:
             if getattr(exc, "docker_client_interrupted", False):
                 self._uncertain_resources.add((kind, name))
@@ -843,6 +855,33 @@ class DockerRuntime:
 
 def _bind_mount(source: Path, target: str) -> str:
     return f"type=bind,source={source.resolve()},target={target},readonly"
+
+
+def _prepare_mcp_redaction_values(agent, agent_environment):
+    if getattr(agent, 'framework', None) != 'acp':
+        return ()
+    from agentbench.adapter.acp.config import ACPConfig
+
+    config = ACPConfig.from_agent_dir(agent.path)
+    keys = tuple(dict.fromkeys(key for server in config.mcp_servers for key in server.env_keys))
+    missing = [key for key in keys if key not in agent_environment]
+    if missing:
+        raise DockerRuntimeError(
+            'Docker ACP MCP server keys must be resolved through runtime environment settings: '
+            + ', '.join(missing)
+        )
+    return tuple(dict.fromkeys(agent_environment[key] for key in keys if agent_environment[key]))
+
+
+def _container_environment(environment, excluded=()):
+    """Pass values through the Docker client environment, never command arguments."""
+    selected = {key: value for key, value in environment.items() if key not in excluded}
+    for key, value in selected.items():
+        if (not isinstance(key, str) or not key or '=' in key or '\0' in key
+                or not isinstance(value, str) or '\0' in value):
+            raise DockerRuntimeError('Docker environment entries must use valid names and NUL-free values')
+    options = tuple(part for key in sorted(selected) for part in ('--env', key))
+    return options, selected
 
 
 def _share_input_mount(directory: Path) -> None:

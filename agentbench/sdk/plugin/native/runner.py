@@ -34,6 +34,26 @@ class NativeRunner(ContainerSDKRunner):
                 raise ValueError('Case IDs must be unique')
         super().__init__(plugin, context=context, options=options)
 
+    def _run(self, registration, *, settings, context, on_progress, **kwargs):
+        from agentbench.runtime.agentcontainer.config import tomllib
+        from agentbench.runtime.interception.native_model import resolve_shared_model
+
+        environment = dict(context.environ)
+        if context.model is not None:
+            environment['ABB_MODEL'] = context.model
+        manifest = tomllib.loads((Path(registration.path) / 'agent.toml').read_text(encoding='utf-8'))
+        target = resolve_shared_model(manifest, environment)
+        # The provider key is used by the host runtime and the ABB alias by the Agent.
+        # The SDK controller needs neither credential.
+        excluded = tuple(dict.fromkeys((
+            *kwargs.pop('excluded_controller_environment', ()),
+            'ABB_AGENT_MODEL_API_KEY',
+            *((target.credential_env,) if target is not None else ()),
+        )))
+        return super()._run(registration, settings=settings, context=context,
+                            on_progress=on_progress,
+                            excluded_controller_environment=excluded, **kwargs)
+
     def prepare_cases(self, registration, **kwargs):
         cases = self.sdk_options.get('cases', [])
         if len(cases) != registration.case_count:

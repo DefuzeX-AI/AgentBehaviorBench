@@ -1,11 +1,24 @@
 """Prepare per-run service data; framework behavior owns credential substitution."""
 from dataclasses import asdict
+from pathlib import Path
 import secrets
 from .target_routing import resolve_target_routing
 
 
+def write_mount_file(path: Path, value: str) -> None:
+    """Write a read-only file that a restricted service container can read.
+
+    The containing temporary directory stays private on the host. Set the file
+    mode explicitly because a restrictive host umask would otherwise make a
+    bind-mounted file unreadable to the container's unprivileged namespace.
+    """
+    path.write_text(value, encoding='utf-8')
+    path.chmod(0o444)
+
+
 def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_dir,
-                           secret_resolver, environ, model_provider=None, egress_proxy=None):
+                           secret_resolver, environ, model_provider=None, egress_proxy=None,
+                           redaction_values=()):
     """Return service JSON data and explicitly declared Agent credential env.
 
     Observe never resolves a model target, reads a replacement secret or creates
@@ -21,6 +34,14 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
             'routes': [_route_data(r) for r in interception.routes],
             'tool_routes': [asdict(r) for r in interception.tool_routes],
             'token_counting': dict(interception.token_counting)}
+    redaction_files = []
+    for index, value in enumerate(dict.fromkeys(
+        item for item in redaction_values if isinstance(item, str) and item
+    )):
+        filename = f'redaction-{index}.secret'
+        write_mount_file(secret_dir / filename, value)
+        redaction_files.append(f'/run/secrets/{filename}')
+    data['redaction_secret_files'] = redaction_files
     if egress_proxy is not None:
         data['egress_proxy'] = {'host': egress_proxy[0], 'port': egress_proxy[1]}
     token_environment = {}
@@ -32,7 +53,7 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
     prepared_targets = {}
     for name, target in plan.targets.items():
         filename = f'target-{name}.secret' if plan.explicit else 'target.secret'
-        (secret_dir / filename).write_text(secret_resolver.require(target.credential_env), encoding='utf-8')
+        write_mount_file(secret_dir / filename, secret_resolver.require(target.credential_env))
         prepared = {'provider_id': target.provider_id, 'target_plugin': target.target_plugin,
                     'base_url': target.base_url, 'model': target.model, 'headers': dict(target.headers),
                     'secret_file': f'/run/secrets/{filename}', 'input_modalities': list(plan.inputs[name])}
@@ -48,7 +69,7 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
     for credential in interception.credentials:
         token = secrets.token_urlsafe(32)
         token_file = secret_dir / f'{credential.credential_id}.token'
-        token_file.write_text(token, encoding='utf-8')
+        write_mount_file(token_file, token)
         token_environment[credential.agent_env] = token
         item = {'id': credential.credential_id, 'auth_plugin': credential.auth_plugin,
                 'token_file': f'/run/secrets/{token_file.name}'}
