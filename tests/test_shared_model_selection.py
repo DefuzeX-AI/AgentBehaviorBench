@@ -279,7 +279,7 @@ def test_registered_units_omit_redundant_model_defaults():
     # Units with a fixed provider pin, and the provider each one names.
     provider_pins = {
         'minimax-code': 'minimax', 'claude-agent-acp': 'codex',
-        'qwen-code': 'dashscope', 'openharness': 'deepseek'}
+        'qwen-code': 'dashscope', 'openharness': 'deepseek', 'whale': 'deepseek'}
     assert set(declarations) == metadata_only | set(provider_pins)
     assert {name: config['provider'] for name, config in declarations.items() if 'provider' in config} == provider_pins
     for name in metadata_only:
