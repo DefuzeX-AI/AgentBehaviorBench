@@ -8,11 +8,13 @@ class ControllerExecutionPolicy:
     """Mount private SDK artifacts only in the trusted controller."""
 
     def __init__(self, storage, *, repository, target='/opt/abb-sdk-repo',
-                 writable=False, replay=None, channel=None, publications=()):
+                 writable=False, replay=None, channel=None, publications=(),
+                 policy=None):
         self.storage = Path(storage).resolve()
         self.repository = Path(repository).resolve()
         self.target, self.writable = target, writable
         self.replay, self.channel, self.publications = replay, channel, publications
+        self.policy = policy
 
     def owned_directories(self):
         return (self.storage,)
@@ -24,7 +26,8 @@ class ControllerExecutionPolicy:
         from agentbench.runtime.workspace_replay import REPLAY_MOUNT
         from agentbench.sdk.integration.context import STORAGE
         recording = ('--mount', f'type=bind,source={self.replay},target={REPLAY_MOUNT}') if self.replay else ()
-        return (*DockerPolicy().run_arguments(), '--mount',
+        base_policy = self.policy if self.policy is not None else DockerPolicy()
+        return (*base_policy.run_arguments(), '--mount',
                 f'type=bind,source={self.repository},target={self.target}' + ('' if self.writable else ',readonly'),
                 '--mount', f'type=bind,source={self.storage},target={STORAGE}', *recording,
                 *(self.channel.mounts(controller=True) if self.channel else ()),
@@ -33,14 +36,16 @@ class ControllerExecutionPolicy:
 
 
 class AgentExecutionPolicy:
-    def __init__(self, repository, target, writable, channel, output):
+    def __init__(self, repository, target, writable, channel, output, *, policy=None):
         self.repository, self.target = repository, target
         self.writable, self.channel, self.output = writable, channel, output
+        self.policy = policy
 
     def owned_directories(self):
         return (self.channel.requests, self.channel.responses, self.output)
 
     def run_arguments(self):
-        return (*DockerPolicy().run_arguments(), '--mount',
+        base_policy = self.policy if self.policy is not None else DockerPolicy()
+        return (*base_policy.run_arguments(), '--mount',
                 f'type=bind,source={self.repository},target={self.target}' +
                 ('' if self.writable else ',readonly'), *self.channel.mounts())
