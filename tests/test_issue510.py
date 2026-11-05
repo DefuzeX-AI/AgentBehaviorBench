@@ -71,6 +71,26 @@ def test_transport_preserves_context_state_and_interceptor_environment(monkeypat
     assert value == {"message": "Compute", "context": {"locale": "en", "skillIds": ["beam"]}}
 
 
+def test_text_input_uses_native_console_default_skills(monkeypatch):
+    module = bridge()
+    seen = {}
+    class Process:
+        returncode = 0
+        def __init__(self, argv, **kwargs):
+            self.output = Path(argv[-1])
+        def communicate(self, data=None, timeout=None):
+            seen["input"] = json.loads(data)
+            self.output.write_text(json.dumps({"response": "native", "state": {}}))
+            return "", ""
+        def poll(self):
+            return 0
+    monkeypatch.setattr(module.subprocess, "Popen", Process)
+    module.create_graph().invoke("Analyze", {"configurable": {"thread_id": "case-2"}})
+    assert seen["input"]["input"]["context"] == {"skillIds": ["opensees-static", "generic", "validation-structure-model", "report-export-builtin"]}
+    module.create_graph().invoke({"message": "Analyze", "context": {"locale": "en"}}, {"configurable": {"thread_id": "case-3"}})
+    assert seen["input"]["input"]["context"] == {"locale": "en", "skillIds": list(module.DEFAULT_CONSOLE_SKILL_IDS)}
+
+
 def test_native_bridge_keeps_full_upstream_graph():
     source = (UNIT / "bindings/native.mjs").read_text()
     assert "service.runFull(input)" in source

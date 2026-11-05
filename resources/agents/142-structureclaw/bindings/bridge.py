@@ -9,6 +9,11 @@ import subprocess
 import tempfile
 import uuid
 
+# The published console's DEFAULT_CONSOLE_SKILL_IDS (dist/frontend). Native
+# runFull reads only context.skillIds, so a text-only ABB input would otherwise
+# run with no analysis provider selected.
+DEFAULT_CONSOLE_SKILL_IDS = ("opensees-static", "generic", "validation-structure-model", "report-export-builtin")
+
 
 class StructureClawGraph:
     def __init__(self):
@@ -23,6 +28,10 @@ class StructureClawGraph:
         if not isinstance(value, dict) or not isinstance(value.get("message"), str) or not value["message"].strip():
             raise ValueError("StructureClaw requires a nonempty message")
         request = dict(value)
+        context = dict(request.get("context") or {})
+        if "skillIds" not in context:
+            context["skillIds"] = list(DEFAULT_CONSOLE_SKILL_IDS)
+        request["context"] = context
         configurable = (config or {}).get("configurable", {})
         request.setdefault("conversationId", configurable.get("thread_id") or self.conversation_id)
         env = os.environ.copy()
