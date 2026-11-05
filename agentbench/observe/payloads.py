@@ -3,11 +3,11 @@ import errno
 import hashlib
 import os
 from pathlib import Path
-from .legacy_archive import _safe
+from .artifact_paths import _safe
 
 
 def publish_payload(temporary, target, step):
-    """Use filesystem references within one trajectory; no virtual-file index.
+    """Use filesystem references within one attempt; no virtual-file index.
 
     Unsupported filesystems retain an ordinary file. Publication never mutates
     an existing shared payload.
@@ -18,7 +18,7 @@ def publish_payload(temporary, target, step):
         return
     root = step.parent.parent.resolve()
     if not target.resolve().is_relative_to(root) or target.is_symlink():
-        raise ValueError('Payload leaves trajectory')
+        raise ValueError('Payload leaves attempt')
     blobs = _safe(root, 'blobs')
     if blobs.is_symlink():
         raise ValueError('Linked payload store')

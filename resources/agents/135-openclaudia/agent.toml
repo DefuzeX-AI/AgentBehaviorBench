@@ -1,0 +1,67 @@
+# Hand-written: OpenClaudia native ACP is acpx "Agent Control Protocol", not
+# Agent Client Protocol. ABB drives the upstream one-shot print frontend
+# (`openclaudia --print --target local`) through an outer LangGraph-compatible
+# binding plus bindings/model_relay.py (rustls ignores SSL_CERT_FILE).
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "openclaudia"
+display_name = "OpenClaudia (print-mode chat via LangGraph binding)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "git"
+repository = "https://github.com/Corvidae-Coding-Projects/OpenClaudia"
+revision = "fad337c447320ea0a3281bcbff378b30e7a1d3d0"
+downloaded_on = "2026-10-27"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+cpus = 2
+env_keys = ["OPENAI_BASE_URL", "OPENAI_MODEL"]
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+input_key = "message"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/chat/completions", "/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"

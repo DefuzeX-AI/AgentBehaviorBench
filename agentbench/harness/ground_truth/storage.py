@@ -9,7 +9,7 @@ from agentbench.sdk.common.artifacts import Artifacts
 
 
 def agent_roots(directory, plan):
-    if plan.get('artifact_layout') != 'agent-trajectories-v1':
+    if plan.get('artifact_layout') != 'agent-attempts-v1':
         return {}
     store = FileArtifactStore(directory)
     return {a['agent_id']: store.agent_directory(a['agent_id']) / 'gt' / plan['suite_id']

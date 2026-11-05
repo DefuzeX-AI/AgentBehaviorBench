@@ -1,0 +1,19 @@
+schema_version = "abb.network.v1"
+
+# The original ACP bridge reaches its private Gateway through this WebSocket.
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [19001]
+methods = ["GET"]
+path_patterns = ["/"]
+purpose = "tool"
+required = true
+
+# Native managed Chromium CDP: loopback metadata and debugging WebSocket only.
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [18800]
+methods = ["GET", "POST", "PUT", "DELETE"]
+path_patterns = ["/json", "/json/*", "/devtools/*"]
+purpose = "tool"
+required = false

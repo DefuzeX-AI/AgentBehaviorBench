@@ -256,7 +256,7 @@ def test_migrated_acp_unit_can_prepare_from_install_only(unit,tmp_path):
     from agentbench.harness.registry import _parse_agent
     base=Path(__file__).resolve().parents[1]
     root=tmp_path/'resources/agents'/unit.name
-    shutil.copytree(unit,root,ignore=lambda directory,names: {'agent'} if Path(directory)==unit else set())
+    shutil.copytree(unit,root,ignore=lambda directory,names: {'agent', 'ground_truth'} if Path(directory)==unit else set())
     manifest=tomllib.loads((root/'agent.toml').read_text(encoding='utf-8'))
     record=dict(agent_id=manifest['agent_id'],framework='acp',path='resources/agents/'+unit.name)
     _parse_agent(record,tmp_path)
@@ -365,7 +365,7 @@ def test_registered_abb_descriptor_loads_after_clean_source_preparation(unit_nam
 
     source = Path(__file__).resolve().parents[1]/'resources/agents'/unit_name
     root = tmp_path/'unit'
-    shutil.copytree(source, root, ignore=lambda directory, names: {'agent'} if Path(directory)==source else set())
+    shutil.copytree(source, root, ignore=lambda directory, names: {'agent', 'ground_truth'} if Path(directory)==source else set())
     archive = tmp_path/'upstream.zip'
     with zipfile.ZipFile(archive, 'w') as file:
         # Upstream has no ABB descriptor; preparation must add the tracked input.

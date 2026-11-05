@@ -7,6 +7,7 @@ import SuiteSidebar from './navigation/SuiteSidebar.jsx';
 import { DEFAULT_CASE_TAB, readSuiteRoute, writeSuiteRoute } from './navigation/suiteRoute.js';
 import TraceView from './otel/TraceView.jsx';
 import EvaluationView from './evaluation/EvaluationView.jsx';
+import TrajectoryView from './trajectory/TrajectoryView.jsx';
 import CaseDetailsPage from './cases/CaseDetailsPage.jsx';
 import useLiveJson from './useLiveJson.js';
 import useSuiteLive from './suite/useSuiteLive.js';
@@ -76,7 +77,7 @@ function TraceExplorer() {
   const [events, setEvents] = useState([]);
   const [view, setView] = useState(() => {
     const requested = new URLSearchParams(window.location.hash.slice(1)).get('view');
-    return ['otel', 'evaluation', 'raw', 'flow', 'replay'].includes(requested) ? requested : 'otel';
+    return ['otel', 'evaluation', 'raw', 'flow', 'replay', 'trajectory'].includes(requested) ? requested : 'otel';
   });
   const [imported, setImported] = useState(false);
   const [files, setFiles] = useState([]);
@@ -129,18 +130,19 @@ function TraceExplorer() {
 
   return <div className="workspace">
     <RunSidebar runs={runs} selected={selected} busy={!catalog.data && !catalog.error} error={catalog.error}
-      onSelect={id => { setImported(false); setView(current => ['flow', 'replay'].includes(current) ? current : 'otel'); if (id === selected) setRevision(value => value + 1); else setSelected(id); }}
+      onSelect={id => { setImported(false); setView(current => ['flow', 'replay', 'trajectory'].includes(current) ? current : 'otel'); if (id === selected) setRevision(value => value + 1); else setSelected(id); }}
       onRefresh={() => setRevision(value => value + 1)} />
     <main><header><div><div className="brand">AGENT BEHAVIOR BENCH</div><h1>Trace</h1></div>
       <button className="primary" onClick={() => input.current.click()} disabled={loading}>{loading ? 'Reading…' : 'Open trace files'}</button>
       <input ref={input} type="file" multiple accept=".jsonl,.json" hidden onChange={event => { loadFiles(Array.from(event.target.files)); event.target.value = ''; }} /></header>
       <p className="description">{selected ? `Run ${selected}: choose a view below to inspect its records.` : 'Select a run on the left to load it automatically, or open trace files manually.'}</p>
-      <nav className="trace-tabs" aria-label="Trace views"><button aria-pressed={view === 'replay'} onClick={() => setView('replay')}>Replay</button><button aria-pressed={view === 'otel'} onClick={() => setView('otel')}>OTel call tree</button><button aria-pressed={view === 'evaluation'} onClick={() => setView('evaluation')}>Case / SDK / Judge</button><button aria-pressed={view === 'raw'} onClick={() => setView('raw')}>Interaction timeline</button><button aria-pressed={view === 'flow'} onClick={() => setView('flow')}>Execution flow</button></nav>
+      <nav className="trace-tabs" aria-label="Trace views"><button aria-pressed={view === 'replay'} onClick={() => setView('replay')}>Replay</button><button aria-pressed={view === 'trajectory'} onClick={() => setView('trajectory')}>Trajectory</button><button aria-pressed={view === 'otel'} onClick={() => setView('otel')}>OTel call tree</button><button aria-pressed={view === 'evaluation'} onClick={() => setView('evaluation')}>Case / SDK / Judge</button><button aria-pressed={view === 'raw'} onClick={() => setView('raw')}>Interaction timeline</button><button aria-pressed={view === 'flow'} onClick={() => setView('flow')}>Execution flow</button></nav>
       {!selected && !imported && <p role="status">{!catalog.data && !catalog.error ? 'Reading run directory…' : catalog.error ? `Run directory unavailable: ${catalog.error}` : 'Select a run or open trace files.'}</p>}
       {Object.entries(runMetadata.data?.evidence_availability || {}).filter(([, value]) => value.status !== 'available').map(([kind, value]) => <p role="status" key={kind}>{kind}: {value.status}{value.reason ? `, ${value.reason}` : ''}</p>)}
       {runMetadata.data?.artifacts?.received_report?.host_accepted === false && <p role="alert">Judge report retained ({runMetadata.data.artifacts.received_report.status}), but the host rejected this execution. Rejection reason: {runMetadata.data.error || 'inspect the run diagnostics'}.</p>}
       {view === 'replay' ? <Suspense fallback={<p>Loading replay…</p>}><CaseReplay key={selected} run={selected} /></Suspense>
         : view === 'flow' ? <Suspense fallback={<p>Loading execution flow…</p>}><FlowPrototype key={selected} run={selected} revision={revision} /></Suspense>
+        : view === 'trajectory' ? <TrajectoryView run={selected} revision={revision} live={runMetadata.data?.status === 'running'} />
         : view === 'otel' ? <TraceView run={selected} revision={revision} />
           : view === 'evaluation' ? <EvaluationView run={selected} revision={revision} />
             : view === 'raw' && selected ? <Suspense fallback={<p>Loading interaction timeline…</p>}><RawRunView key={selected} run={selected} revision={revision} /></Suspense> : <>

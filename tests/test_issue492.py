@@ -5,7 +5,7 @@ from pathlib import Path
 import tomllib
 import pytest
 
-UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/127-dotcraft'
+UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/141-dotcraft'
 
 
 def launcher():

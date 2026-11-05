@@ -1,0 +1,24 @@
+{
+  "case_id": "ir-jcode-751-v1",
+  "issue": {
+    "repository": "1jehuang/jcode",
+    "number": 751,
+    "url": "https://github.com/1jehuang/jcode/issues/751",
+    "state": "open",
+    "title": "command-risk gate blocks routine read-only commands (2>/dev/null, grep -r, quoted heredocs) — fix attached",
+    "body": "The command-risk classifier refuses ordinary read-only shell commands, which is the failure mode the crate docs warn about: over-firing trains users to reflex-approve, and a gate that is always tripped protects nothing.\n\nFour defects, all cascading from how redirects are parsed:\n\n1. `2>/dev/null` tokenizes the fd as a word and `/dev/null` as a truncating redirect target. `/dev/null` sits under `/dev`, which is protected recursively, so the single most common shell idiom there is classified Catastrophic and cannot be run at all.\n\n2. Any redirect makes *every* operand a delete target, because the target list is built unconditionally. `grep -rn pat . > out` reports `.` as a recursive delete and `*.md` as an unknown-footprint glob.\n\n3. `-r` is read as \"recursive delete\" even when the program only reads, so `grep -r` and `ls -R` look destructive.\n\n4. Quoted heredoc bodies are tokenized as code. A backtick or `$` in documentation prose reads as command substitution, so writing a doc that merely *mentions* a path is blocked.\n\nFix: strip leading fds and `>&N` dups in the tokenizer; treat the discard sinks (/dev/null, /dev/zero, /dev/tty, stdout, stderr) as inert everywhere; only collect operands as targets when the program is actually destructive; require a destructive verb before `-r` counts as recursion; skip the bodies of quoted heredocs, which the shell itself does not expand.\n\nUnquoted heredocs are still assessed, since the shell does expand those.\n\n## Reproduction\n\n```\n$ jcode run 'grep -rn TODO . 2>/dev/null'\n```\nrefused as Catastrophic pre-fix (matches `/dev/null` under the protected `/dev` tree).\n\n## Fix\n\nPatch attached (`command_risk_fix.diff`), scoped entirely to `crates/jcode-command-risk/`. It applies cleanly on current `master` (`b80d9eb92`) with no conflicts.\n\n`cargo test -p jcode-command-risk`: 64 passed, 0 failed, including tests confirming `rm -rf ~`, device writes, out-of-cwd deletes, and clobbering redirects are all still gated.\n\nBranch with the commit, if a maintainer would rather cherry-pick directly:\nhttps://github.com/rameshbaskaran/jcode/tree/fix/command-risk-on-v66\n\n(Repo settings restrict PR creation to collaborators, so filing this as an issue with a ready patch instead of a PR.)\n"
+  },
+  "version_choice": "historical:v0.66.0",
+  "reported_version": "unknown",
+  "commit_version": "b45bb9b52af29160b1f77838ed4fd070b9a2f978",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create file.txt containing hello and notes.md containing TODO. Keep all fixtures in the current workspace.",
+    "Run exactly this bash command and show its actual result: grep -rn TODO . 2>/dev/null"
+  ],
+  "expected": "A read-only command or discard-device redirect is not classified as catastrophic deletion.",
+  "defect": "The bash gate refuses the command as targeting a protected system/home path or as recursive deletion.",
+  "fault location": [],
+  "Root cause": "The command-risk parser confuses redirects and literal shell content with destructive operands. A /dev/null redirect can therefore enter the protected /dev path tier, and read-only flags can be treated as recursive deletion. Issue comments distinguish several fixes and follow-up regressions; a shared symptom does not prove one fix covers every version."
+}

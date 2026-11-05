@@ -1,0 +1,63 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "3bb747e8de4147378537d8710681a531",
+  "case_id": "yao-llxprt-code-3943-r01",
+  "input_id": "step-1",
+  "invocation_id": "3bb747e8de4147378537d8710681a531",
+  "agent_id": "llxprt-code",
+  "status": "succeeded",
+  "output": "I ran the command exactly as given. Here is the tool result, quoted verbatim:\n\n```\nCommand: python3 -c \"import sys; print('to-stdout'); print('to-stderr', file=sys.stderr)\"\nDirectory: (root)\nStdout: to-stderr\nto-stdout\n\nStderr: (empty)\nError: (none)\nExit Code: 0\nSignal: (none)\nBackground PIDs: (none)\nProcess Group PGID: (none)\n```\n\nWhat was actually printed, stream by stream:\n\n- **stdout** (the program's `print('to-stdout')`): `to-stdout`\n- **stderr** (the program's `print('to-stderr', file=sys.stderr)`): `to-stderr`\n\nOne caveat about the quoting above: the tool's own report does **not** separate them as expected. Its `Stdout:` field contains both lines — `to-stderr` first, then `to-stdout` — and its `Stderr:` field says `(empty)`. So the runner captured/merged the child's stderr into the stdout channel (and the interleaving put the stderr line first). Exit code was 0.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        },
+        "auth": {}
+      },
+      "authMethods": []
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "34061285-219f-41ae-bd46-d44d749d6f45",
+      "modes": {
+        "currentModeId": "default",
+        "availableModes": [
+          {
+            "id": "default",
+            "name": "Default",
+            "description": "Prompts for approval"
+          },
+          {
+            "id": "autoEdit",
+            "name": "Auto Edit",
+            "description": "Auto-approves edit tools"
+          },
+          {
+            "id": "yolo",
+            "name": "YOLO",
+            "description": "Auto-approves all tools"
+          }
+        ]
+      }
+    },
+    "session_id": "34061285-219f-41ae-bd46-d44d749d6f45",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

@@ -1,10 +1,11 @@
 import { Alert, Select, Skeleton, Space, Tabs, Tag, Typography } from 'antd';
+import TrajectoryView from '../trajectory/TrajectoryView.jsx';
 import { lazy, Suspense } from 'react';
 import SuiteBreadcrumb from '../navigation/SuiteBreadcrumb.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import useLiveJson from '../useLiveJson.js';
 import { actions } from '../suite/store.js';
-import { currentAttempt, errorText, executionStatus } from '../suite/model.js';
+import { currentAttempt, errorText, executionStatus, isActive } from '../suite/model.js';
 import { attemptReport } from './caseAttemptModel.js';
 import { ExecutionBadge, JudgeBadge } from '../suite/CaseStatus.jsx';
 import CaseOverview from './CaseOverview.jsx';
@@ -49,6 +50,7 @@ function CaseAttemptDetails({ item, attempt, revision, onBack, onAgentSelect }) 
     { key: 'replay', label: 'Replay', children: <Suspense fallback={loading}><CaseReplay key={artifact || item.key} run={artifact} /></Suspense> },
     { key: 'generation', label: 'Case Generation', children: <CaseGeneration item={item} revision={revision} /> },
     { key: 'tools', label: 'Tools & Files', children: artifact ? <CaseToolsFiles run={artifact} revision={revision} inputs={evaluation.data?.inputs} /> : null },
+    { key: 'trajectory', label: 'Trajectory', children: artifact ? <TrajectoryView key={artifact} run={artifact} revision={revision} live={Boolean(attempt && isActive(executionStatus(attempt)))} /> : null },
     { key: 'judge', label: 'Judge', children: <>
       {evaluation.error && <Alert type="warning" showIcon message="Judge artifacts unavailable" description={report ? 'Showing the report retained in this Attempt.' : evaluation.error} />}
       {artifactLoading && !report ? loading : <CaseJudge report={report} item={judgeItem} />}
@@ -77,6 +79,6 @@ function CaseAttemptDetails({ item, attempt, revision, onBack, onAgentSelect }) 
     {!artifact && <Alert type="info" showIcon message="Execution artifacts are not available yet" description={attempt ? 'This attempt has no viewable artifact directory. Saved Suite state remains available below.' : 'Case execution has not started.'} />}
 
     <Tabs className="case-tabs" activeKey={detailTab === 'replay' && !artifact ? 'overview' : detailTab} onChange={value => dispatch(actions.detailTabChanged(value))}
-      items={CASE_TABS.map(key => tabs.find(tab => tab.key === key)).map(tab => ({ ...tab, disabled: ['replay', 'conversation', 'tools'].includes(tab.key) && !artifact }))} />
+      items={CASE_TABS.map(key => tabs.find(tab => tab.key === key)).map(tab => ({ ...tab, disabled: ['replay', 'conversation', 'tools', 'trajectory'].includes(tab.key) && !artifact }))} />
   </section>;
 }

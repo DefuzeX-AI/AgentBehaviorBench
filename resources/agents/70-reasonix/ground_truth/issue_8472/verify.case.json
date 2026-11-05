@@ -1,0 +1,24 @@
+{
+  "case_id": "ir-reasonix-8472-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 8472,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/8472",
+    "state": "closed",
+    "title": "[Bug]:  explore探索技能永远会失效，因为Reasonix框架试图解析不存在的参数 | explore subagent always fail because Reasonix try to parse invalid arguments",
+    "body": "### Version line\n\nv2 — Go rewrite (1.x), main-v2 (active development)\n\n### Exact version\n\n1.24.1\n\n### What happened?\n\nDeepseek试图探索代码库时会启动explore。在**1.24.1**版本中，启动explore会直接报错。1.24.0版本无此错误。\n\nWhen Deepseek try to explore codebase it will use explore subagent. However in version **1.24.1** the explore will immediately fail with the following error. This WILL NOT HAPPEN in **1.24.0**.\n\n\n{\n  \"action\": \"call\",\n  \"capability_id\": \"skill:explore\",\n  \"arguments\": \"{\\\"task\\\": \\\"全面探索 PicAnnotateCenter 在代码库中的位置、角色、结构和用法。需要找到：\\\\n1. PicAnnotateCenter 组件/模块的定义位置\\\\n2. 它的主要功能和职责\\\\n3. 它依赖了哪些其他模块/组件\\\\n4. 哪些地方使用了它（引用者）\\\\n5. 它的 props、事件、状态等接口\\\\n\\\\n请搜索以下模式：\\\\n- grep \\\\\\\"PicAnnotateCenter\\\\\\\" 在全代码库\\\\n- 查找相关文档\\\\n- 分析其目录结构\\\\n- 找到其父组件和子组件关系\\\\n\\\\n请返回一份详细的分析报告。\\\"}\"\n}\n\n\ninvalid args: json: cannot unmarshal string into Go value of type struct { Name string \"json:\\\"name\\\"\"; Arguments string \"json:\\\"arguments\\\"\"; Continue string \"json:\\\"continue_from\\\"\"; Fork string \"json:\\\"fork_from\\\"\" }\n\n\n<img width=\"1460\" height=\"1173\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/abe4ffe3-79f8-43ab-bc62-8733db8a3193\" />\n\n根本原因是这是一个explore探索任务，但Reasonix试图从参数中解析不存在的name arguments continue_from fork_from这四个参数\n\n### Steps to reproduce\n\n1. 启动Reasonix，在任意代码库要求Agent探索代码。\n2. Agent启动skill:explore，并立刻收到调用失败错误。\n\n### OS / platform\n\nWindows 11\n\n### Relevant logs or output\n\n```shell\n\n```"
+  },
+  "version_choice": "historical:v1.24.1",
+  "reported_version": "1.24.1",
+  "commit_version": "8e55fc49f832ec74f73d37804280e78dc63f49ca",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create a tiny local JavaScript project with src/PicAnnotateCenter.js exporting a function named PicAnnotateCenter, src/main.js importing it, and a README describing it.",
+    "请用 explore 探索任务全面探索 PicAnnotateCenter 在代码库中的位置、角色、结构和用法。需要找到它的定义、主要职责、依赖、引用者及接口，返回详细分析报告。"
+  ],
+  "expected": "The explore capability accepts the advertised arguments and returns a repository analysis.",
+  "defect": "skill:explore fails immediately because JSON-string-wrapped capability arguments are unmarshaled into the wrong nested struct.",
+  "fault location": [],
+  "Root cause": "The capability dispatcher attempts to decode the string-valued arguments as a struct with name/arguments/continue_from/fork_from instead of normalizing the requested explore task. #8553 normalizes skill capability arguments in the 1.x history."
+}
