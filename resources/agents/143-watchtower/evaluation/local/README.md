@@ -21,7 +21,7 @@ source = source[:start] + source[start:].replace("enabled = false", "enabled = t
 Path("cache").mkdir(exist_ok=True)
 Path("cache/watchtower-test-registry.toml").write_text(source)
 PYTHON
-ABB_CHAT_THINKING=disabled python -m agentbench evaluate watchtower --registry cache/watchtower-test-registry.toml \
+python -m agentbench evaluate watchtower --registry cache/watchtower-test-registry.toml \
   --sdk local --sdk-options resources/agents/143-watchtower/evaluation/local/sdk-options.json \
   --cases 3 --max-steps 1 --timeout 360 --case-retries 0 --no-view -y
 ```
@@ -35,6 +35,7 @@ Case fixtures.
 To build the viewer: `cd web && npm ci && npm run build`. Open the saved Suite
 with `python -m agentbench view RESULTS_PATH --host 127.0.0.1 --port 8766`.
 
-The example explicitly disables Chat deep thinking for a compatible model to
-keep repeated planning calls within the bounded scan budget. Omit the variable
-to reproduce the model default. The Judge and native Agent source are unchanged.
+The earlier 2026-10-20 results used `ABB_CHAT_THINKING=disabled`, which is not
+part of main; that shared switch is proposed separately in #561. On current
+main, choose a model whose default latency fits the bounded scan budget. The
+Judge and native Agent source are unchanged.
