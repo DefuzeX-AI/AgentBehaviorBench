@@ -4,9 +4,11 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 
 from bailian_judge_transport import BailianJudgeTransport, MODEL
@@ -33,12 +35,26 @@ def main():
                ABB_MODEL_PROVIDERS_CONFIG=str(here / 'bailian-providers.toml'),
                ABB_MAX_PARALLEL_CASES='1', ABB_MAX_PARALLEL_JUDGES='1',
                ABB_LOCAL_JUDGE_MAX_CHARS='4000000', PYTHONUNBUFFERED='1')
+    registry_dir = repo / 'resources'
+    registry_text = (registry_dir / 'registry.toml').read_text(encoding='utf-8')
+    smoke_registry, count = re.subn(
+        r'(^agent_id = "ontocast"\n(?:(?!\[\[agents\]\]).)*?^enabled = )(?:false|true)$',
+        r'\g<1>true', registry_text, flags=re.MULTILINE | re.DOTALL,
+    )
+    if count != 1:
+        parser.error('Expected exactly one OntoCast entry in the registry.')
     relay = BailianJudgeTransport(results / 'judge-transport.json')
     env.update(ABB_LOCAL_JUDGE_BASE_URL=relay.start(), ABB_LOCAL_JUDGE_MODEL=MODEL,
                ABB_LOCAL_JUDGE_API_KEY=env['DASHSCOPE_API_KEY'])
     case = here / 'smoke-case.json'
+    with tempfile.NamedTemporaryFile(
+        mode='w', encoding='utf-8', suffix='.toml', prefix='.ontocast-smoke-',
+        dir=registry_dir, delete=False,
+    ) as registry:
+        registry.write(smoke_registry)
+    registry_path = Path(registry.name)
     command = [sys.executable, '-m', 'agentbench', 'evaluate', 'ontocast',
-               '--sdk', 'local', '--registry', str(repo / 'resources/registry.toml'),
+               '--sdk', 'local', '--judge', 'local', '--registry', str(registry_path),
                '--case-file', str(case), '--cases', '1', '--max-steps', '1',
                '--case-retries', '0', '--timeout', '900', '--no-view', '-y',
                '--results-dir', str(results / 'abb')]
@@ -50,7 +66,7 @@ def main():
             process = subprocess.Popen(command, cwd=repo, env=env, stdout=log, stderr=subprocess.STDOUT)
             while process.poll() is None:
                 count = 0
-                for path in (results / 'abb').glob('agents/*/cases/*/trajectory/*/logs/network.jsonl'):
+                for path in (results / 'abb').glob('agents/*/cases/*/attempts/*/logs/network.jsonl'):
                     for line in path.read_bytes().splitlines():
                         try:
                             count += json.loads(line).get('event') == 'llm_request'
@@ -68,6 +84,7 @@ def main():
                 time.sleep(2)
     finally:
         relay.close()
+        registry_path.unlink()
     receipt = {'sdk': 'local', 'model': 'bailian/' + MODEL,
                'exit_code': process.returncode if process else None, 'guard': guard,
                'duration_seconds': round(time.monotonic() - started, 2),
