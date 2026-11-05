@@ -67,6 +67,10 @@ def config(base_url: str, model: str) -> dict:
         # turn; the one-shot worker closes ACP before it finishes and the trace
         # records a cut request. Removing the agent skips title generation.
         "agent": {"title": {"disable": True}},
+        # The question tool waits for a human answer that never comes in an
+        # unattended Case, so the step idles until its timeout. A "*" deny rule
+        # removes the tool from every request Kilo sends to the model.
+        "permission": {"question": "deny"},
     }
 
 

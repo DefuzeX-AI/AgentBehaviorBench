@@ -1,0 +1,24 @@
+{
+  "case_id": "ir-reasonix-9405-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 9405,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9405",
+    "state": "closed",
+    "title": "[Bug]: shell contract blocks pure verification commands / 纯验证命令被误拦",
+    "body": "> 状态：draft（待提）｜提交到 `esengine/DeepSeek-Reasonix`。\n\n## TL;DR(中文摘要)\n\n`bash` 工具在\"会话已有状态变更（任何编辑/提交）后\"，会拦截**纯验证命令**（`go test`、`go vet`、`git diff --check` 等），即使这些命令不含任何修改段、即使改动已 `git commit`。拦截文案与 `internal/evidence/evidence.go` 的 `BashToolCallMixesMutationAndVerification` / `BashToolCallMixesMutationAndMaskableVerification` 完全一致，但行为与仓库内 `shell_contract_test.go` 断言（`{\"command\":\"go test ./...\"}` 应放行）矛盾。影响：agent 在正常开发迭代中无法运行测试，属阻碍开发的回归。\n\n## Background\n\n在 Reasonix 桌面版里，一次正常的开发循环是：`edit_file`/`write_file` 修改文件 → `go build`/`pnpm build`（构建，放行）→ `go test`（验证，被拦）。实测 `go test ./internal/agent ...`、`go vet ./internal/agent/`、`git diff --check` 均在会话存在任何先前状态变更后返回同一个\"mixed\"拦截文案：\n\n> blocked: this command runs a verification check after a state-changing segment, separated so the check's exit status would hide a failure in that earlier segment. Chain them with '&&' so a failed step stops the command and stays the result, or run the modification and the verification as separate calls.\n\n该文案出自 `internal/evidence/evidence.go:1767`（`ShellContractPreflightMessage(\"mixed\")`），拦截点在 `internal/agent/execute_one.go:389-403`。\n\n## Steps to reproduce\n\n1. 在任一会话里用 `edit_file`（或 `write_file`）修改仓库任意文件（制造一个\"state-changing\"记录）。\n2. 用 `git commit` 提交该改动（让工作区收敛到干净）。\n3. 运行纯验证命令：`go test ./...` 或 `git diff --check`。\n\n**Actual**：命令被 `blocked: this command runs a verification check after a state-changing segment...` 拒绝，未执行。\n\n**Expected**：纯验证命令（无修改段）应放行；仓库内 `internal/agent/shell_contract_test.go` 已有 `{\"command\":\"go test ./...\"}` 的多条用例，本意即放行。\n\n## Root cause (hypothesised)\n\n`BashToolCallMixesMutationAndVerification`（`evidence.go:1608`）返回 `bashContainsVerificationSegment(command) && bashMayMutate(command)`。`bashMayMutate`（`evidence.go:1801`）应跳过被 `bashSegmentIsVerification` 识别的段（如 go test/vet、git diff --check）使纯验证命令返回 false。\n\n但实测纯验证命令仍被判为 `mixed`，说明实际运行的分类器对**已提交/带引号参数/含管道段**的命令，`bashMayMutate` 或 `CanMaskEarlierFailure`（`evidence.go:1630`）落入保守分支（`fail closed`），导致对最常规的 `go test` 也误拦。\n\n另外：拦截与\"是否已 commit\"无关——提交后工作区已干净，仍拦截，说明判定不是基于\"未提交的脏改动\"，而是基于**会话曾发生过状态变更**这一更宽的条件。\n\n## Impact\n\n- 阻断 agent 的正常开发迭代：任何一次修改后都无法跑测试验证，只能靠 `go build`/`pnpm build`（mutation 类，不被拦）间接确认。\n- 与仓库内 `shell_contract_test.go` 明确的放行意图相悖。\n\n## Possible direction\n\n1. 让 `bashMayMutate` 对**纯验证命令**（整个命令只含被识别的验证段）稳定返回 `false`，仅当命令**确实混有非只读段**时才走 `mixed` 拦截；\n2. 或放宽 `CanMaskEarlierFailure` 判定：仅当验证段之后**确实存在可能掩盖失败的非只读段**（如分号后跟 `echo $?`、`exit`）才拦截，纯验证命令不因\"历史上有过变更\"而拦。\n\n## Refs\n\n- `internal/evidence/evidence.go:1602-1632`（mixed 分类）、`:1762-1782`（文案）、`:1784-1814`（bashMayMutate）、`:1918-1945`（go/vet 识别）\n- `internal/agent/execute_one.go:376-413`（拦截点）\n- `internal/agent/shell_contract_test.go`（含放行 `go test ./...` 的用例）"
+  },
+  "version_choice": "historical:v1.38.3",
+  "reported_version": "unknown",
+  "commit_version": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "fixed_in": "1.x v1.38.8",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create a local Git repository with calc.py containing value = 1, configure user.name Fixture and user.email fixture@example.com, and commit it.",
+    "Read calc.py, use edit_file to change value = 1 to value = 2, commit this change, then run git diff --check as a separate bash call. Show the actual verification result."
+  ],
+  "expected": "A pure verification command is allowed after an edit or commit.",
+  "defect": "The shell contract refuses git diff --check as mixed mutation/verification even though the current call has no mutation.",
+  "fault location": [],
+  "Root cause": "The issue hypothesizes that the shell-contract classifier carries or conservatively infers mutation when evaluating a later verification call. #10223 removes the old evidence-gate machinery in 1.x. The precise branch responsible for this reported session remains inferred until trace validation."
+}

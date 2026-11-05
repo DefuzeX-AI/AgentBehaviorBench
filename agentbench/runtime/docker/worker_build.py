@@ -11,7 +11,7 @@ from .runtime_build import stage_runtime_dependencies
 from .source_links import materialize_file_links
 
 
-def _ignore(directory, names):
+def source_build_ignore(directory, names):
     return [name for name in names if name in {".git", ".venv", "__pycache__", "node_modules", "results", "reports"}
             or name.startswith(".env") or name.endswith((".pyc", ".pem", ".key"))]
 
@@ -21,7 +21,7 @@ def agent_build_ignore(agent_root):
     root = Path(agent_root).resolve()
 
     def ignore(directory, names):
-        excluded = _ignore(directory, names)
+        excluded = source_build_ignore(directory, names)
         if Path(directory).resolve() == root and 'ground_truth' in names:
             excluded.append('ground_truth')
         return excluded
@@ -38,7 +38,7 @@ def runtime_build_ignore(package):
     root = Path(package).resolve()
 
     def ignore(directory, names):
-        excluded = _ignore(directory, names)
+        excluded = source_build_ignore(directory, names)
         if Path(directory).resolve() == root:
             excluded.extend(name for name in names if name in {'cli', 'onboarding', '__main__.py'})
         return excluded

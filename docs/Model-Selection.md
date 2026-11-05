@@ -5,12 +5,20 @@ Model selection follows the Agent's declared integration constraints, not its fr
 | Deployment | Selection |
 | --- | --- |
 | Replacement-mode Agents, including LangGraph | Existing shared run-level model resolver |
-| ACP Agents 15-32 and 36, no provider pin | Same resolver, mapped to the Agent's native configuration |
-| MiniMax Code (12), native | Requires `MINIMAX_API_KEY` |
-| Claude Agent ACP (13), native | Requires its configured Anthropic Messages endpoint and `CODEX_*` settings |
-| Qwen Code (14), native | Requires `DASHSCOPE_API_KEY` and `QWEN_*`; native web search also uses DashScope Responses |
+| ACP Agents without a provider pin | Same resolver, mapped to the Agent's native configuration |
+| MiniMax Code (`minimax-code`), native | Requires `MINIMAX_API_KEY` |
+| Claude Agent ACP (`claude-agent-acp`), native | Requires its configured Anthropic Messages endpoint and `CODEX_*` settings |
+| Qwen Code (`qwen-code`), native | Requires `DASHSCOPE_API_KEY` and `QWEN_*`; native web search also uses DashScope Responses |
 
 ## Shared settings
+
+The supplied `.env.example` explicitly selects `ABB_MODEL_PROVIDER=deepseek`
+and `DEEPSEEK_MODEL=deepseek-flash`. Exp1 and Exp3 oracles read the same shared
+provider selection and provider-specific model from the loaded environment.
+Their model selection ignores target-only `--model` / `ABB_MODEL` overrides,
+Agent provider pins, and legacy Judge/GT overrides. Use the CLI's `--env-file`
+to choose another environment file; existing process environment variables retain
+the normal precedence over dotenv values.
 
 Without an explicit provider, ABB selects the first nonempty credential in this order:
 **OpenRouter -> DeepSeek -> GLM**. Configure that provider's key and model:
@@ -38,21 +46,6 @@ DEEPSEEK_MODEL=deepseek-flash
 ```
 
 Use a model available to your account that supports the Agent's required capabilities.
-
-## Explicit Chat thinking mode
-
-For replacement-mode Agents using a Chat Completions service that supports
-`thinking.type`, set `ABB_CHAT_THINKING=disabled`, `enabled`, or `auto` for a
-particular run. Unset means preserve the Agent's request unchanged. This explicit
-setting overrides only the Chat request's `thinking` field; messages, tools and
-streaming remain intact. Other protocols and the local Judge are unaffected.
-Shared native launchers reject this option because they cannot apply it.
-
-The selected setting is retained in model provenance, and interception records
-both the source payload and the effective upstream payload. The destination
-must support the option; ABB does not silently substitute a model or retry with
-weaker settings. For example, Volcano Engine documents this field in its
-[Chat API](https://docs.volcengine.com/docs/ark/chat-api?lang=en).
 
 ## Native mapping and limits
 

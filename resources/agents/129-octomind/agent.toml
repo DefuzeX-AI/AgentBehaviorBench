@@ -1,0 +1,53 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "octomind"
+display_name = "Octomind developer:general (native ACP)"
+framework = "acp"
+
+[model]
+metadata_paths = ["/models"]
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/workspace/project"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "git"
+repository = "https://github.com/Muvon/octomind"
+revision = "aa08782640ddc441e8a0ef0f1bf25bec85344a73"
+downloaded_on = "2026-10-26"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = []
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+cwd = "/workspace/project"
+permission_policy = "allow_once"
+handshake_timeout = 180
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []

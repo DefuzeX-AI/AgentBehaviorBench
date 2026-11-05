@@ -1,0 +1,20 @@
+schema_version = "abb.network.v1"
+
+# Native local filesystem, shell and code tools do not need external model routes.
+# Model traffic is exclusively admitted through ABB's runtime-selected shared route.
+# These optional routes are public data retrieval used by preserved native tools.
+[[tool_routes]]
+host_patterns = ["duckduckgo.com", "html.duckduckgo.com", "www.bing.com", "www.startpage.com", "search.brave.com"]
+ports = [443]
+methods = ["GET", "POST"]
+path_patterns = ["/", "/html/*", "/lite/*", "/search*", "/sp/search*"]
+purpose = "tool"
+required = false
+
+[[tool_routes]]
+host_patterns = ["huggingface.co", "cdn-lfs.huggingface.co", "cdn-lfs-us-1.hf.co", "cas-bridge.xethub.hf.co"]
+ports = [443]
+methods = ["GET", "HEAD"]
+path_patterns = ["/muvon/*", "/Xenova/*", "/jinaai/*", "/api/models/muvon/*", "/api/models/Xenova/*", "/api/models/jinaai/*", "/api/resolve-cache/models/muvon/*", "/api/resolve-cache/models/Xenova/*", "/api/resolve-cache/models/jinaai/*", "/xet-bridge-us/*", "/repos/*"]
+purpose = "tool"
+required = false

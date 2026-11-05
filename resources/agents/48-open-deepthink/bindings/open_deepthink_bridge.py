@@ -6,6 +6,7 @@ an independent brief; no conversation history, tools or synthetic graph is added
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Mapping
 
 _ALLOWED_CONTEXT_KEYS = frozenset({
@@ -46,12 +47,27 @@ class OpenDeepThink:
         from langchain_core.runnables.config import set_config_context
         from openai import DefaultHttpxClient, DefaultAsyncHttpxClient
 
+        api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENROUTER_API_KEY") or os.getenv("API_KEY")
+        base_url = os.getenv("DEEPSEEK_BASE_URL") or os.getenv("OPENROUTER_BASE_URL") or "https://api.deepseek.com"
+        model = os.getenv("DEEPSEEK_MODEL") or os.getenv("OPENROUTER_MODEL") or "deepseek-chat"
+
+        llm_kwargs = {
+            'provider': 'openrouter',
+        }
+        if api_key:
+            llm_kwargs['api_key'] = api_key
+        if base_url:
+            llm_kwargs['base_url'] = base_url
+        if model:
+            llm_kwargs['model'] = model
+
         # Use OpenAI's own timeout/connection defaults. Clients belong to this
         # invocation, so repeated sync calls cannot reuse a closed event loop.
         with DefaultHttpxClient() as http_client:
             async with DefaultAsyncHttpxClient() as http_async_client:
-                llm = create_llm(provider='openrouter', http_client=http_client,
-                                 http_async_client=http_async_client)
+                llm = create_llm(http_client=http_client,
+                                 http_async_client=http_async_client,
+                                 **llm_kwargs)
                 # run_qnn has no config argument. LangChain's runnable context
                 # carries the worker's live callbacks through every native chain.
                 # Creating the task inside the copied context also works on 3.10.

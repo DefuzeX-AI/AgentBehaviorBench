@@ -1,0 +1,24 @@
+{
+  "case_id": "ir-gptme-992-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 992,
+    "url": "https://github.com/gptme/gptme/issues/992",
+    "state": "closed",
+    "title": "fix: shell bg command fails when not first command in code block",
+    "body": "## Bug Description\n\nThe `bg` shell feature for background jobs fails when used after other commands in the same code block. It appears to only work when `bg` is the first (and only) command.\n\n## Steps to Reproduce\n\n### Fails - bg after cd:\n```shell\ncd /some/directory\nbg npm run dev\n```\nError: `bash: line 32: bg: no job control`\n\n### Fails - bg with &&:\n```shell\ncd /some/directory && bg npm run dev\n```\nError: `bash: bg: no job control`\n\n### Works - bg alone:\n```shell\nbg npm run dev\n```\nOutput: `Started background job **#1**: \\`npm run dev\\``\n\n## Expected Behavior\n\nThe `bg` command should work regardless of its position in the code block, or at minimum provide a clear error message explaining the limitation.\n\n## Possible Cause\n\nThe shell tool likely parses the code block looking for `bg` at a specific position (start of block or start of line), and when it's part of a compound command or follows other commands, the parsing fails and it falls through to bash's built-in `bg` command.\n\n## Environment\n\n- gptme v0.31.0\n- macOS 15.4.1"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.31.0",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.32.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run this shell block exactly as written:\n\ncd /tmp\nbg sleep 30",
+    "Run `cd /tmp && bg sleep 30`."
+  ],
+  "expected": "The `bg` command starts a background job (`Started background job #1: ...`) even when it follows other commands, or a clear error explains the limitation.",
+  "defect": "When `bg` is not the first command in the block it falls through to bash's builtin and fails with `bash: line 32: bg: no job control`.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/994 (commit f32186a63ec3b9a763f2348dfdae535844dfcbab). In v0.31.0, execute_shell recognised the background-job syntax only via `cmd.strip().lower().startswith(\"bg \")`, i.e. when `bg` was the first token of the whole block. With a preceding `cd` line (or `cd ... && bg ...`) the block was sent unchanged to the persistent non-interactive bash, where `bg` is the job-control builtin and fails with 'no job control'. PR #994 scans each line for a leading `bg `, runs the preceding lines in the stateful shell first and then starts the background job. The fix ships in v0.32.0. Note that the `&&` variant is not handled by #994, and at the pinned revision the `bg <cmd>` prefix syntax has been removed altogether (background jobs are requested with a `background` argument), so a literal `bg` there always reaches the bash builtin by design."
+}

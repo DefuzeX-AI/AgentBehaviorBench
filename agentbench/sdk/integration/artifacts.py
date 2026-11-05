@@ -66,7 +66,7 @@ class FileCaseArtifacts:
         return path
 
     def attempt(self, identifier):
-        return FileAttemptArtifacts(child(self.directory, 'trajectory/' + component(identifier)), self.environ)
+        return FileAttemptArtifacts(child(self.directory, 'attempts/' + component(identifier)), self.environ)
 
 
 class FileArtifactStore:
@@ -76,7 +76,7 @@ class FileArtifactStore:
         self.environ = environ
         plan = self.directory / 'plan.json'
         self.managed = (plan.is_file() and json.loads(plan.read_text(encoding='utf-8')).get(
-            'artifact_layout') == 'agent-trajectories-v1')
+            'artifact_layout') == 'agent-attempts-v1')
 
     def agent_directory(self, agent_id):
         component(agent_id)

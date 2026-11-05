@@ -1,0 +1,58 @@
+{
+  "case_id": "ir-mastracode-23818-v1",
+  "issue": {
+    "repository": "mastra-ai/mastra",
+    "number": 23818,
+    "url": "https://github.com/mastra-ai/mastra/issues/23818",
+    "state": "closed",
+    "title": "[BUG] Native grep reports success and \"0 matches\" when stat/readdir/readFile fail",
+    "body": "### Describe the Bug\n\nThe native grep tool (`WORKSPACE_TOOLS.FILESYSTEM.GREP`) catches every filesystem error it encounters and reports a normal, successful result. A missing path, an unreadable directory and an unreadable file are all indistinguishable from \"there are no matches here\".\n\nIn `@mastra/core@1.63.0` (`dist/workspace-CaGq31JM.js`, the grep tool) there are four independent swallow sites:\n\n1. Target resolution — if `filesystem.stat(searchPath)` throws, the whole search silently becomes an empty file list:\n\n```js\nelse try {\n  if ((await filesystem.stat(searchPath)).type === \"file\") { ... }\n  else { /* walk */ }\n} catch {\n  filePaths = [];\n}\n```\n\n2. Directory walk — an unreadable directory becomes an empty directory:\n\n```js\nconst directoryEntries = await pMap(directoryFrontier, async (dir) => {\n  try { return await filesystem.readdir(dir); } catch { return []; }\n}, { concurrency: GREP_FILESYSTEM_CONCURRENCY });\n```\n\n3. File read — an unreadable file is skipped with no trace:\n\n```js\nconst batchContents = await pMap(batchPaths, async (filePath) => {\n  try {\n    const raw = await filesystem.readFile(filePath, { encoding: \"utf-8\" });\n    return typeof raw === \"string\" ? raw : void 0;\n  } catch { return; }\n}, ...);\n// later: if (content === void 0) continue;\n```\n\n4. `loadGitignore` — `catch { return; }` swallows any error, not just a missing `.gitignore`. A permission or IO failure on that file is treated as \"no gitignore\", silently changing which files are searched.\n\nNone of these escape to the outer `catch (err) { span.error(err); throw err; }`, so the tool returns its normal output (`0 matches across 0 files`) and closes its span with `span.end({ success: true })`.\n\nWhy this matters more for grep than for most tools: an agent that receives \"0 matches\" concludes the content does not exist and proceeds on that premise. There is no error, no exception, no timeout — only a wrong conclusion, and nothing downstream can detect it. A partial result is arguably worse than a hard failure here, because it is indistinguishable from a complete one.\n\n### Steps To Reproduce\n\nThe shortest repro needs no permission setup at all — a path that does not exist:\n\n```js\nimport { Workspace, LocalFilesystem } from '@mastra/core/workspace'\n\nconst workspace = new Workspace({\n  id: 'repro',\n  filesystem: new LocalFilesystem({ rootDir: '/tmp/grep-repro' }),\n})\nawait workspace.init()\n\n// /tmp/grep-repro exists and is empty\nconst grep = workspace.getTools()['workspace_grep']       // or call the tool through an agent\nconsole.log(await grep.execute({ pattern: 'needle', path: 'does-not-exist' }))\n// -> \"0 matches across 0 files\\n---\"\n// expected: a file-not-found error, or at minimum a statement that the path was not searched\n```\n\nPermission variants, same outcome:\n\n```\n/tmp/grep-repro/\n  readable.txt          # contains \"needle\"\n  locked/               # chmod 000\n    hidden.txt          # contains \"needle\"\n```\n\n- `grep({ pattern: 'needle', path: '.' })` → reports `1 match across 1 file`, with nothing to indicate that `locked/` could not be read. The result looks complete.\n- `grep({ pattern: 'needle', path: 'locked' })` → `0 matches across 0 files`, not a permission error.\n- Make `readable.txt` itself unreadable (`chmod 000`) → `0 matches across 0 files`, not a permission error.\n\nA custom `WorkspaceFilesystem` whose `stat` / `readdir` / `readFile` throw is an equivalent and platform-independent way to reproduce all four sites.\n\n### Link to Minimal Reproducible Example\n\nThe snippet above is self-contained against `@mastra/core@1.63.0` and needs no provider, no model and no network. Happy to put it in a repo if that is preferred — the four swallow sites are also directly readable in the published `dist`, which may be faster to confirm.\n\n### Expected Behavior\n\nA search that could not read part of its target should not present its result as complete.\n\nEither behaviour would be an improvement over the current one:\n\n- **Fail** — propagate the underlying error (a missing `path` should surface as file-not-found, a permission failure as a permission error), or\n- **Report honestly** — return the matches that were found *and* state which paths were skipped and why, so the caller (and the model) can tell a partial result from a complete one.\n\nThe `.gitignore` probe is the one case where swallowing is correct, but it should be narrowed to \"not found\". A permission or IO failure on `.gitignore` silently changes the search scope and should not be treated the same as its absence.\n\nSuggested shape, if useful: keep today's matching, limits and output, and add a `skipped` section to the output plus an option (e.g. `strict: true`) that turns any read failure into a thrown error. That keeps the change additive for existing callers.\n\n### Environment Information\n\n- `@mastra/core@1.63.0` (verified in the published `dist/workspace-CaGq31JM.js`)\n- Filesystem-provider independent — reproduces with `LocalFilesystem` and with a custom `WorkspaceFilesystem`\n- Not a regression report: I have not checked when the behaviour was introduced\n\n### Verification\n\n- [x] I have searched the existing issues to make sure this is not a duplicate\n- [x] I have included sufficient information for the team to reproduce and understand the issue\n"
+  },
+  "version_choice": "historical:mastracode@0.40.0",
+  "reported_version": "@mastra/core@1.63.0",
+  "commit_version": "871bdaa5957c2b680cd043a728b1b7fec4101512",
+  "fixed_in": "mastracode@0.41.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a file named readable.txt containing the single line `needle`.",
+    "Use the grep tool to search for 'needle' in the path does-not-exist."
+  ],
+  "expected": "Searching a path that does not exist returns a file-not-found error (or at least says the path was not searched) instead of a normal empty result.",
+  "defect": "The grep tool returns the normal successful summary `0 matches across 0 files`, indistinguishable from a real search with no hits.",
+  "fault location": [
+    {
+      "file": "packages/core/src/workspace/tools/grep.ts",
+      "function": "grepTool.execute",
+      "line_start": 131,
+      "line_end": 132,
+      "commit": "871bdaa5957c2b680cd043a728b1b7fec4101512",
+      "url": "https://github.com/mastra-ai/mastra/blob/871bdaa5957c2b680cd043a728b1b7fec4101512/packages/core/src/workspace/tools/grep.ts#L131-L132",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Resolves the search target with filesystem.stat(searchPath) inside a try block whose failure is not reported; PR #24053 (commit d7f0579) reports a missing/unreadable target instead."
+    },
+    {
+      "file": "packages/core/src/workspace/tools/grep.ts",
+      "function": "grepTool.execute",
+      "line_start": 242,
+      "line_end": 245,
+      "commit": "871bdaa5957c2b680cd043a728b1b7fec4101512",
+      "url": "https://github.com/mastra-ai/mastra/blob/871bdaa5957c2b680cd043a728b1b7fec4101512/packages/core/src/workspace/tools/grep.ts#L242-L245",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "`catch { filePaths = []; }` turns any stat failure (e.g. ENOENT for does-not-exist) into an empty file list, so the tool prints `0 matches across 0 files` with success; PR #24053 surfaces the error (and counts skipped paths) instead."
+    },
+    {
+      "file": "packages/core/src/workspace/tools/grep.ts",
+      "function": "grepTool.execute",
+      "line_start": 176,
+      "line_end": 184,
+      "commit": "871bdaa5957c2b680cd043a728b1b7fec4101512",
+      "url": "https://github.com/mastra-ai/mastra/blob/871bdaa5957c2b680cd043a728b1b7fec4101512/packages/core/src/workspace/tools/grep.ts#L176-L184",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Directory walk swallows readdir failures (`catch { return []; }`), and the readFile batch at lines 372-377 likewise returns undefined for unreadable files, so partial searches look complete; PR #24053 records these as skipped/unreadable in the summary (or throws in strict mode)."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/mastra-ai/mastra/pull/24053 (commit d7f0579a0445469430b9eadbf9c28ed3fa009839). In the tested source, grepTool.execute in packages/core/src/workspace/tools/grep.ts wraps target resolution in try { const stat = await filesystem.stat(searchPath); ... } catch { filePaths = []; }, so a path that does not exist (or cannot be stat'ed) silently becomes an empty file list; the directory walk swallows readdir errors with `catch { return []; }`, file reads swallow readFile errors and are skipped, and loadGitignore swallows any error. None of these reach the outer error handler, so the tool returns the ordinary `0 matches across 0 files` summary and ends its span as successful, leading the agent to conclude the content does not exist. The fix replaces grepTool with createGrepTool({ strict }), distinguishes ENOENT/ENOTDIR from other errors, reports missing targets and skipped unreadable directories/files in the summary (or throws when strict), and narrows loadGitignore's catch to a missing file. The fix is first released in mastracode@0.41.0 / @mastra/core@1.68.0, which is exactly the pinned revision, so the case is tested at mastracode@0.40.0 (the last release before the fix), which still has the swallowing catches."
+}

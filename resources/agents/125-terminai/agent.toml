@@ -1,0 +1,50 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "terminai"
+display_name = "TerminaI (Native ACP, DeepSeek provider)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "git"
+repository = "https://github.com/Prof-Harita/terminaI"
+revision = "4b816c7acc5a89afb692d512c046cdc61bf6186b"
+downloaded_on = "2026-10-25"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1200
+env_keys = []
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 150
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []

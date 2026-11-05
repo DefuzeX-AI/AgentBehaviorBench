@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-deer-flow-7302-v1",
+  "issue": {
+    "repository": "bytedance/deer-flow",
+    "number": 7302,
+    "url": "https://github.com/bytedance/deer-flow/issues/7302",
+    "state": "closed",
+    "title": "[bug] Data-analysis JSON export silently drops duplicate SQL result columns",
+    "body": "### Problem\n\nThe built-in data-analysis skill reports successful JSON exports while dropping\nvalues if the query returns repeated column names. This happens naturally with\njoins, for example `SELECT a.id, b.id FROM ...`.\n\n### Reproduction\n\nAt main 22633f6, from the repository root with DuckDB and openpyxl installed:\n\n```python\nimport json\nimport runpy\nimport tempfile\nfrom pathlib import Path\n\nimport duckdb\n\nanalysis = runpy.run_path(\"skills/public/data-analysis/scripts/analyze.py\")\nwith tempfile.TemporaryDirectory() as directory:\n    output = Path(directory) / \"result.json\"\n    with duckdb.connect() as con:\n        analysis[\"action_query\"](\n            con, \"SELECT 1 AS id, 2 AS id\", {}, str(output)\n        )\n    print(json.loads(output.read_text(encoding=\"utf-8\")))\n```\n\nActual output: `[{\"id\": 2}]`, preceded by a successful-export message. DuckDB\nreturned two columns named `id` and the row `(1, 2)`; the value `1` is lost.\nThe CLI uses the same function and exits zero for this result.\n\n### Expected\n\nA JSON record cannot retain both values under one key. Reject the ambiguous\nresult with a clear instruction to use distinct SQL aliases before writing or\nreplacing the destination. CSV and Markdown can continue to preserve both columns.\n\n### Cause\n\n`_export_results` assigns each result value into `record[col]`, overwriting an\nexisting entry when another result column has the same name.\n\n### Environment\n\nmacOS, Python 3.12.14, DuckDB 1.5.2, openpyxl 3.1.5, main 22633f6.\nReproduced completely offline. Existing issues and PRs were searched; #7132 is an\nindependent basename-path issue in the same exporter.\n\nAI assistance: OpenAI Codex was used for source inspection, duplicate-work searches, offline reproduction, tests and the proposed fix. The contributor has confirmed human review and responsibility for the change.\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "main 22633f6",
+  "commit_version": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Use the bundled data-analysis skill to run the DuckDB SQL SELECT 1 AS id, 2 AS id and export the result to /mnt/user-data/outputs/result.json. Preserve the query column names; show the export result."
+  ],
+  "expected": "JSON export rejects duplicate column names before replacing the output, asking for distinct aliases.",
+  "defect": "The exporter reports success but writes only [{\"id\": 2}], losing the first column value.",
+  "fault location": [
+    {
+      "file": "skills/public/data-analysis/scripts/analyze.py",
+      "function": "_export_results",
+      "line_start": 366,
+      "line_end": 377,
+      "commit": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+      "url": "https://github.com/bytedance/deer-flow/blob/a1eb3971412ee269f1f89bfb5cc9e158b682f86e/skills/public/data-analysis/scripts/analyze.py#L366-L377",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "_export_results builds a dictionary by assigning record[col] for every column; the second id overwrites the first id. #7305 rejects ambiguous JSON export columns before writing."
+    }
+  ],
+  "Root cause": "_export_results builds a dictionary by assigning record[col] for every column; the second id overwrites the first id. #7305 rejects ambiguous JSON export columns before writing."
+}
