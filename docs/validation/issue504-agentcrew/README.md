@@ -2,9 +2,26 @@
 
 Recorded on October 26, 2026. This is an integration execution record, not a
 certification or Ground Truth finding. It predates the split from PR #661 and
-used that branch's shared ABB changes. The integration still needs a fresh CLI
-run against upstream main. Upstream AgentCrew source remains unchanged at
+used that branch's shared ABB changes. The November 5 attempt below used upstream
+ABB main. Upstream AgentCrew source remains unchanged at
 `eaff35483b1fea0a856d9e1dd3ce85ace0cf9c04`.
+
+## November 5 integration-only CLI attempt
+
+This attempt used upstream ABB main at `55a093f941fa32120322a80702e91fb1fbb86818`
+plus the AgentCrew integration files. Source preparation restored and verified
+463 pinned files. The Agent and interception images built, and the CLI delivered
+all three Case inputs. Each output contained the configured model endpoint's
+HTTP 403 quota error. The derived trajectory is partial, Judge delivery failed,
+and the quality gate failed. This attempt does not establish Agent behavior or
+terminal capability.
+
+The local Suite is
+`results/verification/issue504-split/suites/suite_6997c639433445a3a742eba4ecff0417`.
+The corresponding Attempt is
+`results/verification/issue504-split/agents/agentcrew/cases/71447b45aa7d51778122bcb8f5c407a5/attempts/57834e1ff75848abbb2d2b6e72127060`.
+It retains the Case, the returned error text, the trace and the Judge delivery
+record. A fresh acceptance run requires an available model endpoint.
 
 ## Implementation and offline verification
 
