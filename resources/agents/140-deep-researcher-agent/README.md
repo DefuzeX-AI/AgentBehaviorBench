@@ -56,5 +56,5 @@ intercepted at OpenAI Chat, with explicit POST `/search` egress to Tavily. No
 other tool network access is configured.
 
 The source provenance, actual validation and remaining acceptance blockers are
-recorded in `docs/validation/issue479-deep-researcher/README.md`. This unit is
+recorded in `evaluation/README.md`. This unit is
 registered disabled/adapting. GT starts only after the onboarding PR is merged.
