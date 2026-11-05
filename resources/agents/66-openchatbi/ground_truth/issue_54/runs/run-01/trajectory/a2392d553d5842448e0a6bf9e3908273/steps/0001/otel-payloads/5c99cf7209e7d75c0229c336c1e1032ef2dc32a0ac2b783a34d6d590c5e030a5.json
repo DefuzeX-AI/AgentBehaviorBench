@@ -1,0 +1,84 @@
+[
+  [
+    {
+      "content": "You are a professional SQL engineer, your task is to transform user query into sqlite SQL. \n- I will give you the business knowledge introduction and the glossaries of MyCompany for reference.\n- I will give you the selected tables, you need to analyze the user query, read the table description, schema, constrains and examples carefully to write sqlite SQL to answer user's question.\n- You are a read-only analytics assistant. NEVER generate DELETE, DROP, UPDATE, or INSERT statements. \n\n# Sales Business System Glossary\n\n## Overview\nYou're answering questions related to a sales order tracking business system that manages the complete customer order lifecycle from placement to delivery.\n\n## Key Business Concepts\n\n**Customer Management:**\n- Customer: Individual or entity who places orders\n- Customer Details: Additional information like contact info, preferences, or notes\n\n**Order Processing:**\n- Order: A request from a customer to purchase products\n- Order Status: Current state - Valid values: \"Shipped\", \"Packing\", \"On Road\"\n- Order Item: Individual product within an order (orders can contain multiple items)\n- Order Item Status: Status of specific items - Valid values: \"Finish\", \"Payed\", \"Cancel\"\n\n**Product Catalog:**\n- Product: Items available for purchase\n- Product Name (`product_name`): Represents the product category. Values include food, book,\n  clothes, electronics, kitchen, beauty, toy, music, outdoor, garden, sports, office, pet,\n  health, and phone. Some values use `category-code` format (e.g. `beauty-1050`); the prefix\n  before `-` is the category. For category aggregation, normalize with:\n  `CASE WHEN INSTR(product_name, '-') > 0 THEN SUBSTR(product_name, 1, INSTR(product_name, '-') - 1)\n  ELSE product_name END`.\n- Product Details: Specifications, descriptions, or additional product information\n\n**Fulfillment & Shipping:**\n- Shipment: Physical delivery package sent to customer\n- Shipment Items: Specific order items included in a shipment\n- Tracking Number: Unique identifier for package tracking\n- Shipment Date: When package was dispatched\n\n**Financial Processing:**\n- Invoice: Bill generated for completed orders\n- Invoice Number: Unique identifier for billing purposes\n- Invoice Date: When billing document was created\n\n## Business Rules\n- One order can have multiple items (products)\n- One order can be fulfilled through multiple shipments\n- Each shipment links to one invoice for billing\n- Order items can have different statuses within the same order\n- Customers can have multiple orders over time\n\n\n# Tables\n## Table Order_Items\nLinks products to orders with individual item status and details\n### Columns\nColumn(Name, Type, Display Name, Description):\n[\n    Column(\"order_item_id\", INTEGER, Order Item ID, \"alias(oi_id)Unique identifier for order items\"),\n    Column(\"product_id\", INTEGER, Product ID, \"alias(prod_id)Unique identifier for products\"),\n    Column(\"order_id\", INTEGER, Order ID, \"alias(ord_id)Unique identifier for orders\"),\n    Column(\"order_item_status\", VARCHAR(10), Order Item Status, \"alias(oi_status)Current status of the order item (Finish|Payed|Cancel)\"),\n    Column(\"order_item_details\", VARCHAR(255), Order Item Details, \"alias(oi_details)Additional order item information\"),\n]\nAlways join with Products table via product_id and Orders table via order_id for complete information\n\n# Examples\n<example>\nQ: Show me all items in order 123\nA: SELECT oi.order_item_id, p.product_name, oi.order_item_status, oi.order_item_details \nFROM Order_Items oi \nJOIN Products p ON oi.product_id = p.product_id \nWHERE oi.order_id = 123\n</example>\n\n\n# Rules for sqlite SQL\n\n\n# Rules for Task\n- I will provide you with data schema definition and the explanation and usage scenario of each field.\n- You can only use the tables listed in \"# Tables\". \n- You can only use the metrics, dimension, columns from the schema I provided.\n- You should only use the display name as alias in query if provided in schema.\n- Never create or assume additional tables or columns, even if they were mentioned in history message.\n- Do not use any id or date in example SQL.\n- Do not output any explanations or comment.\n- If the query asks for a metric or field not explicitly defined in the table schema, do not generate a SQL query with an invented field, instead, you should output \"NULL\".\n- You can only answer when you are very confident, otherwise, please output \"NULL\"\n- **CRITICAL**: The user context in the chat history may contain a section called \"Deferred Tasks\". You MUST completely IGNORE any requirements or logic mentioned in \"Deferred Tasks\". Only write SQL for the exact query requested in the final \"Generate a SQL query for the question:\" prompt.\n\n# Output format(case sensitive)\n```sql\n<SQL>\n```\n\n# Realtime Environment \nCurrent time is 2026-10-24 11:17:28 (format 'yyyy-MM-dd HH:mm:ss')\n\nBased on the Tables, Columns, take your time to think user query carefully, transform it into sqlite SQL and reply following Output format.\n",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Shared Context: Sales order tracking system. Table Order_Items has columns order_item_id, order_id, order_item_status (valid values per docs: Finish, Payed, Cancel).\nCurrent Subtask: Return the total number of open order items, where \"open\" means order_item_status is neither 'Finish' nor 'Canceled'/'Cancel'. Also show the breakdown count by order_item_status so the result is verifiable.\nOutput: no chart needed.\nDeferred Tasks: detailed row-level list (ignore for now).",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "4085ae43-2f7d-458d-8129-103e87e3958d"
+    },
+    {
+      "content": "{\n  \"reasoning\": \"The subtask asks for a metric (count of order items) with two parts: 1) total number of 'open' order items, defined explicitly as order_item_status NOT IN ('Finish', 'Cancel'), and 2) a breakdown of that count by order_item_status for verification. The relevant column is order_item_status, which is the categorical dimension for the breakdown. No time language is present, so this is an all-time aggregate with no time filter (start_time/end_time = null). No timezone is mentioned. No chart is requested. The 'open' definition is fully specified in the subtask, so no clarification or knowledge search is needed. The key nuance is that the filter excludes 'Finish' and 'Cancel' (the docs valid values list includes 'Cancel', while the question also mentions the variant 'Canceled'), so the filter uses NOT IN ('Finish','Cancel') and preserves all other statuses (e.g., 'Payed') in the open count.\",\n  \"keywords\": [\"order item\", \"order_item_status\", \"open order items\", \"order item count\", \"status breakdown\"],\n  \"dimensions\": [\"order_item_status\"],\n  \"metrics\": [\"order item count\"],\n  \"filter\": [\"order_item_status NOT IN ('Finish','Cancel')\"],\n  \"start_time\": null,\n  \"end_time\": null,\n  \"rewrite_question\": \"Return the total number of open order items, where 'open' means order_item_status is neither 'Finish' nor 'Cancel' (including 'Canceled' variant), i.e., filtering order_item_status NOT IN ('Finish','Cancel'). Also return the count of order items grouped by order_item_status as a breakdown so the open total is verifiable. Use an all-time aggregation with no time filter and no chart.\"\n}",
+      "additional_kwargs": {
+        "parsed": null,
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 641,
+          "prompt_tokens": 3665,
+          "total_tokens": 4306,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 259,
+            "rejected_prediction_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 3328
+          },
+          "prompt_cache_hit_tokens": 3328,
+          "prompt_cache_miss_tokens": 337
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "14795001-0c99-4ae4-b3b9-1b1c854d8042",
+        "finish_reason": "stop",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16da1-3066-7bf1-b46a-253617267894-0",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 3665,
+        "output_tokens": 641,
+        "total_tokens": 4306,
+        "input_token_details": {
+          "cache_read": 3328
+        },
+        "output_token_details": {
+          "reasoning": 259
+        }
+      }
+    },
+    {
+      "content": "Please select the appropriate tables for the question: Return the total number of open order items, where 'open' means order_item_status is neither 'Finish' nor 'Cancel' (including 'Canceled' variant), i.e., filtering order_item_status NOT IN ('Finish','Cancel'). Also return the count of order items grouped by order_item_status as a breakdown so the open total is verifiable. Use an all-time aggregation with no time filter and no chart.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Generate a SQL query for the question: Return the total number of open order items, where 'open' means order_item_status is neither 'Finish' nor 'Cancel' (including 'Canceled' variant), i.e., filtering order_item_status NOT IN ('Finish','Cancel'). Also return the count of order items grouped by order_item_status as a breakdown so the open total is verifiable. Use an all-time aggregation with no time filter and no chart.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": null
+    }
+  ]
+]

@@ -1,0 +1,68 @@
+[
+  {
+    "graph": null,
+    "update": {
+      "messages": [
+        {
+          "content": "",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 2535,
+              "prompt_tokens": 18266,
+              "total_tokens": 20801,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 412,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cached_tokens": 17280
+              },
+              "prompt_cache_hit_tokens": 17280,
+              "prompt_cache_miss_tokens": 986
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-flash",
+            "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+            "id": "af586391-cdff-4fa7-a364-1f6d63fcc7e5",
+            "finish_reason": "tool_calls",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a173b2-1a12-7dc2-b964-e2db1928fe39-0",
+          "tool_calls": [
+            {
+              "name": "run_python_code",
+              "args": {
+                "code": "\nimport statistics as st, datetime as dt, math\n\nraw = open('/tmp/raw.txt').read() if False else None\n# rebuild series inline\nvals = {}\ndata_str = \"\"\"2026-01-01,60\n2026-01-02,59\n2026-01-03,55\n2026-01-04,51\n2026-01-05,33\n2026-01-06,40\n2026-01-07,50\n2026-01-08,31\n2026-01-09,24\n2026-01-10,27\n2026-01-11,20\n2026-01-12,24\n2026-01-13,24\n2026-01-14,24\n2026-01-15,20\n2026-01-16,44\n2026-01-17,28\n2026-01-18,26\n2026-01-19,23\n2026-01-20,21\n2026-01-21,24\n2026-01-22,27\n2026-01-23,20\n2026-01-24,22\n2026-01-25,25\n2026-01-26,22\n2026-01-27,24\n2026-01-28,27\n2026-01-29,22\n2026-01-30,26\n2026-01-31,25\n2026-02-01,58\n2026-02-02,57\n2026-02-03,63\n2026-02-04,40\n2026-02-05,47\n2026-02-06,49\n2026-02-07,33\n2026-02-08,23\n2026-02-09,22\n2026-02-10,27\n2026-02-11,40\n2026-02-12,33\n2026-02-13,34\n2026-02-14,31\n2026-02-15,33\n2026-02-16,26\n2026-02-17,29\n2026-02-18,28\n2026-02-19,57\n2026-02-20,25\n2026-02-21,20\n2026-02-22,22\n2026-02-23,27\n2026-02-24,23\n2026-02-25,26\n2026-02-26,29\n2026-02-27,27\n2026-02-28,23\n2026-03-01,59\n2026-03-02,44\n2026-03-03,81\n2026-03-04,32\n2026-03-05,63\n2026-03-06,40\n2026-03-07,37\n2026-03-08,23\n2026-03-09,33\n2026-03-10,34\n2026-03-11,23\n2026-03-12,34\n2026-03-13,31\n2026-03-14,23\n2026-03-15,29\n2026-03-16,26\n2026-03-17,21\n2026-03-18,28\n2026-03-19,21\n2026-03-20,29\n2026-03-21,28\n2026-03-22,24\n2026-03-23,25\n2026-03-24,29\n2026-03-25,20\n2026-03-26,21\n2026-03-27,26\n2026-03-28,24\n2026-03-29,27\n2026-03-30,23\n2026-03-31,21\n2026-04-01,58\n2026-04-02,46\n2026-04-03,40\n2026-04-04,53\n2026-04-05,73\n2026-04-06,47\n2026-04-07,45\n2026-04-08,22\n2026-04-09,25\n2026-04-10,20\n2026-04-11,51\n2026-04-12,30\n2026-04-13,25\n2026-04-14,20\n2026-04-15,26\n2026-04-16,27\n2026-04-17,28\n2026-04-18,20\n2026-04-19,25\n2026-04-20,27\n2026-04-21,25\n2026-04-22,23\n2026-04-23,29\n2026-04-24,24\n2026-04-25,21\n2026-04-26,24\n2026-04-27,29\n2026-04-28,22\n2026-04-29,21\n2026-04-30,28\n2026-05-01,63\n2026-05-02,47\n2026-05-03,50\n2026-05-04,33\n2026-05-05,41\n2026-05-06,38\n2026-05-07,35\n2026-05-08,23\n2026-05-09,33\n2026-05-10,22\n2026-05-11,27\n2026-05-12,22\n2026-05-13,28\n2026-05-14,26\n2026-05-15,20\n2026-05-16,49\n2026-05-17,25\n2026-05-18,27\n2026-05-19,20\n2026-05-20,38\n2026-05-21,22\n2026-05-22,29\n2026-05-23,23\n2026-05-24,24\n2026-05-25,26\n2026-05-26,20\n2026-05-27,27\n2026-05-28,50\n2026-05-29,24\n2026-05-30,20\n2026-05-31,29\"\"\"\nfor line in data_str.strip().split(\"\\n\"):\n    a,b = line.split(\",\"); vals[dt.date.fromisoformat(a)] = int(b)\n\ndays = sorted(vals)\n# --- leave-one-out day-of-month seasonal baseline ---\nby_dom = {}\nfor k,v in vals.items(): by_dom.setdefault(k.day, []).append((k,v))\n\nresid = {}\nfor k in days:\n    others = [v for kk,v in by_dom[k.day] if kk != k]\n    base = st.median(others) if others else st.median(vals.values())\n    resid[k] = vals[k] - base\n\nr = list(resid.values())\nmad = st.median([abs(x - st.median(r)) for x in r])\nsigma = 1.4826 * mad\nprint(\"residual median=%.2f MAD=%.2f sigma=%.2f\" % (st.median(r), mad, sigma))\n\n# robust z with leave-one-out MAD (exclude point itself -> approximate using full-series MAD; scale stable)\ndef rz(k):\n    return resid[k] / sigma\n\n# analysis window = most recent 92 days of available data\nw_start, w_end = dt.date(2026,3,1), dt.date(2026,5,31)\nwin = [k for k in days if w_start <= k <= w_end]\nprint(\"window:\", win[0], \"->\", win[-1], \"n=\", len(win))\nprint(\"window mean=%.1f median=%.1f min=%d max=%d\" % (st.mean([vals[k] for k in win]), st.median([vals[k] for k in win]), min(vals[k] for k in win), max(vals[k] for k in win)))\n\nrows = []\nfor k in win:\n    z = rz(k)\n    base = vals[k] - resid[k]\n    pct = (resid[k]/base*100) if base else 0\n    if abs(z) >= 3.0:\n        sev = \"SEVERE\" if abs(z) >= 5.0 else \"anomaly\"\n        rows.append((k, vals[k], base, resid[k], z, pct, sev))\n\nprint(\"\\n--- flagged (|z|>=3) ---\")\nfor k,a,b,rr,z,pct,sev in sorted(rows, key=lambda x: -abs(x[4])):\n    print(\"%s  actual=%3d expected=%5.1f dev=%+6.1f (%+6.1f%%) z=%+6.2f  %s\" % (k, a, b, rr, pct, z, sev))\n\nprint(\"\\ntop |z| overall in window:\")\nfor k in sorted(win, key=lambda x: -abs(rz(x)))[:8]:\n    print(k, vals[k], \"base=%.1f\"%(vals[k]-resid[k]), \"z=%+.2f\"%rz(k))\n",
+                "reasoning": "Run leave-one-out seasonal (day-of-month) robust z-score / MAD anomaly detection on the daily order series"
+              },
+              "id": "call_00_zaUV7VFsSpEPnvQHb1Nw3585",
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "usage_metadata": {
+            "input_tokens": 18266,
+            "output_tokens": 2535,
+            "total_tokens": 20801,
+            "input_token_details": {
+              "cache_read": 17280
+            },
+            "output_token_details": {
+              "reasoning": 412
+            }
+          }
+        }
+      ]
+    },
+    "resume": null,
+    "goto": []
+  }
+]
