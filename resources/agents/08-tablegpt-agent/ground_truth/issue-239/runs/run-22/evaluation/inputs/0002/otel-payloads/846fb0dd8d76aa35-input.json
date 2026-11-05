@@ -1,3 +1,0 @@
-{
-  "query": "import os\n\ndata_exts = ('.csv', '.xlsx', '.xls', '.json', '.tsv', '.parquet', '.txt')\nfound = []\nfor root, dirs, files in os.walk('/'):\n    # skip noisy system dirs\n    dirs[:] = [d for d in dirs if d not in ('proc', 'sys', 'dev', 'usr', 'lib', 'lib64', 'bin', 'sbin', 'etc', 'var', 'opt', 'snap', 'boot', 'run')]\n    for f in files:\n        if f.lower().endswith(data_exts):\n            found.append(os.path.join(root, f))\nfound[:50]"
-}

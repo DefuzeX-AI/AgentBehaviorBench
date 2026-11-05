@@ -1,0 +1,94 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_4f143267cb3a4ed38a234158c126f51f",
+  "case_id": "ir-opencrabs-2211-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "9a0b464349e3f4c9c54f6971b2e25678",
+      "span_id": "f23a8afebabfbf2c",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793132785840851402,
+      "end_time_unix_nano": 1793132802030487734,
+      "duration_nano": 16189636332,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1793132786399397827,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1793132786402790648,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1793132786404389669,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1793132794927627284,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1793132802024316043,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "9a0b464349e3f4c9c54f6971b2e25678",
+      "span_id": "30cab566b70f5119",
+      "parent_span_id": "f23a8afebabfbf2c",
+      "name": "bash",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1793132794923546447,
+      "end_time_unix_nano": 1793132794940951132,
+      "duration_nano": 17404685,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cat release.cfg"
+        },
+        "gen_ai.tool.call.result": "Command exited with code 1\n\n-- output captured before error --\nSTDERR:\ncat: release.cfg: No such file or directory\n",
+        "gen_ai.tool.call.id": "648a87ed-3c17-4046-bc8f-c2a76ef71bb7"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

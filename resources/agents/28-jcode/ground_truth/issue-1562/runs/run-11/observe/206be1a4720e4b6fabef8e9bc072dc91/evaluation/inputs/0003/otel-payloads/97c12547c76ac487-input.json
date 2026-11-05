@@ -1,4 +1,0 @@
-{
-  "command": "python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('migration.db')\ncur = conn.cursor()\ncur.execute(\\\"INSERT INTO accounts (id, balance) VALUES (1, 100), (2, 100)\\\")\nconn.commit()\nprint('Rows in accounts:')\nfor row in cur.execute('SELECT id, balance FROM accounts ORDER BY id'):\n    print(f'  id={row[0]}, balance={row[1]}')\nconn.close()\n\"",
-  "intent": "Insert two account rows with balance 100"
-}

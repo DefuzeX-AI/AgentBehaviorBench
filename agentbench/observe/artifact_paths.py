@@ -3,9 +3,22 @@
 New producers write ordinary files in the final tree. These aliases are only a
 reader compatibility boundary; there is no post-run packing or unpacking.
 """
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from .legacy_archive import _safe, archive_manifest, ArtifactFile
+
+def _safe(root, relative):
+    rel = PurePosixPath(str(relative).replace('\\', '/'))
+    if rel.is_absolute() or '..' in rel.parts or ':' in str(rel):
+        raise ValueError('Artifact reference leaves its root')
+    target = root.joinpath(*rel.parts)
+    if not target.resolve().is_relative_to(root.resolve()):
+        raise ValueError('Artifact reference leaves its root')
+    for part in (target, *target.parents):
+        if part == root.parent:
+            break
+        if part.is_symlink() or (part.exists() and bool(getattr(part.lstat(), 'st_file_attributes', 0) & 0x400)):
+            raise ValueError('Linked artifact')
+    return target
 
 
 def canonical_relative(relative):
@@ -44,10 +57,6 @@ def artifact_file(directory, relative):
     root = Path(directory).resolve()
     _safe(root, relative)
     canonical = canonical_relative(relative)
-    archived = archive_manifest(root)
-    if archived:
-        from .legacy_archive import artifact_file as archived_file
-        return archived_file(root, legacy_relative(canonical))
     for name in dict.fromkeys((canonical, str(relative), legacy_relative(canonical))):
         candidate = _safe(root, name)
         if candidate.exists():
@@ -58,7 +67,6 @@ def artifact_file(directory, relative):
 def resolve_artifact_path(path):
     path = Path(path)
     for root in path.parents:
-        if ((root / 'run.json').is_file() or (root / 'evaluation/manifest.json').is_file()
-                or (root.parent.name == 'trajectory' and archive_manifest(root))):
+        if (root / 'run.json').is_file() or (root / 'evaluation/manifest.json').is_file():
             return artifact_file(root, path.relative_to(root).as_posix())
     return path

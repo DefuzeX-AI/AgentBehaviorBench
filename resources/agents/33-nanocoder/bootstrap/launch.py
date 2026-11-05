@@ -16,6 +16,10 @@ MODEL_ENV = "ABB_AGENT_MODEL"
 PROVIDER_NAME = "abb-shared"
 NANOCODER_CLI = (Path(__file__).resolve().parents[1]
                  / "agent/node_modules/@nanocollective/nanocoder/dist/cli.js")
+# Historical units compile the exact upstream commit into its native dist/.
+SOURCE_CLI = Path(__file__).resolve().parents[1] / "agent/dist/cli.js"
+if SOURCE_CLI.is_file():
+    NANOCODER_CLI = SOURCE_CLI
 # Environment variables that would change Nanocoder's stdout or provider set if
 # inherited: NANOCODER_LOG_LEVEL turns on console logging to stdout (which must
 # stay pure JSON-RPC), NODE_ENV=test/development switches logger and provider

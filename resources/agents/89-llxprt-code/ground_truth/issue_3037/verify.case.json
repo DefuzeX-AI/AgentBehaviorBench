@@ -1,0 +1,47 @@
+{
+  "case_id": "ir-llxprt-code-3037-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3037,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3037",
+    "state": "closed",
+    "title": "Tool errors discard the model-facing llmContent remedy and surface only the terse error.message",
+    "body": "### What happened?\n\nWhile evaluating the editing tools (#3033 and the `ast_edit` / range-editor issues filed alongside it) the same pattern kept recurring, and it is not really a per-tool bug: **tools write a helpful, remedial error message into `llmContent`, but the caller only ever receives the terse `error.message`.** The useful half is discarded at the boundary.\n\nThis is worth fixing in one place because it silently degrades every tool at once, and because the good messages already exist — they are written, tested, and then thrown away.\n\n### What did you expect to happen?\n\nThe message the tool authors wrote for the model is the message the model receives.\n\n---\n\n## Evidence\n\n**`insert_at_line`** (`packages/tools/src/tools/insert_at_line.ts:181-186`) constructs both halves:\n\n    llmContent:    `Cannot insert at line 999: exceeds file length (8). Use line_number <= 9 to append.`\n    error.message: `line_number 999 exceeds file length (8)`\n\nWhat I actually received:\n\n    {\"error\":\"line_number 999 exceeds file length (8)\"}\n\nThe remedy — \"Use line_number <= 9 to append\" — is the entire actionable content, and it never arrived. I had to discover the correct boundary by probing.\n\n**`apply_patch`** (`apply-patch.ts`, `validatePatchTarget`) does the same:\n\n    llmContent:    `Patch header targets \"src/calculator.ts\" but the absolute_path targets \"calculator.ts\". Ensure the patch header matches the target file, or use a separate apply_patch call for \"src/calculator.ts\".`\n    error.message: `Patch header target \"src/calculator.ts\" does not match absolute_path \"calculator.ts\".`\n\nReceived: the second one. The instruction on how to fix it was dropped.\n\n**`apply_patch` multi-file** likewise:\n\n    llmContent:    `...Make a separate apply_patch call for each file.`\n    error.message: `...Use a separate apply_patch call per file.`\n\nHere the two happen to be equally useful, which is why that message reads so well in practice — it is the case where nothing was lost.\n\n## Why this matters\n\nThe pattern across the tools I exercised is consistent: `error.message` is written for a log or a UI status line (short, declarative, symptom-only), while `llmContent` is written for the model (states the constraint, names the remedy, sometimes renders surrounding context). Surfacing only the former means:\n\n- Callers burn extra turns rediscovering constraints that the tool already knows and already wrote down.\n- Tool authors' effort on good guidance is invisible, so there is no feedback pressure to keep it good.\n- The quality difference is invisible in review: both strings look fine in the source.\n\nThe best error I encountered in the whole evaluation was `replace`'s wrong-line-number message, which renders the surrounding lines with a marker at the requested line:\n\n    Failed to edit, 0 occurrences found for old_string starting at line 3 in <file>. No edits made.\n    The exact text in old_string was not found starting at that line.\n\n    Context around requested line:\n          1 | export function alpha(value: number): number {\n          2 |   const scaled = value * 4;\n    ->    3 |   return scaled;\n          4 | }\n\nThat one arrives intact and is immediately self-correcting. It is the standard the others could meet — several of them already write comparable text and simply lose it.\n\n## Suggested fix\n\nWhen a `ToolResult` carries both an `error` and an `llmContent`, return the `llmContent` to the model (or concatenate, with `llmContent` first). Keep `error.message` for logs, telemetry and `returnDisplay`. Then audit the editing tools so the model-facing half of each error names the remedy, not just the symptom.\n\nWorth checking whether this affects non-editing tools too — I only exercised the editors, but nothing about the pattern looks editor-specific.\n\n### Client information\n\n0.11.0-nightly, branch at 75a5cb5d95\n\n### Anything else we need to know?\n\nFound while investigating #3033; the `insert_at_line` case is the cleanest single reproduction, since the discarded sentence is the only part that tells you what to do.\n"
+  },
+  "version_choice": "historical:v0.10.0",
+  "reported_version": "v0.10.0",
+  "commit_version": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+  "fixed_in": "v0.11.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create notes.txt containing 7 lines: line1, line2, line3, line4, line5, line6, line7 (one per line).",
+    "Call insert_at_line on notes.txt with line_number 999 and content `extra`, and report exactly what error the tool returned."
+  ],
+  "expected": "The model receives the tool's model-facing llmContent, including the remedy (e.g. \"Use line_number <= 9 to append.\").",
+  "defect": "The model receives only the terse error.message, e.g. {\"error\":\"line_number 999 exceeds file length (8)\"}, and the remedy written into llmContent is dropped.",
+  "fault location": [
+    {
+      "file": "packages/agents/src/scheduler/result-aggregator.ts",
+      "function": "ResultAggregator.publishResult",
+      "line_start": 376,
+      "line_end": 384,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/agents/src/scheduler/result-aggregator.ts#L376-L384",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "On a tool error it builds the response from result.error.message only and never looks at result.llmContent; PR #3051 passes extractModelFacingErrorText(result.llmContent, ...) to createErrorResponse."
+    },
+    {
+      "file": "packages/core/src/utils/generateContentResponseUtilities.ts",
+      "function": "createErrorResponse",
+      "line_start": 427,
+      "line_end": 445,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/core/src/utils/generateContentResponseUtilities.ts#L427-L445",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The functionResponse sent to the model is { error: error.message }; PR #3051 adds a modelFacingContent parameter and uses it in preference to error.message."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3051. Tools return a ToolResult whose llmContent is written for the model (constraint plus remedy) and whose error.message is a terse log/UI string. In v0.10.0, when a tool result has an error, ResultAggregator.publishResult wraps result.error.message in a new Error and calls createErrorResponse, which builds the tool_response part as { error: error.message }; result.llmContent is discarded at this boundary. For insert_at_line the model therefore sees 'line_number 999 exceeds file length (8)' instead of 'Cannot insert at line 999: exceeds file length (8). Use line_number <= 9 to append.' Commit 85ce51c (PR #3051, 'Deliver the model-facing llmContent remedy on tool errors') adds extractModelFacingErrorText (with the same output limiting as the success path) and passes it into createErrorResponse, which prefers it over error.message. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0."
+}

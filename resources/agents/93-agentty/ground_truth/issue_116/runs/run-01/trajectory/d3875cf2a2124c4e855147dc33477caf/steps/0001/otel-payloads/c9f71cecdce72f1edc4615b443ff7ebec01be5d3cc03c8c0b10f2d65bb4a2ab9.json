@@ -1,0 +1,4 @@
+{
+  "content": "\"\"\"Text styling helpers.\"\"\"\n\n\ndef _shout(text: str) -> str:\n    return text.upper()\n\n\ndef _whisper(text: str) -> str:\n    return text.lower()\n\n\ndef _excited(text: str) -> str:\n    return f\"{text}!!!\"\n\n\ndef _plain(text: str) -> str:\n    return text\n\n\nSTYLES = {\n    \"plain\": _plain,\n    \"shout\": _shout,\n    \"whisper\": _whisper,\n    \"excited\": _excited,\n}\n\n\ndef apply_style(text: str, style: str = \"plain\") -> str:\n    \"\"\"Apply a named style to text.\"\"\"\n    try:\n        fn = STYLES[style]\n    except KeyError:\n        raise ValueError(f\"unknown style {style!r}; choose from {sorted(STYLES)}\") from None\n    return fn(text)\n",
+  "file_path": "/home/agent/workspace/greetkit/styles.py"
+}

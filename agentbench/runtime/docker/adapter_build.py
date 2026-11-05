@@ -6,7 +6,7 @@ from agentbench.runtime.agentcontainer.config import tomllib
 
 
 def stage_adapter_dependencies(config, context, dockerfile):
-    manifest = tomllib.loads((config.agent_root / 'agent.toml').read_text())
+    manifest = tomllib.loads((config.agent_root / 'agent.toml').read_text(encoding='utf-8'))
     requirements = DEFAULT_ADAPTER_FACTORY.build_requirements(manifest.get('framework', 'langgraph'))
     if requirements is None:
         return
@@ -16,7 +16,7 @@ def stage_adapter_dependencies(config, context, dockerfile):
     destination = context / '.abb-adapter'
     destination.mkdir(exist_ok=True)
     (destination / 'requirements.txt').write_bytes(requirements.read_bytes())
-    source = dockerfile.read_text()
+    source = dockerfile.read_text(encoding='utf-8')
     users = re.findall(r'(?im)^USER\s+(.+)$', source)
     if not users or users[-1].strip() in ('root', '0', '0:0'):
         raise ValueError('Adapter overlay requires an explicit non-root image USER')
@@ -24,4 +24,4 @@ def stage_adapter_dependencies(config, context, dockerfile):
         'COPY .abb-adapter/requirements.txt /opt/abb-adapter/requirements.txt\n'
         'RUN python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip\n'
         'RUN python -m pip --isolated install --no-cache-dir --index-url https://pypi.org/simple '
-        '-r /opt/abb-adapter/requirements.txt\nUSER ' + users[-1] + '\n')
+        '-r /opt/abb-adapter/requirements.txt\nUSER ' + users[-1] + '\n', encoding='utf-8')

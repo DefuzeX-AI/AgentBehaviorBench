@@ -1,4 +1,0 @@
-{
-  "content": "const fs = require(\"node:fs\");\n\nfunction loadConfig(filePath, defaults) {\n  let raw;\n  try {\n    raw = fs.readFileSync(filePath, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") {\n      return { ...defaults };\n    }\n    throw err;\n  }\n  const userConfig = JSON.parse(raw);\n  return { ...userConfig, ...defaults };\n}\n\nmodule.exports = { loadConfig };\n",
-  "encoding": "utf-8"
-}

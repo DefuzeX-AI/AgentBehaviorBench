@@ -1,4 +1,4 @@
-"""Compare saved Judge summaries, then both traces, without executing an Agent."""
+"""Compare saved Judge summaries, then both trajectories, without executing an Agent."""
 import json
 import os
 from pathlib import Path
@@ -11,12 +11,13 @@ from agentbench.observe.store import environment_secrets, redact
 from agentbench.sdk.common.artifacts import Artifacts
 from .files import read_json, within
 from .manifests import registered_units, load_manifest
-from .matching import SUMMARY_SYSTEM, TRACE_SYSTEM, validate_match, summarize
-from .traces import read_trace, read_reference_traces
+from .matching import SUMMARY_SYSTEM, TRAJECTORY_SYSTEM, validate_match, summarize
+from .trajectories import (cited_steps, judge_cited_steps, matcher_payload, read_candidate, read_reference,
+                           reference_step_id)
 from .transport import model_config, ask_once
 
-SCHEMA = 'abb.gt.evaluation.v2'
-PROTOCOL = 'summary-trace-discovery-v2.1'
+SCHEMA = 'abb.gt.evaluation.v3'
+PROTOCOL = 'summary-trajectory-attribution-v3'
 
 
 def input_state(directory, root, agent_ids):
@@ -75,7 +76,7 @@ def evaluate_suite(directory, project_root, *, environ=None, output=print, ask=N
     directory, project_root = Path(directory).resolve(), Path(project_root).resolve()
     environ = dict(os.environ if environ is None else environ)
     plan, _ = read_suite(directory)
-    gt_root = directory if plan.get('artifact_layout') == 'agent-trajectories-v1' else within(directory, directory / 'ground_truth')
+    gt_root = directory if plan.get('artifact_layout') == 'agent-attempts-v1' else within(directory, directory / 'ground_truth')
     gt_root.mkdir(exist_ok=True)
     with FileLock(str(gt_root / '.evaluation.lock'), timeout=0):
         return _evaluate(directory, project_root, environ, output, ask or ask_once,
@@ -128,7 +129,7 @@ def _evaluate(directory, root, environ, output, ask, snapshot_reader, catalog_ty
 
     def call(stage, payload):
         nonlocal model
-        system = SUMMARY_SYSTEM if stage == 'summary' else TRACE_SYSTEM
+        system = SUMMARY_SYSTEM if stage == 'summary' else TRAJECTORY_SYSTEM
         payload = redact(payload, secrets)
         if len(json.dumps(payload, ensure_ascii=False).encode()) > limit:
             raise ValueError('Matcher context too large; decision remains pending')
@@ -228,19 +229,29 @@ def _evaluate(directory, root, environ, output, ask, snapshot_reader, catalog_ty
                         states = (attempt, result, result.get('artifacts') or {})
                         if any(s.get('evidence_status') in ('missing', 'invalid', 'failed') for s in states):
                             raise ValueError('Captured trace unavailable or invalid')
-                        candidate = read_trace(api, limit=limit)
-                        reference = read_reference_traces(defect, limit=limit)
-                        reference_ids = {e['id'] for t in reference for e in t['events']}
-                        candidate_ids = {e['id'] for e in candidate['events']}
-                        second_payload = {**payload, 'reference_traces': reference, 'candidate_trace': candidate}
-                        evidence_path = f'tasks/{len(rows):06d}/traces.json'
-                        files.save(evidence_path, redact(second_payload, secrets))
-                        row['trace_evidence_path'] = os.path.relpath(destination / evidence_path, directory).replace('\\', '/')
-                        second = validate_match(call('trace', second_payload), reference_ids, candidate_ids)
-                        row['trace_match'] = second
-                        row['trace_evidence'] = redact({
-                            'reference': [e for t in reference for e in t['events'] if e['id'] in second['reference_event_ids']],
-                            'candidate': [e for e in candidate['events'] if e['id'] in second['candidate_event_ids']]}, secrets)
+                        candidate = read_candidate(api, environ=environ)
+                        reference = read_reference(defect)
+                        reference_ids = {reference_step_id(t['attempt'], s['step_id']) for t in reference for s in t['steps']}
+                        candidate_ids = {s['step_id'] for s in candidate['steps']}
+                        second_payload, mode = matcher_payload(reference, candidate, defect, text, limit=limit)
+                        evidence_path = f'tasks/{len(rows):06d}/trajectories.json'
+                        files.save(evidence_path, redact({'reference': reference, 'candidate': candidate,
+                                                          'render_mode': mode, 'decisive_step': defect['decisive_step']}, secrets))
+                        row['trajectory_evidence_path'] = os.path.relpath(destination / evidence_path, directory).replace('\\', '/')
+                        row['render_mode'] = mode
+                        second = validate_match(call('trajectory', second_payload), reference_ids, candidate_ids)
+                        row['trajectory_match'] = second
+                        row['trajectory_evidence'] = redact({
+                            'reference': cited_steps(reference, set(second['reference_step_ids'])),
+                            'candidate': cited_steps([candidate], set(second['candidate_step_ids']))}, secrets)
+                        judge_steps = judge_cited_steps(finding)
+                        decisive = second.get('candidate_decisive_step')
+                        row['localization'] = {
+                            'reference_decisive_step': reference_step_id(defect['decisive_step']['attempt'],
+                                                                         defect['decisive_step']['step_id']),
+                            'candidate_decisive_step': decisive, 'judge_cited_steps': judge_steps,
+                            # Only reports that name steps can be scored on localization.
+                            'step_match': None if judge_steps is None or decisive is None else decisive in judge_steps}
                         row.update(score=None if second['match'] is None else int(second['match']), reason=second['reason'])
                     except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
                         row.update(score=None, reason=str(redact(str(exc), secrets)))

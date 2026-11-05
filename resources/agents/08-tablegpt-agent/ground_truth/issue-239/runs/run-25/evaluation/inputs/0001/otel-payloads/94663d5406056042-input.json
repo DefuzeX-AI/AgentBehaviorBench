@@ -1,3 +1,0 @@
-{
-  "query": "import os\n\nprint(\"cwd:\", os.getcwd())\nprint(\"\\nfull listing of cwd (including hidden):\")\nfor entry in sorted(os.listdir(\".\")):\n    print(\" \", entry, \"(dir)\" if os.path.isdir(entry) else \"(file)\")\n\nprint(\"\\nany 'docs' dir anywhere?\")\nfor root, dirs, files in os.walk(\"/\", topdown=True):\n    dirs[:] = [d for d in dirs if d not in {\"proc\", \"sys\", \"dev\", \"run\", \"usr\", \"lib\", \"lib64\", \"bin\", \"sbin\", \"etc\", \"var\", \"opt\", \"boot\", \"snap\"}]\n    if os.path.basename(root) == \"explanation\" and \"docs\" in root:\n        print(\" \", root, \"->\", files[:20])"
-}

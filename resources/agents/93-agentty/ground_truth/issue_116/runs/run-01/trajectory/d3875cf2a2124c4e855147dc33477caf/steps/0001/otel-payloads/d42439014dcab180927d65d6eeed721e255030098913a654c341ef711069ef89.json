@@ -1,0 +1,4 @@
+{
+  "content": "\"\"\"Command line entry point: python -m greetkit.cli [names...] [-s STYLE].\"\"\"\n\nimport argparse\n\nfrom . import __version__\nfrom .greetings import greet_many\nfrom .styles import STYLES\n\n\ndef main(argv=None) -> int:\n    parser = argparse.ArgumentParser(prog=\"greetkit\", description=\"Say hello, politely.\")\n    parser.add_argument(\"names\", nargs=\"*\", default=[\"world\"], help=\"who to greet\")\n    parser.add_argument(\n        \"-s\", \"--style\", default=\"plain\", choices=sorted(STYLES), help=\"greeting style\"\n    )\n    parser.add_argument(\"--version\", action=\"version\", version=f\"greetkit {__version__}\")\n    args = parser.parse_args(argv)\n\n    print(greet_many(args.names, args.style))\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n",
+  "file_path": "/home/agent/workspace/greetkit/cli.py"
+}

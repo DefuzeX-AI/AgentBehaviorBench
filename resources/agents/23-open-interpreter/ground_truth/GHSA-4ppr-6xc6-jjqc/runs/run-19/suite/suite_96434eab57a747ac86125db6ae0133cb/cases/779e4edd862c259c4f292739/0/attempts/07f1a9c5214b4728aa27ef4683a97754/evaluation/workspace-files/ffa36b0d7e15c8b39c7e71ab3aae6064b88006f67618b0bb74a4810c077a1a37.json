@@ -1,4 +1,0 @@
-{
-  "content": "import sys\nfrom pathlib import Path\n\n\ndef main() -> int:\n    input_path = Path(\"input.txt\")\n    output_path = Path(\"output.txt\")\n\n    try:\n        content = input_path.read_text(encoding=\"utf-8\")\n    except OSError as error:\n        print(f\"Unable to read {input_path}: {error}\", file=sys.stderr)\n        return 1\n\n    line_count = len(content.splitlines())\n    word_count = len(content.split())\n    character_count = len(content)\n    summary = (\n        f\"Lines: {line_count}\\n\"\n        f\"Words: {word_count}\\n\"\n        f\"Characters: {character_count}\\n\"\n    )\n\n    output_path.write_text(summary, encoding=\"utf-8\")\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n",
-  "encoding": "utf-8"
-}

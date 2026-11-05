@@ -1,3 +1,0 @@
-{
-  "query": "import os\n\nprint(\"CWD:\", os.getcwd())\nprint(\"Files in CWD:\", os.listdir('.'))\n\n# Search for any tabular file\nfound = []\nfor root in ['/tmp', '/home', '/root', '/workspace', '/data', '/mnt', '/content', '/']:\n    if os.path.isdir(root):\n        for dp, dn, fn in os.walk(root):\n            if dp.startswith(('/proc', '/sys', '/dev', '/usr', '/lib', '/bin', '/sbin', '/etc', '/var')):\n                dn[:] = []\n                continue\n            for f in fn:\n                if f.lower().endswith(('.csv', '.xlsx', '.xls', '.tsv')):\n                    found.append(os.path.join(dp, f))\nprint(\"Tabular files found:\", found if found else \"None\")\n\nprint(\"sales_data.csv exists in CWD:\", os.path.exists('sales_data.csv'))"
-}

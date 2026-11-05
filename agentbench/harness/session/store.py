@@ -78,7 +78,7 @@ class SuiteStore:
             store._plan = build_plan(suite_id, registrations, configuration=configuration,
                                      secrets=store._secrets, result_log_path=store.path,
                                      origin_suite_id=origin_suite_id)
-            store._plan['artifact_layout'] = 'agent-trajectories-v1'
+            store._plan['artifact_layout'] = 'agent-attempts-v1'
             if result_log_path is not None:
                 store._plan['requested_output_path'] = str(Path(result_log_path).resolve())
             atomic_json(store.path, [])
@@ -155,7 +155,7 @@ class SuiteStore:
         pending = [*self._events, value]
         from .event_refs import retain_event
         stored = retain_event(self.directory, value,
-            managed=self._plan.get('artifact_layout') == 'agent-trajectories-v1')
+            managed=self._plan.get('artifact_layout') == 'agent-attempts-v1')
         stored_pending = [*self._stored_events, stored]
         atomic_json(self.path, stored_pending)
         self._stored_events = stored_pending
