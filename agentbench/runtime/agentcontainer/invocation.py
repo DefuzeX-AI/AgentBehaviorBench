@@ -56,7 +56,8 @@ def invoke_once(runtime, agent, value, config=None, *, cancelled=None):
         if "output" not in result or "raw_output" not in result:
             raise RuntimeError("Incomplete worker result")
         session.validate_trace(0)
-        return AdapterInvocation(output=result["output"], raw_output=result["raw_output"])
+        return AdapterInvocation(output=result["output"], raw_output=result["raw_output"],
+                                 public_messages=result.get('public_messages'))
     finally:
         if session is not None:
             try:

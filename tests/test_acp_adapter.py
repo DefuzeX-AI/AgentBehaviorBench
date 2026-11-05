@@ -29,6 +29,8 @@ def test_sync_turns_reuse_session_and_do_not_replay_history(adapter):
     first = adapter.invoke('first')
     second = adapter.invoke('second')
     assert first.output == '1:first' and second.output == '2:second'
+    assert first.public_messages == {'messages': [{'content': '1:first'}], 'complete': True}
+    assert second.public_messages == {'messages': [{'content': '2:second'}], 'complete': True}
     assert first.raw_output['session_id'] == second.raw_output['session_id']
     assert first.raw_output['pid'] == second.raw_output['pid']
     pid = second.raw_output['pid']
@@ -93,6 +95,12 @@ def test_unknown_authentication_method_fails_before_prompt(adapter):
 
 def test_stderr_is_drained_without_contaminating_answer(adapter):
     assert adapter.invoke('stderr').output == '1:stderr'
+
+
+def test_nontext_public_content_cannot_be_called_complete_text_capture(adapter):
+    result = adapter.invoke('nontext')
+    assert result.output == '1:nontext'
+    assert result.public_messages == {'messages': [{'content': '1:nontext'}], 'complete': False}
 
 
 def test_reply_limit_cannot_be_mistaken_for_success(adapter):
@@ -170,5 +178,6 @@ def test_native_abort_preserves_partial_output_and_closes_only_agent_session(ada
     with pytest.raises(AgentAborted) as raised:
         adapter.invoke('abort')
     assert raised.value.raw_output['partial_text'] == '1:abort'
+    assert raised.value.public_messages == {'messages': [{'content': '1:abort'}], 'complete': False}
     assert not adapter.is_loaded
     assert raised.value.code == 'agent_aborted'

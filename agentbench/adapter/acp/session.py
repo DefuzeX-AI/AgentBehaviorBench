@@ -74,6 +74,7 @@ class ACPSession:
         self.busy = True
         self.callbacks = callbacks
         self.client.parts, self.client.output_bytes, self.client.error = [], 0, None
+        self.client.public_text_complete = True
         started = asyncio.get_running_loop().time()
         try:
             if self.conn is None:
@@ -96,8 +97,15 @@ class ACPSession:
             if stop not in ('end_turn', 'refusal'):
                 raise ACPError(f'ACP stopped before completion: {stop}', code=stop)
             return ''.join(self.client.parts), {**self.info, 'session_id': self.client.session_id,
-                    'stop_reason': stop, 'prompt_response': plain(response)}
+                    'stop_reason': stop, 'prompt_response': plain(response)}, {
+                        'messages': ([{'content': ''.join(self.client.parts)}] if self.client.parts else []),
+                        'complete': self.client.public_text_complete}
         except BaseException as exc:
+            # A failed turn may already have disclosed a limitation or result.
+            # Keep observed text without declaring an unfinished stream complete.
+            exc.public_messages = {
+                'messages': ([{'content': ''.join(self.client.parts)}] if self.client.parts else []),
+                'complete': False}
             try:
                 try:
                     await self.client.terminals.snapshot_all()
