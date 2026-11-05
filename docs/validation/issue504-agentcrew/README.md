@@ -6,6 +6,24 @@ used that branch's shared ABB changes. The November 5 attempt below used upstrea
 ABB main. Upstream AgentCrew source remains unchanged at
 `eaff35483b1fea0a856d9e1dd3ce85ace0cf9c04`.
 
+## November 5 Bailian model retries
+
+Two fresh integration-only CLI runs on ABB main `55a093f94` used Bailian
+`qwen-flash` and `qwen-plus` as Agent models, with `qwen-flash` selected for
+the Local Judge. Each run produced native output for all three Case inputs.
+Host trace validation and cleanup succeeded. ACP records still show the native
+terminal refusal.
+
+| Agent model | Suite | Attempt | Derived trajectory |
+| --- | --- | --- | --- |
+| `qwen-flash` | `suite_15e0269b2caa4bd3a15fda0b75d34d9a` | `24a14b66b89e4e95b91cb7406d924f8f` | Partial, 18 model requests lacked confirmed Input attribution |
+| `qwen-plus` | `suite_1708fadb20c446d5ab515c66e6fce053` | `7605706ddb3d4fe59fa5713f78f5adc2` | Partial, 15 model requests lacked confirmed Input attribution |
+
+Both Judge receipts were inconclusive because the original Local Judge payload
+exceeded its 120,000-character limit. Both quality gates failed. The local
+evidence is retained under `results/verification/issue504-split-qwen-flash/` and
+`results/verification/issue504-split-qwen-plus/`.
+
 ## November 5 integration-only CLI attempt
 
 This attempt used upstream ABB main at `55a093f941fa32120322a80702e91fb1fbb86818`
@@ -21,7 +39,7 @@ The local Suite is
 The corresponding Attempt is
 `results/verification/issue504-split/agents/agentcrew/cases/71447b45aa7d51778122bcb8f5c407a5/attempts/57834e1ff75848abbb2d2b6e72127060`.
 It retains the Case, the returned error text, the trace and the Judge delivery
-record. A fresh acceptance run requires an available model endpoint.
+record. The Bailian retries above proceeded with available models.
 
 ## Implementation and offline verification
 
