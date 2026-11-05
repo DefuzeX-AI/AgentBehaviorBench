@@ -12,7 +12,7 @@ Git과 Python 3.10+를 설치하고 위 시작 가이드에 따라 ABB를 설치
 
 ```bash
 python -m pip install -e .
-python -m pip install "kuma-defuzex[otel]>=0.3.3"
+python -m pip install "kuma-defuzex[otel]>=0.3.8"
 git --version
 agentbench --help
 agentbench sdk list
