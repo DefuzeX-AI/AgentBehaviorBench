@@ -113,6 +113,10 @@ for line in sys.stdin:
         if text == 'big':
             notify('x' * 4096)
         else:
+            if text == 'nontext':
+                send({'method': 'session/update', 'params': {'sessionId': session,
+                      'update': {'sessionUpdate': 'agent_message_chunk',
+                                 'content': {'type': 'image', 'data': 'AA==', 'mimeType': 'image/png'}}}})
             notify(f'{turn}:')
             notify(text)
         stop = 'cancelled' if text == 'abort' else 'max_tokens' if text == 'limit' else 'refusal' if text == 'refuse' else 'end_turn'
