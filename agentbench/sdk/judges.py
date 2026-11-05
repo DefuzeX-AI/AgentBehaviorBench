@@ -57,6 +57,11 @@ def build_request(directory, registration, document):
                                    'size_bytes': path.stat().st_size}
         steps.append({'input': read(prefix + '/input.json'),
                       'result': read(prefix + '/result.json'), 'evidence_prefix': prefix})
+    # The derived step sequence lives at the package root beside the raw evidence.
+    derived = root / 'trajectory.json'
+    if derived.is_file() and not derived.is_symlink():
+        files['trajectory.json'] = {'sha256': hashlib.sha256(derived.read_bytes()).hexdigest(),
+                                    'size_bytes': derived.stat().st_size}
     body = {'schema': 'abb.judge.request.v1', 'agent_id': registration.agent_id,
             'run_id': manifest['run_id'], 'case': document['case'],
             'case_sha256': digest(case_bytes(document['case'])),
@@ -87,10 +92,6 @@ def execute_judge(judge, request, *, directory, environ):
     lock = SuiteLock(Path(directory) / 'judge-protocol-lock')
     lock.acquire()
     try:
-        from agentbench.observe.legacy_archive import restore_archive
-        from agentbench.observe.legacy_archive import archive_manifest
-        if archive_manifest(directory):
-            restore_archive(directory)
         return _execute_judge(judge, request, directory=directory, environ=environ)
     finally:
         lock.close()

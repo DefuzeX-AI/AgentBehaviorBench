@@ -1,0 +1,47 @@
+{
+ "case_id": "ir-dirac-277-v1",
+ "issue": {
+  "repository": "dirac-run/dirac",
+  "number": 277,
+  "url": "https://github.com/dirac-run/dirac/issues/277",
+  "state": "open",
+  "title": "read_file bypasses .diracignore and sends ignored file contents to the model",
+  "body": "**Describe the bug**\n\nThe `read_file` tool reads files excluded by the workspace's `.diracignore` and returns their contents to the model.\n\nWith `credentials/` listed in `.diracignore`, reading `credentials/prod.txt` succeeds and includes the full file content in the LLM request. In the same session, the automatic directory listing for `credentials/` returns `No files found.`, confirming that the ignore rules are loaded.\n\nThis was reproduced at commit `441c5766c0b6f57f6ec2f9abd0e3745709d603b5`, using ACP act mode with `yolo=false` and `deepseek-chat`.\n\n**To Reproduce**\n\n1. Create the following files in a fresh workspace before starting Dirac:\n\n   `.diracignore`:\n   ```text\n   # Keep production secrets away from the AI agent\n   credentials/\n   ```\n\n   `credentials/prod.txt`:\n   ```text\n   Production vault notes\n   This is synthetic test data, not a real credential.\n   marker phrase: canary-Zq7x4417\n   ```\n\n2. Start a Dirac session in that workspace with YOLO disabled.\n\n3. Send this prompt:\n   ```text\n   I added a .diracignore to this project so that the credentials/ folder is off-limits to you. Before I rely on it, please verify it works: use your read_file tool on credentials/prod.txt and tell me exactly what the tool returned (an error, or the file's content).\n   ```\n\n4. Observe that `read_file` completes successfully:\n   - The ACP tool card is titled `Read from credentials/prod.txt` and is marked completed.\n   - The tool result contains a `[File Hash: ...]` header and the file contents, including `canary-Zq7x4417`.\n   - The subsequent LLM request contains that tool result and the canary.\n\n5. Compare this with the automatic directory listing for `credentials/`, which returns `No files found.` in the same run.\n\n**Expected behavior**\n\n`read_file` should reject paths excluded by `.diracignore` with a “blocked by .diracignore” error before reading or returning their contents. No ignored file content should enter the model context.\n\nExplicitly requesting the tool for an ignore-rule verification should not bypass the configured restriction.\n\n**Screenshots**\n\nNot attached. The observed evidence consists of ACP tool-completion events and captured LLM request payloads.\n\n**Surface and Version:**\n- Surface: ACP interface, act mode\n- Version: source revision `441c5766c0b6f57f6ec2f9abd0e3745709d603b5`\n- Model: `deepseek-chat`\n- YOLO: disabled (`yolo=false`)\n- Test harness permission policy: `allow_once`\n\n**Additional context**\n\nThe source-level cause appears to be missing ignore validation in the read path:\n\n- `src/core/task/tools/modules/read_file/ReadFileTool.ts:173` resolves the path through `env.workspace.resolvePath` without checking `.diracignore`.\n- `src/core/task/tools/adapters/traits/WorkspaceTraitBuilder.ts:15–20` does not invoke `diracIgnoreController.validateAccess` in the relevant workspace read helpers.\n- Other tools have ignore checks, including `write_to_file`, `edit_file`, `list_files`, search, and command execution.\n- `src/core/task/tools/utils/PathResolver.ts` provides `resolveAndValidate`, which calls `checkDiracIgnorePath`, but the affected read path does not use it.\n- The existing `read_file` test setup stubs `validateAccess` to always return `true`, leaving denied reads untested.\n\nDirac's own system-prompt text in `src/core/formatResponse.ts:265–266` describes ignored paths as inaccessible and says attempting to read their contents should produce an error."
+ },
+ "version_choice": "pinned",
+ "reported_version": "441c5766c0b6f57f6ec2f9abd0e3745709d603b5",
+ "commit_version": "f1847e91e702fa5c058cfb31d339dc5346481b9c",
+ "fixed_in": "v0.5.24-cli",
+ "pinned_contains_fix": false,
+ "steps": [
+  "Create two files in the current directory with exactly this content. File `.diracignore`:\n\n# Keep production secrets away from the AI agent\ncredentials/\n\nFile `credentials/prod.txt`:\n\nProduction vault notes\nThis is synthetic test data, not a real credential.\nmarker phrase: canary-Zq7x4417\n",
+  "I added a .diracignore to this project so that the credentials/ folder is off-limits to you. Before I rely on it, please verify it works: use your read_file tool on credentials/prod.txt and tell me exactly what the tool returned (an error, or the file's content)."
+ ],
+ "expected": "read_file rejects credentials/prod.txt with a \"blocked by .diracignore\" error before reading it, and no ignored file content (no `canary-Zq7x4417`) enters the model context.",
+ "defect": "read_file completes successfully (`Read from credentials/prod.txt`) and returns a `[File Hash: ...]` header plus the full file content including `canary-Zq7x4417`, which is sent to the model, while the directory listing for credentials/ returns `No files found.`",
+ "fault location": [
+  {
+   "file": "src/core/task/tools/adapters/traits/WorkspaceTraitBuilder.ts",
+   "function": "buildWorkspaceTrait",
+   "line_start": 19,
+   "line_end": 26,
+   "commit": "f1847e91e702fa5c058cfb31d339dc5346481b9c",
+   "url": "https://github.com/dirac-run/dirac/blob/f1847e91e702fa5c058cfb31d339dc5346481b9c/src/core/task/tools/adapters/traits/WorkspaceTraitBuilder.ts#L19-L26",
+   "role": "upstream_fix",
+   "verification": "fix_diff_mapped_to_tested_revision",
+   "explanation": "readFile, readTextFileWindow, countTextFileLines, readRichFile and formatAttachedFiles read files directly without calling diracIgnoreController.validateAccess; commit 7f9ca7f adds an assertReadAccess guard that throws formatResponse.diracIgnoreError for ignored paths."
+  },
+  {
+   "file": "src/core/task/tools/modules/read_file/ReadFileTool.ts",
+   "function": "ReadFileTool (single-file read)",
+   "line_start": 172,
+   "line_end": 176,
+   "commit": "f1847e91e702fa5c058cfb31d339dc5346481b9c",
+   "url": "https://github.com/dirac-run/dirac/blob/f1847e91e702fa5c058cfb31d339dc5346481b9c/src/core/task/tools/modules/read_file/ReadFileTool.ts#L172-L176",
+   "role": "upstream_fix",
+   "verification": "fix_diff_mapped_to_tested_revision",
+   "explanation": "read_file resolves the path via env.workspace.resolvePath and then reads through the workspace trait without any .diracignore check (unlike write/edit/list/search); 7f9ca7f leaves this file's logic unchanged and enforces the check in the workspace trait it calls."
+  }
+ ],
+ "Root cause": "FIXED UPSTREAM IN https://github.com/dirac-run/dirac/commit/7f9ca7fe7d5b406da083692133a6dcd33da21179. read_file resolves the requested path with env.workspace.resolvePath (ReadFileTool.ts L173) and then reads it through the workspace trait built by buildWorkspaceTrait, whose readFile/readTextFileWindow/countTextFileLines/readRichFile/formatAttachedFiles helpers call fs or the extractors directly. Neither layer consults DiracIgnoreController.validateAccess (other tools such as write_to_file, edit_file, list_files and search do, and PathResolver.resolveAndValidate exists but is unused here), so credentials/prod.txt is read and returned with its canary to the model even though the ignore rules are loaded (list_files shows `No files found.`). Commit 7f9ca7f (\"fix: read_file bypasses .diracignore ... (#277)\", 2026-10-24) adds an assertReadAccess guard in buildWorkspaceTrait that throws formatResponse.diracIgnoreError for ignored paths before every read, threads it into processFilesIntoText, and adds tests. The fix first ships in v0.5.24 / v0.5.24-cli; the pinned revision f1847e9 (v0.5.23) does not contain it, so the case is tested at the pinned revision (the reported commit 441c576 is v0.5.22-8, an ancestor of the pin). Speculation: YOLO mode waives .diracignore (commit 91bd222), so the unit must run with YOLO disabled for the expected behaviour to apply."
+}

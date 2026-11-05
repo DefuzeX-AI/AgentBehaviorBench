@@ -1,0 +1,55 @@
+# Hand-written from the pinned easycode-ai npm release's native ACP server
+# (`easycode --acp`) and its custom OpenAI-compatible model contract.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "easycode"
+display_name = "Easy Code (ACP, shared model provider)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+# The revision is the gitHead that npm records for easycode-ai 1.1.91. That commit
+# is not on the public repository (its `opensource` branch ends at 887b8bb4,
+# CLI 1.1.14); the installed artifact is the integrity-pinned npm tarball.
+[source]
+method = "install"
+repository = "https://github.com/OrionStarAI/EasyCode"
+revision = "3e7d8e89b5ca96c649240ebaa5d4c08f87afb7b6"
+downloaded_on = "2026-10-26"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = []
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 120
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []

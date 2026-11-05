@@ -1,3 +1,0 @@
-{
-  "query": "import urllib.request, json\n\ndef get(path):\n    url = f\"http://127.0.0.1:8080{path}\"\n    try:\n        with urllib.request.urlopen(url, timeout=3) as r:\n            return r.status, r.read(1000).decode('utf-8', 'replace')\n    except Exception as ex:\n        return None, f\"<error: {type(ex).__name__}: {ex}>\"\n\nfor p in ('/', '/status', '/cluster', '/health', '/leader', '/v1/status', '/metrics'):\n    code, body = get(p)\n    print(f\"--- GET {p} -> {code}\")\n    if body:\n        print(body[:400].strip())\n    print()"
-}

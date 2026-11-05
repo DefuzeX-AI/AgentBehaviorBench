@@ -1,0 +1,86 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_2a28167448c0480f9f28aaec02429853",
+  "case_id": "ir-opencrabs-2210-v1",
+  "input_id": "step-3",
+  "spans": [
+    {
+      "trace_id": "fe86519fa7636307df07485136740cf3",
+      "span_id": "449b1441df5f45b8",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793131260558898765,
+      "end_time_unix_nano": 1793131462042086499,
+      "duration_nano": 201483187734,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1793131260562783656,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1793131273634869660,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1793131462038561261,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "fe86519fa7636307df07485136740cf3",
+      "span_id": "f55ba663e24c7044",
+      "parent_span_id": "449b1441df5f45b8",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1793131273631923550,
+      "end_time_unix_nano": 1793131273638842472,
+      "duration_nano": 6918922,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "kiwis=1\nlemons=2\n",
+          "overwrite_read_confirm": true,
+          "path": "inventory.txt"
+        },
+        "gen_ai.tool.call.result": "Refusing to overwrite /home/agent/workspace/inventory.txt: it changed on disk after you read it. Another agent is working in this directory. Read the file again, re-apply your change to the current content, then write. If you only need to change part of it, prefer edit_file — it re-reads the file itself and cannot clobber a concurrent edit.",
+        "gen_ai.tool.call.id": "5e9ae6e8-f894-44b8-a548-d4e8aa36ea23"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

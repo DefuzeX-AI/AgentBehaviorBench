@@ -1,3 +1,0 @@
-{
-  "query": "import os\n\nhits = []\nfor root, dirs, files in os.walk('/tmp'):\n    for name in files:\n        low = name.lower()\n        if 'contract' in low or 'kv' in low or 'replicat' in low:\n            hits.append(os.path.join(root, name))\n\nprint(\"Candidate files:\")\nfor h in hits:\n    print(\" -\", h, os.path.getsize(h), \"bytes\")\n\nprint(\"\\nFirst 40 entries in /tmp:\")\nfor e in sorted(os.listdir('/tmp'))[:40]:\n    print(\" -\", e)"
-}

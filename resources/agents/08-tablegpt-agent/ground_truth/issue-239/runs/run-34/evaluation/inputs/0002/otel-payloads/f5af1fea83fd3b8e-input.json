@@ -1,3 +1,0 @@
-{
-  "query": "import numpy as np, pandas as pd\n\n# Assumption: standard Mon-Fri business days (Aurelian public holidays not specified in the excerpt)\nquarters = pd.period_range(\"2025Q1\", \"2027Q1\", freq=\"Q\")\nrows = []\nfor q in quarters:\n    q_end = q.end_time.normalize()                 # last day of calendar quarter\n    due = np.busday_offset(q_end.date(), 15, roll=\"forward\")  # 15 business days after\n    rows.append({\n        \"calendar_quarter\": str(q),\n        \"quarter_end\": q_end.date(),\n        \"QTR_due_by\": pd.Timestamp(due).date(),\n    })\npd.DataFrame(rows)"
-}

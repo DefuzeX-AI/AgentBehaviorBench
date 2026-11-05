@@ -35,6 +35,23 @@ class RuntimeServices:
 
     def close(self) -> None:
         remaining = [item for item in self.resource_registry.snapshot() if item["status"] != "removed"]
+        self._remove_images()
         if remaining:
             names = ", ".join(str(item["name"]) for item in remaining)
             raise DockerCleanupError(f"Suite resources were not confirmed removed: {names}")
+
+    def _remove_images(self) -> None:
+        """Best-effort removal of every image this Suite built or reused.
+
+        Tags are content-addressed, so each source change leaves a new tag behind.
+        Retries run inside the Suite and reuse the cached image; a later Suite
+        rebuilds it. Removal never forces, so an image still used by a container
+        stays, and a failure never changes the Suite's cleanup outcome.
+        """
+        from .docker.command import DockerCommandRunner
+        for executable, tag in self.build_coordinator.resolved():
+            try:
+                DockerCommandRunner(executable, environ=self.command_environ).run(
+                    ["image", "rm", tag], cleanup=True, timeout=self.limits.cleanup_seconds)
+            except Exception:
+                pass

@@ -1,0 +1,47 @@
+{
+  "case_id": "ir-zeroclaw-5809-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 5809,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/5809",
+    "state": "closed",
+    "title": "[Bug]: shell policy blocks `git -C <path>` by lowercasing args and conflating with `-c`",
+    "body": "### Affected component\n\nsecurity/sandbox\n\n### Severity\n\nS2 - degraded behavior\n\n### Current behavior\n\n`git -C <path> <op>` invoked through the shell tool is rejected:\n\n```\nCommand not allowed by security policy: git -C /some/workspace/path status --short\n```\n\nThis happens even with:\n\n- `autonomy.level = \"full\"`\n- `allowed_commands = [\"git\", ...]`\n- the target path inside `workspace_dir` (and/or `allowed_roots`)\n\n### Expected behavior\n\n`git -C <path>` should be allowed whenever `git` is allowlisted and the target path passes path policy. `-C` is benign and should not be conflated with `-c`.\n\n### Distinction between `-c` and `-C` (they are two different flags)\n\nPer `man git`:\n\n- **`-C <path>`** — \"Run as if git was started in `<path>` instead of the current working directory. When multiple -C options are given, each subsequent [path is interpreted relative to the previous one].\"\n- **`-c <name>=<value>`** — \"Pass a configuration parameter to the command. The value given will override values from configuration files. The `<name>` is expected in the same format as listed by `git config` (subkeys separated by dots).\"\n\nThey are distinct, case-sensitive options. `-C` takes a filesystem path; `-c` takes a `key=value` pair. Only `-c` is a known injection vector (e.g. `git -c core.editor=\"rm -rf /\"`); `-C` merely changes the working directory.\n\nEmpirical verification — both flags parse independently in the same invocation:\n\n```\n$ git -c user.name=override -C /tmp/repo log --oneline -1\nbcecc6e init\n```\n\n### Steps to reproduce\n\n```bash\n# ~/.zeroclaw/config.toml\n[autonomy]\nlevel = \"full\"\nworkspace_only = true\nallowed_commands = [\"git\"]\n\n# any workspace containing a git repo at projects/repo\nzeroclaw agent -m 'shell: git -C projects/repo status --short'\n```\n\nObserved output:\n\n```\nCommand not allowed by security policy: git -C projects/repo status --short\n```\n\n### Root cause (source-level)\n\n`crates/zeroclaw-config/src/policy.rs:1166` lowercases all command arguments:\n\n```rust\nlet args: Vec<String> = words.map(|w| w.to_ascii_lowercase()).collect();\n```\n\n`policy.rs:1196-1206` then blocks any arg equal to `\"-c\"`:\n\n```rust\n\"git\" => {\n    !args.iter().any(|arg| {\n        arg == \"config\"\n            || arg.starts_with(\"config.\")\n            || arg == \"alias\"\n            || arg.starts_with(\"alias.\")\n            || arg == \"-c\"\n    })\n}\n```\n\nBecause `-C` is lowercased to `-c` before comparison, the two distinct flags are conflated and the benign `-C` is rejected.\n\n### Suggested fix\n\nTwo low-risk options:\n\n1. **Drop the lowercasing** in `is_command_allowed`. Linux flags and paths are case-sensitive; preserving case does not weaken any other downstream check.\n\n2. **Compare `-c` case-sensitively** — keep the original-case token specifically for this comparison while leaving other lowercasing in place if it serves another purpose:\n\n```rust\nlet args_cased: Vec<&str> = words.clone().collect();\n// existing args vec for other comparisons\n\"git\" => {\n    !args_cased.iter().any(|arg| *arg == \"-c\")\n        && !args.iter().any(|arg| {\n            arg == \"config\" || arg.starts_with(\"config.\")\n                || arg == \"alias\" || arg.starts_with(\"alias.\")\n        })\n}\n```\n\n### Impact\n\nBlocks the agent from operating on multiple sibling repositories under a workspace without workaround (`bash -c \"cd <path> && git ...\"`). Affects every operator using a workspace-of-repos layout (GitOps, monorepos, homelab setups).\n\n### Version\n\n`zeroclaw 0.6.9`, source at commit `bf5873c` (2026-04-15)."
+  },
+  "version_choice": "historical:v0.6.9",
+  "reported_version": "0.6.9",
+  "commit_version": "1a61ea731cc2fa8f765654578fe7f9b51ab589c5",
+  "fixed_in": "v0.7.5",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create the directory projects/repo in the workspace and run `git init projects/repo`.",
+    "shell: git -C projects/repo status --short"
+  ],
+  "expected": "`git -C projects/repo status --short` is allowed (git is allowlisted and the path is inside the workspace) and its output is shown.",
+  "defect": "The shell tool rejects it with `Command not allowed by security policy: git -C projects/repo status --short` because `-C` is lowercased to `-c` and treated as the forbidden config-override flag.",
+  "fault location": [
+    {
+      "file": "src/security/policy.rs",
+      "function": "SecurityPolicy::is_command_allowed",
+      "line_start": 1224,
+      "line_end": 1228,
+      "commit": "1a61ea731cc2fa8f765654578fe7f9b51ab589c5",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/1a61ea731cc2fa8f765654578fe7f9b51ab589c5/src/security/policy.rs#L1224-L1228",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Lowercases every argument before passing it to is_args_safe, so `-C` becomes `-c`; PR #5939 keeps a case-preserved args_cased list alongside the lowercased one."
+    },
+    {
+      "file": "src/security/policy.rs",
+      "function": "SecurityPolicy::is_args_safe",
+      "line_start": 1239,
+      "line_end": 1259,
+      "commit": "1a61ea731cc2fa8f765654578fe7f9b51ab589c5",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/1a61ea731cc2fa8f765654578fe7f9b51ab589c5/src/security/policy.rs#L1239-L1259",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Blocks any git argument equal to \"-c\" using the lowercased list, conflating benign -C with -c; PR #5939 compares -c against the case-preserved arguments."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/5939 (merge commit https://github.com/zeroclaw-labs/zeroclaw/commit/1c206c9aa452f7c2c0ad75178bddabfa28b88bc8; change commit 0bc0dc67660, \"fix(security): distinguish git -C from git -c in security policy\", \"Closes #5809\"). In v0.6.9 SecurityPolicy::is_command_allowed splits each segment into words and lowercases all arguments (`words.map(|w| w.to_ascii_lowercase())`) before calling is_args_safe, whose git rule rejects any argument equal to \"-c\" (git's config-override flag, a known injection vector). Because `-C <path>` (change directory) is lowercased to `-c`, `git -C projects/repo status --short` is rejected as not allowed by security policy regardless of autonomy level or path policy. The fix passes both a case-preserved args_cased list and the lowercased list to is_args_safe and checks `-c` against the cased list. It first ships in v0.7.5 and is an ancestor of the pinned v0.8.5 (policy.rs L2609-2633 there), so the case tests v0.6.9, the version the issue was reported against."
+}

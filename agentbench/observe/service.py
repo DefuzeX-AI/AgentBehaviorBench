@@ -44,6 +44,12 @@ def observe(agent, value, *, output: Path, environ, timeout=None):
             adapter.close()
         finally:
             result["trace_summary"] = summarize(directory)
+            try:
+                from agentbench import trajectory
+                result["trajectory"] = trajectory.write(directory, environ=environ)
+            except Exception as exc:  # noqa: BLE001 - the observed run outcome stands
+                result["trajectory"] = {"status": "failed", "path": "trajectory.json",
+                                        "error_type": type(exc).__name__, "error": str(exc)}
             if result["status"] == "succeeded" and (
                 result["trace_summary"].get("framework:span_error", 0)
                 or result["trace_summary"].get("framework:tool_incomplete", 0)

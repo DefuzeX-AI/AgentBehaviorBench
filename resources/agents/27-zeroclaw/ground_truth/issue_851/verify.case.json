@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-zeroclaw-851-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 851,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/851",
+    "state": "closed",
+    "title": "[Bug]: zeroclaw agent -m ignores autonomy level=full — shell commands blocked in non-interactive (Docker/CI) mode",
+    "body": "### Summary\n\nzeroclaw agent -m` blocks shell tool execution when running non-interactively (Docker container, bash loop, CI).  Even with `[autonomy] level = \"full\"`, the SecurityPolicy's `is_command_allowed()` rejects commands that contain  semicolons (`;`) in quoted SQL arguments, and the approval prompt reads EOF from stdin and denies the command.\n\n### Affected component\n\nsecurity/sandbox\n\n### Severity\n\nS1 - workflow blocked\n\n### Current behavior\n\nRunning `zeroclaw agent -m \"search leads\"` inside a Docker container with `level = \"full\"`:\n- Shell tool calls show `[Y]es / [N]o / [A]lways for shell:` prompt on stderr\n- stdin reads EOF → treated as denial → command never executes\n- LLM hallucinates `<tool_result>` with fake data, DB file remains 0 bytes\n- `is_command_allowed()` also blocks SQL commands containing `;` because it splits on `;` \n  without respecting quoted strings (e.g. `sqlite3 db.db \"CREATE TABLE t(id INT); INSERT INTO t VALUES(1);\"`)\n\n### Expected behavior\n\nWith `level = \"full\"`, shell commands execute immediately without interactive approval. \nSemicolons inside quoted arguments should not be treated as command separators.\n\n### Steps to reproduce\n\n```bash\n# config.toml\n[autonomy]\nlevel = \"full\"\nallowed_commands = [\"sqlite3\", \"python3\", \"echo\"]\nforbidden_paths = []\n\n# Non-interactive — no TTY (Docker container, CI, bash loop)\ndocker exec mycontainer bash -c \\\n  'ZEROCLAW_WORKSPACE=/root/.zeroclaw/workspace zeroclaw agent -m \\\n   \"run: sqlite3 /tmp/test.db \\\"CREATE TABLE t(id INT); INSERT INTO t VALUES(1); SELECT * FROM t;\\\"\"'\n\n# stderr shows:\n# 🔧 Agent wants to execute: shell\n#    command: sqlite3 /tmp/test.db \"CREATE TABLE t(id INT); INSERT INTO t...\"\n#    [Y]es / [N]o / [A]lways for shell:   ← blocks, reads EOF, denies\n\n# DB file remains empty:\n# sqlite3 /tmp/test.db \".tables\"  →  (no output, 0 bytes)\nRoot cause (found in source)\nIssue 1 — approval prompt reads stdin even with level = \"full\":\n\nneeds_approval() in src/approval/mod.rs correctly returns false for Full:\n\n\nif self.autonomy_level == AutonomyLevel::Full {\n    return false;\n}\nBut is_command_allowed() in src/security/policy.rs blocks the command before\napproval is even checked, because it splits on ; without respecting quoted strings:\n\n\nfor sep in ['\\n', ';', '|'] {\n    normalized = normalized.replace(sep, \"\\x00\");\n}\nsqlite3 db.db \"INSERT INTO t VALUES(1);\" → splits into sqlite3 db.db \"INSERT INTO t VALUES(1)\nand empty string → second segment fails allowed_commands check → is_command_allowed returns false\n→ validate_command_execution errors → shell tool returns failure before approval prompt.\n\nIssue 2 — approval prompt fires anyway due to the LLM retrying:\n\nThe LLM retries with a simpler command, eventually hitting needs_approval() which — despite\nlevel = \"full\" returning false — still shows the prompt because the security error happens\nat the tool execution layer, not the approval layer, causing confusing mixed output.\n\nMy config.toml\n\n[autonomy]\nlevel = \"full\"\nworkspace_only = false\nallowed_commands = [\"curl\", \"python3\", \"sqlite3\", \"git\", \"npm\", \"echo\", \"ls\", \"cat\", \"grep\", \"find\", \"pwd\", \"wc\", \"head\", \"tail\"]\nforbidden_paths = []\nmax_actions_per_hour = 20\nmax_cost_per_day_cents = 500\nrequire_approval_for_medium_risk = true\nblock_high_risk_commands = true\nauto_approve = [\"file_read\", \"memory_recall\"]\nalways_ask = []\nSuggested fix\nIn src/security/policy.rs, is_command_allowed() — skip shell operator guards for Full autonomy,\nand fix semicolon parsing to respect quoted strings:\n\n\npub fn is_command_allowed(&self, command: &str) -> bool {\n    if self.autonomy == AutonomyLevel::ReadOnly {\n        return false;\n    }\n    // Full autonomy: trust the allowlist, skip pipe/semicolon/redirect guards\n    if self.autonomy == AutonomyLevel::Full {\n        return true;\n    }\n    // ... rest of existing checks\n}\nAnd in validate_command_execution(), skip risk gating for Full:\n\n\nlet risk = self.command_risk_level(command);\n\n// Full autonomy: skip medium/high risk gating\nif self.autonomy == AutonomyLevel::Full {\n    return Ok(risk);\n}\n```\n\n### Impact\n\nBlocks all autonomous agent operation in non-interactive environments (Docker, CI, bash loops).\nlevel = \"full\" is effectively broken for the primary use case of headless agents.\n\n### Logs / stack traces\n\n```text\nLogs\n\nINFO zeroclaw::agent::loop_: Memory initialized backend=\"sqlite\"\nWARN zeroclaw::skills: failed to run git clone for open-skills: No such file or directory\n🔧 Agent wants to execute: shell\n   command: sqlite3 /workspace/leads.db \"CREATE TABLE leads(...); INSERT INTO...\"\n   [Y]es / [N]o / [A]lways for shell:\nDB after run: -rw-r--r-- 1 root root 0 Feb 18 20:00 /workspace/leads.db\n```\n\n### ZeroClaw version\n\nv0.1.0 (commit b43e9eb)\n\n### Rust version\n\nrustc 1.93.0 (ARM64, EC2 Graviton2)\n\n### Operating system\n\nLinux (Docker container, Alpine/Ubuntu)\n\n### Regression?\n\nNo, first-time setup\n\n### Pre-flight checks\n\n- [x] I reproduced this on the latest main branch or latest release.\n- [x] I redacted secrets/tokens from logs.\n- [x] I removed personal identifiers and replaced identity-specific data with neutral placeholders."
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.1.0",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "v0.1.2",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run exactly this shell command: python3 -c \"x = 1; print(x)\""
+  ],
+  "expected": "The shell tool runs the command (the semicolon is inside double quotes, so it is one python3 invocation) and prints 1.",
+  "defect": "The security policy splits the command on the quoted `;`, the second fragment `print(x)\"` is not an allowed command, and the shell call is rejected as not allowed by security policy.",
+  "fault location": [
+    {
+      "file": "src/security/policy.rs",
+      "function": "SecurityPolicy::is_command_allowed",
+      "line_start": 390,
+      "line_end": 423,
+      "commit": "b43e9eb3255df4a71fa91c175a7b6d61c33baa4a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/b43e9eb3255df4a71fa91c175a7b6d61c33baa4a/src/security/policy.rs#L390-L423",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Splits the command on every `;`, `|`, `&&`, `||` and newline with plain string replace, ignoring quotes, then requires each fragment's first word to be allowlisted, so a quoted SQL/Python `;` produces a non-allowlisted fragment; PR #902 (commit 6746625) replaces this with the quote-aware split_unquoted_segments."
+    },
+    {
+      "file": "src/security/policy.rs",
+      "function": "SecurityPolicy::command_risk_level",
+      "line_start": 189,
+      "line_end": 196,
+      "commit": "b43e9eb3255df4a71fa91c175a7b6d61c33baa4a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/b43e9eb3255df4a71fa91c175a7b6d61c33baa4a/src/security/policy.rs#L189-L196",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Risk classification uses the same quote-blind separator replacement (including `&`); PR #902 switches it to split_unquoted_segments as well."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/902 (landed as commit https://github.com/zeroclaw-labs/zeroclaw/commit/67466254f0d1e7a5b616cd8e7896f990425bfecc, \"fix(security): parse shell separators only when unquoted\"). At the reported revision (v0.1.0, commit b43e9eb) SecurityPolicy::is_command_allowed normalises the command by replacing every `;`, `|`, newline, `&&` and `||` with a NUL byte and validates each resulting fragment against allowed_commands, without tracking quotes. A command such as `sqlite3 /tmp/test.db \"CREATE TABLE t(id INT); INSERT ...\"` (or `python3 -c \"x = 1; print(x)\"`) is therefore cut inside the quoted argument, the second fragment starts with `INSERT`/`print(x)\"`, which is not allowlisted, and the shell tool fails with a security-policy rejection before execution; the model may then retry or fabricate output, as the issue reports. PR #902 adds a QuoteState-tracking split_unquoted_segments and contains_unquoted_single_ampersand and uses them in both is_command_allowed and command_risk_level. The fix first ships in v0.1.2 and the pinned v0.8.5 still uses split_unquoted_segments (crates/zeroclaw-config/src/policy.rs L1002, used at L2578), so the pinned revision contains the fix. The issue's second complaint (level=full still prompting / reading EOF from stdin in `zeroclaw agent -m`) is not addressed by this diff and is out of scope for the supervised ACP unit."
+}

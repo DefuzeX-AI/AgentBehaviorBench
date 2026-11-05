@@ -1,3 +1,0 @@
-{
-  "query": "import ssl, re\n\np = '/tmp/abb-ca-bundle.pem'\ntry:\n    with open(p, 'rb') as f:\n        data = f.read()\n    certs = re.findall(rb'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----', data, re.S)\n    print(f\"{p}: {len(data)} bytes, {len(certs)} PEM certificate block(s)\")\n    print(\"first-block subject preview:\")\n    print(certs[0][:200].decode(errors='replace') if certs else \"(no PEM blocks)\")\nexcept Exception as e:\n    print(\"unreadable:\", e)"
-}

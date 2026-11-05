@@ -133,6 +133,10 @@ def test_independent_sdk_uses_shared_host_and_private_case_storage(tmp_path):
     status = json.loads((runner.directory / 'run.json').read_text())
     assert (status['status'], status['cleanup_status'], status['host_trace_validation']) == (
         'succeeded', 'succeeded', 'succeeded')
+    assert status['source_cleanup_status'] == 'succeeded'
+    assert not (runner.directory / 'sdk-source').exists()
+    assert (agent.path / 'agent/echo.py').is_file()
+    assert (runner.directory / 'trajectory.json').is_file()
 
 
 def test_shared_host_cleans_both_sessions_when_agent_evidence_is_rejected(tmp_path):
@@ -148,6 +152,8 @@ def test_shared_host_cleans_both_sessions_when_agent_evidence_is_rejected(tmp_pa
     assert status['status'] == 'failed' and status['cleanup_status'] == 'succeeded'
     assert status['host_trace_validation'] == 'failed'
     assert (directory / 'judge/report.json').is_file()
+    assert not (directory / 'sdk-source').exists()
+    assert status['source_cleanup_status'] == 'succeeded'
 
 
 def test_shared_host_imports_without_vendor_sdk():
@@ -226,6 +232,10 @@ def test_independent_sdk_real_container_retains_case_output_and_judge(tmp_path, 
         verification = json.loads((evaluation / 'verification.json').read_text())
         assert verification['vendor_imported'] is False and verification['span_count'] > 0
         assert json.loads((runner.directory / 'run.json').read_text())['cleanup_status'] == 'succeeded'
+        assert json.loads((runner.directory / 'run.json').read_text())['source_cleanup_status'] == 'succeeded'
+        assert not (evaluation / 'sdk-source').exists()
+        assert (evaluation / 'sdk-repo/independent/case.json').is_file()
+        assert (evaluation / 'trajectory.json').is_file()
         assert (root / 'agent.toml').read_bytes() == original_manifest
         assert (root / 'Dockerfile').read_bytes() == original_dockerfile
         print('Independent SDK acceptance:', runner.directory)

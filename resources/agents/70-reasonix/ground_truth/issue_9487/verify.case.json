@@ -1,0 +1,49 @@
+{
+  "case_id": "ir-reasonix-9487-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 9487,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9487",
+    "state": "closed",
+    "title": "[Bug]: memory index functions silently discard read errors, causing MEMORY.md data loss",
+    "body": "### Version line\n\nv2 — Go rewrite (1.x), main-v2 (active development)\n\n### Exact version\n\ndesktop-v1.31.4\n\n### What happened?\n\nindexLinesExceptIn and flushIndexIn silently discard ReadFileUTF8 errors using `_ =`. When the MEMORY.md file exists but is unreadable (permission error, file corruption), both functions return empty data, causing flushIndexIn to overwrite the file with empty content — deleting all managed index entries.\n\nExpected: read errors should be propagated so the write is aborted and data is preserved.\n\n### Steps to reproduce\n\n1. Ensure MEMORY.md has at least one managed entry (e.g. save a fact with `remember`)\n2. chmod 000 .reasonix/MEMORY.md\n3. Trigger a delete operation (e.g. use the `forget` tool)\n4. chmod 644 .reasonix/MEMORY.md\n5. cat .reasonix/MEMORY.md — all managed entries are gone\n\n### OS / platform\n\nmacOS 26.5 (arm64)\n\n### Relevant logs or output\n\n```shell\n\n```"
+  },
+  "version_choice": "historical:1.31.4",
+  "reported_version": "desktop 1.31.4",
+  "commit_version": "97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66",
+  "fixed_in": "1.x v1.39.1 (#10833)",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Remember these two facts for future sessions, one memory each: (1) my preferred test framework is vitest; (2) my preferred editor is helix.",
+    "Run exactly this shell command and show me the output:\n\n```bash\nfor f in $(find \"${REASONIX_HOME:-$HOME/.reasonix}\" -name MEMORY.md 2>/dev/null); do echo \"$f BEFORE=$(grep -c '^- \\[' \"$f\")\"; chmod 000 \"$f\"; done\n```",
+    "Forget the memory about my preferred test framework.",
+    "Run exactly this shell command and show me the output:\n\n```bash\nfor f in $(find \"${REASONIX_HOME:-$HOME/.reasonix}\" -name MEMORY.md 2>/dev/null); do chmod 644 \"$f\"; echo \"$f AFTER=$(grep -c '^- \\[' \"$f\")\"; done\n```"
+  ],
+  "expected": "When MEMORY.md exists but cannot be read, forget aborts (read error propagated) and the index keeps its other entries (issue's expected behaviour; fixed in 1.39.1).",
+  "defect": "indexLinesExceptIn/flushIndexIn ignore the read error, treat MEMORY.md as empty and atomically rewrite it, deleting every managed index entry.",
+  "fault location": [
+    {
+      "file": "internal/memory/store.go",
+      "function": "indexLinesExceptIn",
+      "line_start": 378,
+      "line_end": 386,
+      "commit": "97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66/internal/memory/store.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "internal/memory/store.go",
+      "function": "flushIndexIn",
+      "line_start": 405,
+      "line_end": 427,
+      "commit": "97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66/internal/memory/store.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The memory index helpers discard ReadFileUTF8 errors and rebuild the index as if an unreadable MEMORY.md were empty. A subsequent atomic rewrite can therefore erase unrelated index entries. The retained case makes the index unreadable before forgetting one memory. The mechanism requires a real read-permission failure and at least one unrelated entry; ordinary removal of the requested entry alone is not evidence of the bug."
+}

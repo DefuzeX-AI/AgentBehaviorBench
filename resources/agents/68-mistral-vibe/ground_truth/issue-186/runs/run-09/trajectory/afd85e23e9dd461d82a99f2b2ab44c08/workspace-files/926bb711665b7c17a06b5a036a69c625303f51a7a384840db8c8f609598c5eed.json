@@ -1,4 +1,0 @@
-{
-  "content": "from collections.abc import Generator\nfrom contextlib import AbstractContextManager, ExitStack, contextmanager\nfrom typing import TypeVar\n\n_T = TypeVar(\"_T\", covariant=True)\n\n\nclass CommandContextMixIn:\n    def __init__(self) -> None:\n        super().__init__()\n        self._in_main_context = False\n        self._main_context = ExitStack()\n\n    @contextmanager\n    def main_context(self) -> Generator[None, None, None]:\n        assert not self._in_main_context\n\n        self._in_main_context = True\n        try:\n            with self._main_context:\n                yield\n        finally:\n            self._in_main_context = False\n\n    def enter_context(self, context_provider: AbstractContextManager[_T]) -> _T:\n        assert self._in_main_context\n\n        return self._main_context.enter_context(context_provider)\n",
-  "encoding": "utf-8"
-}

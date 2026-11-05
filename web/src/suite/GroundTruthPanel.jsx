@@ -27,7 +27,8 @@ export default function GroundTruthPanel({ evaluation }) {
         { title: 'GT', dataIndex: 'ground_truth_id' },
         { title: 'Case', dataIndex: 'case_index', render: n => n == null ? 'No execution' : n + 1 },
         { title: 'Summary comparison', render: (_, r) => r.summary_match ? decision(r.summary_match.match) : 'Not compared' },
-        { title: 'Trace verification', render: (_, r) => r.trace_match ? decision(r.trace_match.match) : 'Not inspected' },
+        { title: 'Trajectory verification', render: (_, r) => r.trajectory_match ? decision(r.trajectory_match.match) : 'Not inspected' },
+        { title: 'Decisive step', render: (_, r) => r.localization?.candidate_decisive_step ?? '—' },
         { title: 'Score', dataIndex: 'score', render: scoreLabel },
         { title: 'Reason', dataIndex: 'reason' },
       ]}
@@ -35,12 +36,17 @@ export default function GroundTruthPanel({ evaluation }) {
         <p><strong>GT summary:</strong> {row.gt_summary}</p>
         <p><strong>Judge finding:</strong> {typeof row.finding === 'string' ? row.finding : row.finding?.message || 'Unavailable'}</p>
         {row.summary_match && <p><strong>Summary decision:</strong> {row.summary_match.reason}</p>}
-        {row.trace_match && <p><strong>Trace decision:</strong> {row.trace_match.reason}</p>}
-        {['reference', 'candidate'].map(side => row.trace_evidence?.[side]?.length > 0 && <div key={side}>
-          <strong>{side === 'reference' ? 'GT reference events' : 'Candidate execution events'}</strong>
-          {row.trace_evidence[side].map(event => <details key={event.id}>
-            <summary>{event.id} · {event.name || event.kind}</summary>
-            <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(event, null, 2)}</pre>
+        {row.trajectory_match && <p><strong>Trajectory decision:</strong> {row.trajectory_match.reason}
+          {row.render_mode ? ` (rendered: ${row.render_mode})` : ''}</p>}
+        {row.localization && <p><strong>Localization:</strong> reference decisive step {row.localization.reference_decisive_step};
+          candidate decisive step {row.localization.candidate_decisive_step ?? 'none'};
+          Judge-cited steps {row.localization.judge_cited_steps ? row.localization.judge_cited_steps.join(', ') : 'not reported'};
+          step match {row.localization.step_match == null ? 'not scored' : String(row.localization.step_match)}</p>}
+        {['reference', 'candidate'].map(side => row.trajectory_evidence?.[side]?.length > 0 && <div key={side}>
+          <strong>{side === 'reference' ? 'GT reference steps' : 'Candidate execution steps'}</strong>
+          {row.trajectory_evidence[side].map(step => <details key={`${step.attempt || 'candidate'}/${step.step_id}`}>
+            <summary>Step {step.step_id} · {step.agent_name} · {step.kind}</summary>
+            <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(step, null, 2)}</pre>
           </details>)}
         </div>)}
         <p>Attempt: {row.attempt_id || 'None'}</p>

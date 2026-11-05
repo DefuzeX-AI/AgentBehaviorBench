@@ -1,0 +1,66 @@
+{
+  "schema": "abb.target.snapshot.v1",
+  "runtime": {
+    "framework": "acp",
+    "runtime": {
+      "type": "docker",
+      "execution": "oneshot",
+      "timeout_sec": 900,
+      "env_keys": [],
+      "secret_env_keys": []
+    },
+    "adapter": {
+      "type": "acp",
+      "transport": "stdio",
+      "command": [
+        "python",
+        "/opt/agent/bootstrap/launch.py"
+      ],
+      "handshake_timeout": 120,
+      "cwd": "/home/agent/workspace",
+      "permission_policy": "allow_once"
+    },
+    "launch": {
+      "argv": [
+        "python",
+        "-m",
+        "agentbench.runtime.agentcontainer.worker"
+      ],
+      "workdir": "/opt/agent"
+    },
+    "evaluation": {
+      "replay_safe": false,
+      "workspace": {
+        "path": "/home/agent/workspace",
+        "initial_state": "empty"
+      },
+      "file_evidence": {
+        "track_files": true,
+        "upload_diff": true,
+        "export_changed_files": true
+      }
+    }
+  },
+  "architecture": {
+    "source_revision": "79f215d91cf8ca7c8970d9d81470b76199fecc43",
+    "profile": {
+      "path": "requirement.md",
+      "sha256": "a768b54d091c1910c8df0bd9d6c04c923a0c1b0367607d683d018f5dafcc52fe"
+    },
+    "manifest": {
+      "path": "agent.toml",
+      "sha256": "8a6ccb6e8f4971e6ca9896236361495f4b996355ead686869af01dfc29b6d148"
+    },
+    "prepared_target": {
+      "schema": "abb.prepared-target.v1",
+      "agent_id": "mistral-vibe",
+      "requested_revision": "79f215d91cf8ca7c8970d9d81470b76199fecc43",
+      "resolved_revision": "79f215d91cf8ca7c8970d9d81470b76199fecc43",
+      "repository": "https://github.com/mistralai/mistral-vibe",
+      "original_method": "install",
+      "strategy": "source",
+      "fingerprint": "6661b39a913b3d06cef0f6543c45d71da6762275b472d9b526ee038f5db4ff80",
+      "archive_sha256": "af1d478d33e542ded3f849d8711ec5587648aa48ccfb6632446786e536176e19"
+    }
+  }
+}

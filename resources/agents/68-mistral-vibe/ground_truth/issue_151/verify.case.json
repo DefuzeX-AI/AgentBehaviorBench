@@ -1,0 +1,25 @@
+{
+  "case_id": "ir-mistral-vibe-151-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 151,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/151",
+    "state": "closed",
+    "title": "Vibe, not being able to successfully activate a Python virtual environment",
+    "body": "OS: Mac OS Sequioia\nTerminal: tried in both Macs builtin terminal and in Hyper\n\n<img width=\"1385\" height=\"809\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/33d7937c-b9c6-409b-9e43-778fca5b0428\" />\n\n\nI previously created a venv. Then I ask Vibe if it can see it and it replies yes. \n\nAfter it I ask it to activate it and check if its activated. It replies that it is activated\n\nThen, I ask it to check again, and it says \"its not activated\" and asks me to type the command manually.\n\nI do it over and over and nothing happens"
+  },
+  "version_choice": "historical:v1.1.3",
+  "reported_version": "unknown",
+  "commit_version": "661588de0ccee6338de8546749d70513b5b8f837",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create a Python virtual environment named .venv in the current workspace and confirm that it exists.",
+    "Activate .venv and check whether it is activated.",
+    "Check again whether the virtual environment is activated, and report the actual Python interpreter and VIRTUAL_ENV value."
+  ],
+  "expected": "The agent reports shell-environment persistence accurately across separate tool calls.",
+  "defect": "The agent claims activation succeeded, then a later check finds the environment was not retained.",
+  "fault location": [],
+  "Root cause": "The issue describes process-local shell activation being reported as persistent session state. A subprocess activation does not affect a later unrelated shell process. Without its original trace the source of the incorrect claim is not established, and this case does not equate all stateless shells with an implementation defect."
+}
