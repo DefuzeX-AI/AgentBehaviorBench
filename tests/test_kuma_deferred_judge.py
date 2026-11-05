@@ -34,7 +34,10 @@ class OfflineBackend:
         if path == '/sdk/judge/config/':
             return {'allowed_extensions': ['.json'], 'max_files': 20,
                     'max_file_bytes': 5 * 1024 * 1024, 'max_total_bytes': 8 * 1024 * 1024,
-                    'manifest_schema_version': '1', 'evidence_types': ['raw_log', 'defuzex.runtime_evidence.capabilities.v1'],
+                    'manifest_schema_version': '1',
+                    'supported_assessment_contracts': ['kuma.judge_assessment.v1'],
+                    'evidence_types': ['raw_log', 'defuzex.runtime_evidence.capabilities.v1',
+                                       'defuzex.assessment_evidence.v1'],
                     'runtime_evidence_capabilities': ['runtime_evidence', 'agent_output', 'file_diff',
                                                       'runtime_trace', 'file_observation_summary']}
         if path.startswith('/sdk/v2/operations/'):
@@ -43,13 +46,25 @@ class OfflineBackend:
                 raise KeyboardInterrupt()
             return {'operation_id': 'operation-judge-offline', 'status': 'succeeded',
                     'result': {'judgment_id': 'judge-offline', 'case_id': self.case_id, 'status': self.verdict,
-                               'confidence': 'high', 'issues': [], 'step_results': [], 'flags': {}}}
+                               'confidence': 'high', 'issues': [], 'step_results': [], 'flags': {},
+                               'assessment': offline_assessment()}}
         raise AssertionError(path)
 
     def multipart(self, path, fields, parts, **kwargs):
         assert path == '/sdk/v2/judge/'
         self.posts.append((fields, parts, kwargs))
         return {'operation_id': 'operation-judge-offline', 'status': 'queued', 'poll_after_ms': 100}
+
+
+def offline_assessment():
+    """A schema-valid fixture response; this is not service acceptance evidence."""
+    return {'schema_version': 'kuma.judge_assessment.v1',
+            **{axis: {'status': 'not_assessed', 'confidence': 'low', 'severity': 'none',
+                      'evidence_refs': [], 'reason_codes': ['not_assessed']}
+               for axis in ('task_completion', 'artifact_quality', 'behavioral_integrity')},
+            'claims': [], 'attributions': [],
+            'claim_coverage': {'status': 'unavailable', 'reason_codes': ['not_assessed'],
+                               'reviewed_message_refs': []}}
 
 
 def stage_task(root, *, native_failure=False, stop_early=False):
@@ -362,7 +377,7 @@ def test_changed_credential_does_not_start_another_paid_judge(tmp_path, monkeypa
     assert 'dfx_offline_fixture_only' not in task and 'dfx_changed_fixture_key' not in task
 
 
-@pytest.mark.parametrize('installed', ['0.3.2', None])
+@pytest.mark.parametrize('installed', ['0.3.2', '0.3.3', '0.3.7', None])
 def test_host_sdk_dependency_is_checked_before_case_work(installed, monkeypatch):
     from importlib.metadata import PackageNotFoundError
     from agentbench.sdk.plugin.kuma.configuration import validate_host_judge_dependency
