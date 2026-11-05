@@ -1,0 +1,18 @@
+{
+  "completion": {
+    "risks": [
+      "If you specifically needed the bash tool path itself exercised (not just the file end state), steps 2/4 did not do that — re-run `echo x > tmp.txt` manually once bash is unblocked."
+    ],
+    "unverified": [
+      "The literal bash commands `echo x > tmp.txt` never executed (host-blocked); tmp.txt was produced via write_file instead"
+    ],
+    "verified": [
+      "edit_file receipt: -print('v1') +print('v2') (1 occurrence)",
+      "read_file tools/foo.py (intent=full): `import sys` / `print('v2')`",
+      "write_file tmp.txt: wrote 2 bytes",
+      "read_file tmp.txt (intent=full): line 1 is `x`"
+    ]
+  },
+  "reason": "All 4 steps finished; steps 2/4 used user-approved write_file substitution because bash writes were host-blocked.",
+  "status": "complete"
+}

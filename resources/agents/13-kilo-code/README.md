@@ -47,7 +47,11 @@ The generated config:
 - disables auto-update and sharing;
 - disables the built-in `title` agent. Otherwise Kilo starts a second,
   background model call after the first turn to name the session; the one-shot
-  worker closes ACP before it finishes and the interceptor records a cut request.
+  worker closes ACP before it finishes and the interceptor records a cut request;
+- denies the `question` tool (`permission.question = "deny"`). It waits for a human
+  answer, which ABB never sends, so a call would idle until the 900 s step timeout
+  and the closed session would lose the rest of the Case. A `*` deny rule removes
+  the tool from the tool list sent to the model.
 
 The launcher also sets these upstream environment switches, each of which stops a
 startup call outside the admitted model route (the interceptor would otherwise
@@ -68,7 +72,8 @@ These switches are read by the 7.7.5 binary but are not all documented upstream;
 re-check them when bumping the pin.
 
 Tool permission prompts are forwarded over ACP and answered by ABB's
-`allow_once` policy.
+`allow_once` policy. The `question` tool is not a permission prompt, which is why
+it is denied in the config instead.
 
 ## Loopback server route
 

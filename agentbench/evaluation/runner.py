@@ -24,6 +24,7 @@ def build_trace_suite_runner(
     sdk_options: Mapping[str, object] | None = None,
     concurrency: ConcurrencySettings | None = None,
     environ: Mapping[str, str] | None = None,
+    retry_policy=None,
 ) -> SuiteRunner:
     sink: TraceSink = activity_sink or NullTraceSink()
 
@@ -55,4 +56,5 @@ def build_trace_suite_runner(
         environ=environ,
     )
 
-    return SuiteRunner(runner_factory=runner_factory, concurrency=concurrency, trace_sink=sink)
+    return SuiteRunner(runner_factory=runner_factory, concurrency=concurrency, trace_sink=sink,
+                       retry_policy=retry_policy)

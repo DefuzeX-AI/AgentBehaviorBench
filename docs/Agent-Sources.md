@@ -38,9 +38,12 @@ Git acquisition implementation cannot reproduce their source:
 
 | Unit | Required local material |
 | --- | --- |
-| `01-folder-mover-agent` | The original local source snapshot matching the recorded SHA-256 content digest; the recorded Windows path is provenance, not a portable download URL. |
 | `10-claude-agent-acp` | The selected upstream checkout, including its documentation link handling. The pinned source contains a symbolic link; automatic Git extraction rejects symbolic links. |
 | `37-biomedical-aiq-research-agent` | The selected upstream checkout and required data assets. Its dataset ZIP files are Git LFS objects; automatic Git extraction does not materialize LFS. |
+| `86-fast-agent` | The pinned checkout with its optional, uninitialized skills submodule; follow the [unit instructions](../resources/agents/86-fast-agent/README.md#source-preparation). |
+| `112-alphastream` | The pinned checkout without the unavailable, unused TradingAgents submodule; follow the [unit instructions](../resources/agents/112-alphastream/README.md#restoring-source). |
+| `124-synergy` | The pinned checkout with its internal symbolic link preserved on a Linux filesystem; follow the [unit instructions](../resources/agents/124-synergy/README.md#manual-source-prerequisite). |
+| `132-whip` | The pinned checkout prepared with the unit helper to materialize its internal directory link; follow the [unit instructions](../resources/agents/132-whip/README.md#manual-source-prerequisite). |
 
 For GitHub sources, the repository and exact commit are recorded in each unit's
 `agent.toml` and `source-manifest.json`. Supply the matching source tree under that
@@ -91,3 +94,18 @@ The generator uses pinned Git acquisition for supported GitHub imports, preserve
 explicit acquisition policy, and uses manual bundled source for local imports or
 unsupported submodule, symlink and LFS layouts. See the add-agent guide for review
 and clean-source verification; static checks do not prove successful execution.
+
+## Refreshing the Agent inventory
+
+The five localized Agent inventories are generated from `resources/registry.toml`
+and the registered units' `agent.toml` files. After changing registrations, source
+revisions or acquisition methods, regenerate and verify them from the repository root:
+
+```bash
+python scripts/update_agent_docs.py
+python scripts/update_agent_docs.py --check
+```
+
+The inventory counts registry entries, not directory-number ranges. It includes
+disabled and adapting integrations; operational state and Case budgets remain in
+the registry. Historical validation reports retain their original observations.

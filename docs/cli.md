@@ -161,7 +161,7 @@ agentbench certify AGENT_ID [OPTIONS]
 | `--case-retries N` | Maximum extra automatic attempts for safely recoverable Case failures. Nonnegative integer; default 2. Zero disables automatic retries. | `--case-retries 0` |
 | `--retry-delay SECONDS` | Initial retry backoff, in seconds. Finite nonnegative number; default 5. Later delays increase within the retry policy. | `--retry-delay 5` |
 | `--no-view` | Save results without starting the web viewer. Default: start or reuse the viewer; built web assets are needed. | `--no-view` |
-| `AGENT_ID` | Required exact ID of an enabled registered Agent. Certifies adapting Agents; ready Agents return without a new run. | `folder-mover-agent` |
+| `AGENT_ID` | Required exact ID of an enabled registered Agent. Certifies adapting Agents; ready Agents return without a new run. | `deer-flow` |
 | `--env-file PATH` | Load another environment file. Default: project .env. Exported shell variables take precedence. | `--env-file .env.testing` |
 | `--results-dir DIR` | ABB result root, created if missing. Default when running from the checkout root: results/. Events are saved at DIR/suites/SUITE_ID/events.json. Mutually exclusive with the legacy result-location option. | `--results-dir results/my-run` |
 | `--output PATH` | Deprecated ABB result location. A file path selects its parent; the named file is not created. Prefer --results-dir. Default result root: project results/ when running from the checkout root. | `--output results/legacy.json` |

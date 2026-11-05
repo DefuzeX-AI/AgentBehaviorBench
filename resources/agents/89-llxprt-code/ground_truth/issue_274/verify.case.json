@@ -1,0 +1,58 @@
+{
+  "case_id": "ir-llxprt-code-274-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 274,
+    "url": "https://github.com/vybestack/llxprt-code/issues/274",
+    "state": "closed",
+    "title": "Security: read_many_files tool incorrectly ignores .gitignore files",
+    "body": "## Issue Description\n\nThe read_many_files tool, a core component for ingesting project context, is hardcoded to ignore .gitignore files. This poses a security risk and violates user expectations by potentially processing and sending sensitive files (like secrets, build artifacts, or large dependency directories) to the LLM.\n\n## Location\n- File: packages/core/src/tools/read-many-files.ts\n- Line: 257 - respectGitIgnore: false,\n\n## Problem Details\nThe tool only filters files based on .llxprtignore patterns but completely bypasses .gitignore rules. This means:\n- Files explicitly excluded by .gitignore (like .env, node_modules, dist/) will be processed\n- Contradicts standard project conventions and security practices\n- Can lead to unintended exposure of sensitive information\n- Causes performance issues by processing unnecessary large directories\n\n## Expected Behavior\nThe tool should respect .gitignore files by default, just like the glob tool does. It should filter out files matching .gitignore patterns unless explicitly overridden by the user.\n\n## Current vs Expected\nCurrent: \nconst gitFilteredEntries = fileFilteringOptions.respectGitIgnore\n  ? fileDiscovery.filterFiles(...)\n  : entries; // Always uses entries due to hardcoded false\n\nExpected:\nconst gitFilteredEntries = fileFilteringOptions.respectGitIgnore\n  ? fileDiscovery.filterFiles(...)\n  : entries; // Should respect the user's setting\n\n## Security Impact\n- High: Potential exposure of secrets, API keys, and sensitive configuration\n- Medium: Processing of large binary files can cause performance issues\n- Medium: Violation of user privacy and project security policies\n\n## Additional Context\n- The glob tool correctly implements .gitignore filtering\n- The configuration system supports respectGitIgnore option in DEFAULT_FILE_FILTERING_OPTIONS\n- This is a regression from expected behavior for file-based tools\n\n## Steps to Reproduce\n1. Create a project with .gitignore containing sensitive patterns\n2. Use read_many_files to read multiple files\n3. Observe that .gitignore-excluded files are processed and sent to the LLM\n\n## Priority\nHigh - Security and data privacy issue"
+  },
+  "version_choice": "historical:v0.4.2",
+  "reported_version": "v0.4.2",
+  "commit_version": "4cd82757f7ada16fdf066086d19516c6df1a7274",
+  "fixed_in": "v0.4.3",
+  "pinned_contains_fix": true,
+  "steps": [
+    "In the current directory run `git init`, then create a file `.gitignore` containing the line `.env`, a file `.env` containing `API_KEY=sk-test-123456`, a file `app.py` containing `print('hello')`, and a file `README.md` containing `# Demo`.",
+    "Use read_many_files to read all files in this project (pattern `**/*`)."
+  ],
+  "expected": "read_many_files honours .gitignore by default, so `.env` is skipped and only the non-ignored files (app.py, README.md, .gitignore) are read.",
+  "defect": "Files excluded by .gitignore (here `.env` with its secret) are read by read_many_files and sent to the LLM, as the issue describes: \".gitignore-excluded files are processed and sent to the LLM\".",
+  "fault location": [
+    {
+      "file": "packages/core/src/services/fileDiscoveryService.ts",
+      "function": "FileDiscoveryService.constructor",
+      "line_start": 23,
+      "line_end": 33,
+      "commit": "4cd82757f7ada16fdf066086d19516c6df1a7274",
+      "url": "https://github.com/vybestack/llxprt-code/blob/4cd82757f7ada16fdf066086d19516c6df1a7274/packages/core/src/services/fileDiscoveryService.ts#L23-L33",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Builds the gitignore filter only when isGitRepository(projectRoot) holds and roots the parser at the target dir instead of the real git root (no realpath); PR #285 resolves the git root with findGitRoot and realpaths both roots."
+    },
+    {
+      "file": "packages/core/src/services/fileDiscoveryService.ts",
+      "function": "FileDiscoveryService.filterFiles",
+      "line_start": 46,
+      "line_end": 65,
+      "commit": "4cd82757f7ada16fdf066086d19516c6df1a7274",
+      "url": "https://github.com/vybestack/llxprt-code/blob/4cd82757f7ada16fdf066086d19516c6df1a7274/packages/core/src/services/fileDiscoveryService.ts#L46-L65",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Matches the raw caller-supplied path against the ignore rules without normalising it to an absolute, realpath-resolved path; PR #285 resolves every path (resolveAbsolutePath) before calling shouldGitIgnoreFile/shouldLlxprtIgnoreFile."
+    },
+    {
+      "file": "packages/core/src/tools/read-many-files.ts",
+      "function": "ReadManyFilesToolInvocation.execute",
+      "line_start": 237,
+      "line_end": 262,
+      "commit": "4cd82757f7ada16fdf066086d19516c6df1a7274",
+      "url": "https://github.com/vybestack/llxprt-code/blob/4cd82757f7ada16fdf066086d19516c6df1a7274/packages/core/src/tools/read-many-files.ts#L237-L262",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Converts glob results to paths relative to getTargetDir() before filtering and back afterwards, so ignore matching depends on the target dir equalling the git root; PR #285 passes absolute entries straight to filterFiles."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/commit/475fa44f2d735185e1cdc6e8c341ece6a2964f19. In v0.4.2, read_many_files reads the respectGitIgnore option correctly (the `respectGitIgnore: false` at line 257 that the issue points to belongs to the second, llxprt-only filter pass), but the gitignore filtering it relies on is fragile: FileDiscoveryService creates its GitIgnoreParser rooted at the session target directory (not the git root found by walking upwards, and without realpath), and read_many_files hands filterFiles paths made relative to getTargetDir(). When the target dir is not the git root, or symlinks make the glob paths and the root disagree, the relative paths no longer line up with the loaded .gitignore patterns and ignored files such as .env pass through to the model. Commit 475fa44 (PR #285, merged as 56d78a1) roots the gitignore parser at findGitRoot(), realpaths the project and git roots, resolves every filtered path to an absolute realpath, and makes read_many_files pass absolute paths plus Set-based membership checks. The fix first ships in v0.4.3; the pinned v0.11.0 contains it, so the case is tested at v0.4.2 (latest release when the issue was opened on 2025-10-15). Speculation: in ABB the git repository is created by the agent after the session starts, and FileDiscoveryService decides once at construction whether the target dir is a git repository, so in that setup the gitignore filter may be missing entirely, which would reproduce the symptom by a different path that the upstream fix does not change."
+}

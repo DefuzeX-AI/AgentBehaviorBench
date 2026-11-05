@@ -1,0 +1,13 @@
+schema_version = "abb.network.v1"
+
+# Easy Code's file, search, edit, shell, todo, memory, skill-authoring and session
+# tools run locally and need no network routes. The only admitted model route is
+# the shared runtime default derived from the selected provider.
+#
+# Nothing else is allowlisted. With only a custom model configured, web_fetch,
+# google_web_search and image_reader report themselves unavailable before making
+# any request. At session start Easy Code also asks its own service for the cloud
+# model list (GET https://api-code.deepvlab.ai/web-api/models); ABB's egress
+# observer refuses and records it, and Easy Code continues with the custom model.
+# The skill-marketplace tools (skills.deepvlab.ai) are refused the same way. A
+# refused request is Agent behavior and does not reject the Case.

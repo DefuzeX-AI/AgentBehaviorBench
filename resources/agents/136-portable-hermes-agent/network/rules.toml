@@ -1,0 +1,39 @@
+schema_version = "abb.network.v1"
+
+# Portable Hermes Agent's ACP toolset (`hermes-acp`, toolsets.py:532-550) is local:
+# read_file/write_file/patch/search_files, terminal/process, execute_code, todo,
+# memory, session_search, delegate_task. Those need no network routes. The only
+# admitted model route is the shared runtime default declared in agent.toml
+# (POST <selected-base>/chat/completions); bootstrap/launch.py pins
+# model.api_mode = chat_completions so the wire shape cannot drift to /responses.
+#
+# Startup metadata fetches are disabled by the per-Case config written by
+# bootstrap/launch.py instead of being allowlisted here:
+#   model_catalog.enabled=false  -> no hermes-agent.nousresearch.com fetch
+#   models_dev.url=file://...    -> models.dev fetch fails locally without a socket
+#   model_catalog.excluded_providers -> drops the keyless OpenCode relays whose
+#                                     catalog is fetched from opencode.ai at session/new
+#
+# Optional model-list metadata routes follow the selected provider via [model].
+
+# `web_search` and `web_extract` use Tavily when TAVILY_API_KEY is supplied
+# (optional_secret_env_keys); tools/web_tools.py picks the backend automatically.
+[[tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search", "/extract"]
+purpose = "tool"
+required = false
+
+# Chrome DevTools Protocol of the Agent's headless Chromium on a pinned loopback port.
+# The runtime redirects loopback TCP to the interceptor too, so the port is declared
+# (HTTP discovery + the WebSocket upgrade are GETs). browser_tool.py:567 reads
+# BROWSER_CDP_URL, which launch.py points at this port.
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [9222]
+methods = ["GET"]
+path_patterns = ["/json", "/json/*", "/devtools/*"]
+purpose = "tool"
+required = false
