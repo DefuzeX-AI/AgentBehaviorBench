@@ -44,11 +44,12 @@ for local acceptance only and is not part of official Case generation.
 `WATCHTOWER_TOOLS` is the headless form of the native tool-selection menu
 (comma-separated names; unset means all tools). The fixture run uses
 `whatweb,wafw00f`; see `../2026-11-07-loopback-fixture-scan.md` for why the
-recon triggers and `nmap` are left out of this bounded run.
+recon triggers and `nmap` are left out of this bounded run and why the local
+Judge limit is raised.
 
 ```sh
 WATCHTOWER_LOOPBACK_FIXTURE=1 WATCHTOWER_TOOLS=whatweb,wafw00f \
-ABB_MODEL_PROVIDER=deepseek ABB_MODEL=deepseek-chat \
+ABB_MODEL_PROVIDER=deepseek ABB_MODEL=deepseek-chat ABB_LOCAL_JUDGE_MAX_CHARS=200000 \
 python -m agentbench evaluate watchtower --registry cache/watchtower-test-registry.toml \
   --sdk local --case-file resources/agents/143-watchtower/evaluation/local/fixture-cases.json \
   --cases 1 --max-steps 1 --timeout 360 --case-retries 0 --no-view -y
