@@ -14,7 +14,7 @@ uses **bundled/manual source**, not unattended automatic Git restoration:
 ```bash
 git clone https://github.com/NVIDIA-AI-Blueprints/deep-researcher-agent /tmp/deep-researcher-source
 git -C /tmp/deep-researcher-source checkout 951a1a1114e9818073ddbe2a5fdbfa824751f4d3
-python resources/agents/140-deep-researcher-agent/prepare_source.py /tmp/deep-researcher-source
+python resources/agents/148-deep-researcher-agent/prepare_source.py /tmp/deep-researcher-source
 ```
 
 The source checkout must be the clean Git root, including no ignored files.

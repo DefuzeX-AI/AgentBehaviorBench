@@ -10,7 +10,7 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-UNIT = Path(__file__).resolve().parents[1] / "resources/agents/140-deep-researcher-agent"
+UNIT = Path(__file__).resolve().parents[1] / "resources/agents/148-deep-researcher-agent"
 
 
 def load(name, path):
