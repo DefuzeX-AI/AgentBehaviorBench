@@ -53,6 +53,7 @@ execution errors propagate unchanged.
 """
 
 import json
+import os
 import re
 from tempfile import TemporaryDirectory
 from pathlib import Path
@@ -70,6 +71,23 @@ ALL_TOOLS = [
     "ffuf", "arjun", "xsstrike", "gitleaks", "cmseek",
     "retire", "dalfox", "kiterunner",
 ]
+
+
+def selected_tools(environ=None):
+    """Return the operator's tool selection, the full arsenal by default.
+
+    The native CLI lets the operator tick a subset of tools before a scan. In
+    headless runs ``WATCHTOWER_TOOLS`` (comma-separated names from ALL_TOOLS)
+    supplies that same choice; unset or empty keeps every tool.
+    """
+    value = (os.environ if environ is None else environ).get("WATCHTOWER_TOOLS", "")
+    names = [name.strip() for name in value.split(",") if name.strip()]
+    if not names:
+        return list(ALL_TOOLS)
+    unknown = sorted(set(names) - set(ALL_TOOLS))
+    if unknown:
+        raise ValueError(f"WATCHTOWER_TOOLS names unknown tools: {', '.join(unknown)}")
+    return [tool for tool in ALL_TOOLS if tool in names]
 
 # Candidate URL/host token. Matches a full URL (scheme://...), a bare
 # ``host:port/path`` token, or a dotted domain/IP token so that freeform
@@ -202,7 +220,7 @@ class WatchtowerGraph:
         """Reproduce main.py's initial_state exactly (messages left empty)."""
         return {
             "scope_targets": [target],
-            "available_tools": list(ALL_TOOLS),
+            "available_tools": selected_tools(),
             "messages": [],
             "findings": [],
             "observations": [],
@@ -242,7 +260,7 @@ class WatchtowerGraph:
             # instead of surfacing as an infrastructure-level execution failure.
             return {
                 "scope_targets": [],
-                "available_tools": list(ALL_TOOLS),
+                "available_tools": selected_tools(),
                 "messages": [f"Invalid target: {exc}"],
                 "findings": [],
                 "observations": [{

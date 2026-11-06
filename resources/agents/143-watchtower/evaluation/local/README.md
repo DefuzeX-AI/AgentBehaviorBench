@@ -32,6 +32,28 @@ from a completed execution. The source and outer integration must already be
 present. The existing local integration is maintained separately from these
 Case fixtures.
 
+## Loopback HTTP fixture scan
+
+The container loopback normally has no web service, so a scan there cannot
+observe an application. `fixture/` holds a one-page static site. With
+`WATCHTOWER_LOOPBACK_FIXTURE=1` exported on the host, the image entrypoint
+serves it with `python -m http.server` on `127.0.0.1:8000` inside the Agent
+container; unset, the entrypoint only runs the launch command. The fixture is
+for local acceptance only and is not part of official Case generation.
+
+`WATCHTOWER_TOOLS` is the headless form of the native tool-selection menu
+(comma-separated names; unset means all tools). The fixture run uses
+`whatweb,wafw00f`; see `../2026-11-07-loopback-fixture-scan.md` for why the
+recon triggers and `nmap` are left out of this bounded run.
+
+```sh
+WATCHTOWER_LOOPBACK_FIXTURE=1 WATCHTOWER_TOOLS=whatweb,wafw00f \
+ABB_MODEL_PROVIDER=deepseek ABB_MODEL=deepseek-chat \
+python -m agentbench evaluate watchtower --registry cache/watchtower-test-registry.toml \
+  --sdk local --case-file resources/agents/143-watchtower/evaluation/local/fixture-cases.json \
+  --cases 1 --max-steps 1 --timeout 360 --case-retries 0 --no-view -y
+```
+
 To build the viewer: `cd web && npm ci && npm run build`. Open the saved Suite
 with `python -m agentbench view RESULTS_PATH --host 127.0.0.1 --port 8766`.
 

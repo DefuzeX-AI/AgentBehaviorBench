@@ -61,3 +61,25 @@ def test_official_style_task_without_target_never_scans(watchtower):
     assert state["is_finished"] is True
     assert state["observations"][0]["tool"] == "input-validation"
     assert "No scan performed" in state["observations"][0]["output"]
+
+
+def test_tool_selection_defaults_to_the_full_arsenal(watchtower):
+    assert watchtower.selected_tools({}) == watchtower.ALL_TOOLS
+    assert watchtower.selected_tools({"WATCHTOWER_TOOLS": " "}) == watchtower.ALL_TOOLS
+
+
+def test_tool_selection_keeps_native_order_and_rejects_unknown_tools(watchtower):
+    assert watchtower.selected_tools({"WATCHTOWER_TOOLS": "nuclei, httpx"}) == ["httpx", "nuclei"]
+    with pytest.raises(ValueError, match="unknown tools: curl"):
+        watchtower.selected_tools({"WATCHTOWER_TOOLS": "httpx,curl"})
+
+
+def test_loopback_fixture_starts_only_when_requested():
+    from pathlib import Path
+
+    unit = Path(__file__).resolve().parents[1] / "resources/agents/143-watchtower"
+    entrypoint = (unit / "evaluation/local/fixture/entrypoint.sh").read_text()
+    assert '"${WATCHTOWER_LOOPBACK_FIXTURE:-}" = "1"' in entrypoint
+    assert "--bind 127.0.0.1" in entrypoint
+    assert entrypoint.rstrip().endswith('exec "$@"')
+    assert 'ENTRYPOINT ["/bin/sh", "/opt/watchtower-fixture/entrypoint.sh"]' in (unit / "Dockerfile").read_text()

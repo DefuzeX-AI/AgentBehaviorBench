@@ -129,4 +129,11 @@ RUN set -eu; \
     chmod 0644 /opt/agent/wordlist.txt /opt/agent/wordlist.LICENSE; \
     ln -s /opt/testssl/testssl.sh /usr/local/bin/testssl.sh
 
+# Optional local acceptance fixture (evaluation/local/fixture). The entrypoint
+# starts a static HTTP site on 127.0.0.1:8000 inside this container only when
+# the host forwards WATCHTOWER_LOOPBACK_FIXTURE=1; otherwise it runs the launch
+# command unchanged.
+COPY evaluation/local/fixture/ /opt/watchtower-fixture/
+ENTRYPOINT ["/bin/sh", "/opt/watchtower-fixture/entrypoint.sh"]
+
 USER agent
