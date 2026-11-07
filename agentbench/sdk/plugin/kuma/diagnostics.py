@@ -37,7 +37,7 @@ def read_diagnostic(directory, relative):
 # reported as such instead of being folded into "no diagnostics".
 REQUIRED_ARTIFACTS = ('manifest.json', 'error.json',
                       'case-collection.json', 'case.json',
-                      'judge/report.json')
+                      'judge/report.json', 'trajectory.json')
 
 
 def unreadable_reason(directory, relative):

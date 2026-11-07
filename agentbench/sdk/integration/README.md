@@ -5,6 +5,15 @@ contracts, artifact storage, and the trusted execution client live here. SDK
 formats and SDK calls belong in `sdk/plugin/<name>/`; Docker processes, ownership,
 mounts and the Agent endpoint belong in `runtime/`.
 
+The read-only `sdk-source/` copy is temporary execution data. After containers
+close and trajectory/artifact collection finishes, shared execution removes it
+for both generation and execution, including failed Cases and rejected traces.
+It is retained when container cleanup fails. `run.json` records
+`source_cleanup_status` (`succeeded`, `retained`, or `failed`) and deletion errors.
+Source cleanup does not remove `sdk-repo/` (SDK/Judge recovery state), replay
+evidence, committed outputs, logs, or the original Agent source/cache. Existing
+archived runs are not modified by this lifecycle cleanup.
+
 ## Default worker and runner: four business operations
 
 Ordinary SDKs do not need their own runner or worker. Export the concrete

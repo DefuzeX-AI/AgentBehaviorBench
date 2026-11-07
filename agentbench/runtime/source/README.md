@@ -4,6 +4,10 @@
 instead restores a registered Docker Agent's pinned source before execution.
 It never creates registrations or regenerates integration configuration.
 
+`evaluation/targets.py` reuses acquisition and installation helpers to prepare
+independent historical units, then passes their registrations to the existing
+executor. See [historical targets](../../../docs/Evaluation-Service.md#historical-targets).
+
 ## Enable pinned Git source
 
 In a source-based unit's `agent.toml`, add an explicit acquisition method:

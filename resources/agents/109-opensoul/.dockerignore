@@ -1,0 +1,31 @@
+.git
+**/.git
+.env
+.env.*
+**/node_modules
+**/__pycache__
+*.pyc
+*.log
+
+# OpenSoul's platform app trees and release binaries are not needed for the
+# headless Gateway + ACP CLI build. Excluding them keeps the Docker context at
+# ~22 MB instead of ~470 MB.
+agent/apps/
+agent/publish/
+agent/assets/
+agent/Swabble/
+agent/*.png
+agent/.github/
+agent/.agents/
+agent/.pi/
+agent/.vscode/
+agent/git-hooks/
+agent/test/
+
+# docs/ is ~12 MB of mostly reference prose, but the Gateway loads its workspace
+# bootstrap templates from docs/reference/templates/ at runtime (AGENTS.md,
+# SOUL.md, ...). Keep that one directory and drop the rest.
+agent/docs/*
+!agent/docs/reference
+agent/docs/reference/*
+!agent/docs/reference/templates

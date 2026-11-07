@@ -1,0 +1,45 @@
+# Generated from the pinned source and native ACP configuration contract.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "whip"
+display_name = "WhipCode (native ACP)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+[source]
+method = "bundled"
+repository = "https://github.com/context-labs/whip"
+revision = "1c5da05987d2869687dfc95fc9128ad2ad68e0f0"
+downloaded_on = "2026-10-26"
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+cpus = 2
+env_keys = []
+[build]
+context = "."
+dockerfile = "Dockerfile"
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+cwd = "/home/agent/workspace"
+handshake_timeout = 120
+permission_policy = "allow_once"
+[model]
+metadata_paths = ["/models"]
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []

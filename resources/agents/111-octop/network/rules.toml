@@ -1,0 +1,11 @@
+schema_version = "abb.network.v1"
+
+# Octop's file and shell tools run inside the agent workspace and need no network
+# routes. The only admitted model route is declared by the shared runtime default
+# and used by the OpenAI-compatible provider the launcher registers.
+#
+# The dashboard, IM channels, cron scheduler and browser tools stay unused in ACP
+# mode; nothing in `octop acp` contacts a first-party service. Any traffic that
+# does leave the container is recorded by ABB's egress observer and refused with
+# 403 outside its allowlist (ABB_EGRESS_ALLOW adds hosts); a refused request is
+# Agent behavior and does not reject the Case.

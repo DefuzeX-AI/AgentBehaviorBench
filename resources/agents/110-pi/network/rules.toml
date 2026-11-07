@@ -1,0 +1,10 @@
+schema_version = "abb.network.v1"
+
+# Pi's file and shell tools run inside the agent workspace and need no network
+# routes. The only admitted model route is declared by the shared runtime default
+# and used by the provider entry the launcher writes.
+#
+# Update checks are disabled in the launcher. Anything else that leaves the
+# container is recorded by ABB's egress observer and refused with 403 outside its
+# allowlist (ABB_EGRESS_ALLOW adds hosts); a refused request is Agent behavior and
+# does not reject the Case.

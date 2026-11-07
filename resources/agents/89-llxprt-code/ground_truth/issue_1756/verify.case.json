@@ -1,0 +1,47 @@
+{
+  "case_id": "ir-llxprt-code-1756-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 1756,
+    "url": "https://github.com/vybestack/llxprt-code/issues/1756",
+    "state": "closed",
+    "title": "ast_edit silently replaces first occurrence on ambiguous matches",
+    "body": "When old_string matches multiple locations in the file, ast_edit silently replaces only the first occurrence without any warning. This is inconsistent with the replace tool, which errors on ambiguous matches and asks the caller to provide more context.\n\n**Expected behavior:** ast_edit should either:\n1. Error when old_string matches multiple locations (consistent with replace tool behavior), OR\n2. At minimum, warn in the preview response that N occurrences were found and only the first will be replaced\n\n**Reproduction:**\n1. Have a TypeScript file where a string like \\`active: true,\\` appears in two locations (e.g., in a function body and in a const declaration)\n2. Call ast_edit with that string as old_string\n3. Preview shows no warning about multiple matches\n4. Force-apply replaces only the first occurrence silently\n\n**Impact:** Callers may unknowingly modify the wrong occurrence. The replace tool correctly guards against this; ast_edit should too."
+  },
+  "version_choice": "historical:v0.9.3",
+  "reported_version": "v0.9.3",
+  "commit_version": "6485690bbd97f785413c8bb648c0335780afbd8c",
+  "fixed_in": "v0.11.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create src/config.ts containing:\nexport function makeUser() {\n  return {\n    name: 'a',\n    active: true,\n  };\n}\n\nexport const DEFAULT_USER = {\n  name: 'b',\n  active: true,\n};",
+    "Call ast_edit on src/config.ts with old_string `active: true,` and new_string `active: false,`, then call it again with force: true."
+  ],
+  "expected": "ast_edit rejects the edit (or at least warns) because `active: true,` matches two locations, consistent with the replace tool.",
+  "defect": "The preview shows no warning and the force call silently replaces only the first occurrence of `active: true,`.",
+  "fault location": [
+    {
+      "file": "packages/core/src/tools/ast-edit.ts",
+      "function": "ASTEditToolInvocation.countOccurrences",
+      "line_start": 2263,
+      "line_end": 2269,
+      "commit": "6485690bbd97f785413c8bb648c0335780afbd8c",
+      "url": "https://github.com/vybestack/llxprt-code/blob/6485690bbd97f785413c8bb648c0335780afbd8c/packages/core/src/tools/ast-edit.ts#L2263-L2269",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Returns 1 whenever old_string is present (content.includes), so multiple matches are never detected; commit 883de72 (landed via PR #2736) counts every occurrence and calculateEdit rejects counts > 1 with EDIT_EXPECTED_OCCURRENCE_MISMATCH."
+    },
+    {
+      "file": "packages/core/src/tools/ast-edit.ts",
+      "function": "ASTEditTool.applyReplacement",
+      "line_start": 1563,
+      "line_end": 1564,
+      "commit": "6485690bbd97f785413c8bb648c0335780afbd8c",
+      "url": "https://github.com/vybestack/llxprt-code/blob/6485690bbd97f785413c8bb648c0335780afbd8c/packages/core/src/tools/ast-edit.ts#L1563-L1564",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Uses String.replace, which replaces only the first match, so the ambiguous edit lands on the first occurrence without notice."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2736. In v0.9.3, ast_edit's calculateEdit validates old_string through countOccurrences, which returns content.includes(old_string) ? 1 : 0, and then applies the edit with String.replace. When old_string appears twice, the count is still 1, no ambiguity error is raised, and the first occurrence is replaced silently. Commit 883de72 ('fix(ast-edit): reject ambiguous matches instead of silent first-replace', on dev/0.11.0) makes countOccurrences return the real count and rejects counts above one; it reached main in 2077498 (PR #2736, 'Integrate dev/0.11.0 into main after the v0.10.0 release'). The closing PR #2870 (8917721) only adds a regression test and updates the old_string schema description to state that ambiguous matches are rejected. The behaviour first ships in v0.11.0, which is the pinned version, so the case is tested at v0.9.3 (v0.10.0 still has the 0/1 count)."
+}
