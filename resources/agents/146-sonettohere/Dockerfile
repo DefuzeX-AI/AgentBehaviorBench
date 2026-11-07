@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 ARG ABB_PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
 
-RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g; s|security.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true \
+RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g; s|security.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources 2>/dev/null || true \
     && apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
