@@ -437,26 +437,22 @@ def test_conversational_input_returns_natural_language_without_synthesis(monkeyp
         output = res["final_output"]
         answer = output.get("answer") or res.get("answer", "")
         assert answer, f"Expected non-empty response for prompt: {prompt}"
-        # Verify natural language capability explanation
-        assert any(
-            kw in answer.lower()
-            for kw in ("postergen", "poster", "paper", "powerpoint", ".pptx", "academic")
-        ), f"Response should explain PosterGen capabilities for prompt '{prompt}': {answer[:120]}"
-        assert output.get("status") in ("completed", "success"), (
-            f"Expected completed status for conversational prompt '{prompt}', got: {output.get('status')}"
+        assert "Unable to generate poster" in answer
+        assert "Requirement: PosterGen requires a valid, accessible research paper in PDF format" in answer
+        assert output.get("status") == "error", (
+            f"Expected error status for prompt without paper '{prompt}', got: {output.get('status')}"
         )
         assert output.get("poster_name") is None
         assert output.get("pptx_path") is None or not Path(str(output.get("pptx_path"))).is_file()
         assert output.get("artifacts") == []
-        assert "Active_Geospatial" not in answer
         # Strictly assert workflow was never invoked
         mock_workflow.assert_not_called()
 
     instance.close()
 
 
-def test_third_person_feature_queries_return_capabilities_text(monkeypatch):
-    """Verify third-person feature queries return POSTERGEN_CAPABILITIES_TEXT with status completed."""
+def test_third_person_feature_queries_without_paper_yield_diagnostic_error(monkeypatch):
+    """Verify third-person feature queries without paper return diagnostic error with status error."""
     from unittest.mock import MagicMock
 
     module = _binding()
@@ -464,7 +460,7 @@ def test_third_person_feature_queries_return_capabilities_text(monkeypatch):
     instance = module.create_graph()
 
     mock_workflow = MagicMock(
-        side_effect=AssertionError("PosterGen workflow should NOT be invoked for conversational queries")
+        side_effect=AssertionError("PosterGen workflow should NOT be invoked without paper")
     )
     monkeypatch.setattr(instance, "_get_workflow", mock_workflow)
 
@@ -472,15 +468,15 @@ def test_third_person_feature_queries_return_capabilities_text(monkeypatch):
     assert isinstance(res, dict)
     assert "final_output" in res
     output = res["final_output"]
-    assert output.get("status") == "completed"
-    assert output.get("answer") == module.POSTERGEN_CAPABILITIES_TEXT
-    assert res.get("status") == "completed"
-    assert res.get("answer") == module.POSTERGEN_CAPABILITIES_TEXT
+    assert output.get("status") == "error"
+    assert "Unable to generate poster" in output.get("answer", "")
+    assert res.get("status") == "error"
+    assert "Unable to generate poster" in res.get("answer", "")
 
     # Also test message envelope
     res_msg = instance.invoke({"messages": [{"role": "user", "content": "What features does postergen have?"}]})
-    assert res_msg["final_output"]["status"] == "completed"
-    assert res_msg["final_output"]["answer"] == module.POSTERGEN_CAPABILITIES_TEXT
+    assert res_msg["final_output"]["status"] == "error"
+    assert "Unable to generate poster" in res_msg["final_output"]["answer"]
 
     mock_workflow.assert_not_called()
     instance.close()
@@ -942,25 +938,16 @@ def test_paper_request_with_introduce_or_features_not_short_circuited(tmp_path, 
 
     for prompt in prompts:
         norm = instance._normalize_input(prompt)
-        raw_text, candidate = instance._extract_text_and_candidate(norm)
 
-        # 1. Must NOT be classified as conversational
-        assert not instance._is_conversational_request(raw_text, candidate, norm=norm), (
-            f"Prompt unexpectedly classified as conversational: {prompt}"
-        )
-
-        # 2. Must resolve paper input cleanly to our temporary fixture
+        # 1. Must resolve paper input cleanly to our temporary fixture
         resolved_pdf, *_ = instance._resolve_paper_input(norm)
         assert Path(resolved_pdf).resolve() == pdf_file.resolve()
 
-        # 3. Must invoke pipeline, NOT short-circuit to POSTERGEN_CAPABILITIES_TEXT
+        # 2. Must invoke pipeline
         mock_workflow.invoke.reset_mock()
         res = instance.invoke(prompt)
         assert mock_workflow.invoke.called, f"Workflow invoke was not called for: {prompt}"
         answer = (res.get("final_output") or {}).get("answer") or res.get("answer") or ""
-        assert answer != module.POSTERGEN_CAPABILITIES_TEXT, (
-            f"Prompt was short-circuited to capabilities text: {prompt}"
-        )
         assert "Successfully generated poster" in answer
 
     instance.close()
@@ -1039,16 +1026,12 @@ def test_long_conversational_prompts_return_capabilities_without_oserror(monkeyp
         output = res["final_output"]
         answer = output.get("answer") or res.get("answer", "")
         assert answer, f"Expected non-empty response for prompt length {len(str(prompt))}"
-        assert any(
-            kw in answer.lower()
-            for kw in ("postergen", "poster", "paper", "powerpoint", ".pptx", "academic")
-        ), f"Expected capabilities explanation in response: {answer[:120]}"
-        assert output.get("status") in ("completed", "success")
-        assert res.get("status") in ("completed", "success")
+        assert "Unable to generate poster" in answer
+        assert output.get("status") == "error"
+        assert res.get("status") == "error"
         assert output.get("poster_name") is None
         assert output.get("pptx_path") is None
         assert output.get("artifacts") == []
-        assert "Active_Geospatial" not in answer
         mock_workflow.assert_not_called()
 
     instance.close()
@@ -1441,21 +1424,22 @@ def test_bridge_conversational_and_invalid_inputs_handle_config_gracefully(monke
         "metadata": {"abb_run_id": "run-early-test"},
     }
 
-    # 1. Conversational prompt with config returns capabilities immediately
+    # 1. Prompt without paper with config returns diagnostic error cleanly
     res1 = instance.invoke("Introduce yourself and PosterGen features", config=dummy_config)
-    assert res1["final_output"]["status"] == "completed"
+    assert res1["final_output"]["status"] == "error"
     assert res1["final_output"]["poster_name"] is None
-    assert "scientific research papers" in res1["final_output"]["answer"]
+    assert "Unable to generate poster" in res1["final_output"]["answer"]
     mock_workflow.invoke.assert_not_called()
 
-    # 2. Conversational prompt async with run_config kwarg
+    # 2. Prompt without paper async with run_config kwarg
     loop = asyncio.new_event_loop()
     try:
         res2 = loop.run_until_complete(
             instance.ainvoke("What can you do?", run_config=dummy_config)
         )
-        assert res2["final_output"]["status"] == "completed"
+        assert res2["final_output"]["status"] == "error"
         assert res2["final_output"]["poster_name"] is None
+        assert "Unable to generate poster" in res2["final_output"]["answer"]
         mock_workflow.invoke.assert_not_called()
     finally:
         loop.close()

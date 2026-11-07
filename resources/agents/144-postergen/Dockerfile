@@ -1,6 +1,8 @@
 # Outer ABB image for Y-Research-SBU/PosterGen onboarding
 FROM python:3.11-slim
 
+ARG ABB_PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/opt/abb-runtime:/opt/agent/agent \
@@ -13,7 +15,8 @@ WORKDIR /opt/agent
 # - libreoffice: required by renderer.py to convert PPTX to PNG
 # - libgl1, libglib2.0-0: required by opencv-python
 # - fonts-dejavu-core: required for font rendering
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g; s|security.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true \
+    && apt-get update && apt-get install -y --no-install-recommends \
     git \
     libreoffice \
     libgl1 \
@@ -24,8 +27,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY agent/ ./agent/
 
 # Install python dependencies and opentelemetry-sdk for ABB tracing
-RUN python -m pip install --no-cache-dir --upgrade pip \
-    && python -m pip install --no-cache-dir -r ./agent/requirements.txt 'rich>=13.0.0' 'opentelemetry-sdk>=1.30,<2' \
+RUN python -m pip install --no-cache-dir --index-url "$ABB_PIP_INDEX_URL" --timeout 120 --retries 5 --upgrade pip \
+    && python -m pip install --no-cache-dir --index-url "$ABB_PIP_INDEX_URL" --timeout 120 --retries 5 -r ./agent/requirements.txt 'rich>=13.0.0' 'opentelemetry-sdk>=1.30,<2' \
     && useradd --create-home --uid 10001 agent \
     && mkdir -p /opt/agent/output /home/agent/.cache/huggingface \
     && chown -R agent:agent /opt/agent /home/agent \

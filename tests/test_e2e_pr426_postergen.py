@@ -391,15 +391,15 @@ class TestTier3CrossFeatureCombinations:
         "user guide",
     ])
     def test_conversational_pure_prompt_routing(self, monkeypatch, prompt):
-        """Verify purely conversational and capability inquiries return capabilities text immediately."""
+        """Verify purely conversational and capability inquiries without paper return diagnostic error."""
         monkeypatch.setenv("OPENAI_API_KEY", "mock-key-for-test")
         bridge = _load_bridge_module()
         binding = bridge.create_graph()
 
         res = binding.invoke(prompt)
-        assert res["final_output"]["status"] == "completed"
-        assert "PosterGen" in res["final_output"]["answer"]
-        assert "scientific research papers into publication-ready academic conference posters" in res["final_output"]["answer"]
+        assert res["final_output"]["status"] == "error"
+        assert "Unable to generate poster" in res["final_output"]["answer"]
+        assert "Requirement: PosterGen requires a valid, accessible research paper in PDF format" in res["final_output"]["answer"]
         assert res["final_output"]["poster_name"] is None
         assert res["final_output"]["artifacts"] == []
         binding.close()
@@ -420,35 +420,21 @@ class TestTier3CrossFeatureCombinations:
         try:
             # 1. Prompt with 'introduce' and explicit paper path
             prompt_introduce = f"Please generate a poster to introduce {tmp_pdf.name}"
-            is_conv_1 = binding._is_conversational_request(prompt_introduce, str(tmp_pdf))
-            assert is_conv_1 is False, "Prompt with paper reference must not be marked conversational"
-
             resolved_1 = binding._resolve_paper_input({"paper_path": str(tmp_pdf), "text": prompt_introduce})
             assert resolved_1[0] == str(tmp_pdf.resolve())
 
             # 2. Prompt with 'features' and explicit paper path
             prompt_features = f"Summarize the main features and architecture of {tmp_pdf.name} into a poster"
-            is_conv_2 = binding._is_conversational_request(prompt_features, str(tmp_pdf))
-            assert is_conv_2 is False, "Prompt with 'features' and paper reference must not be marked conversational"
-
             resolved_2 = binding._resolve_paper_input({"paper_path": str(tmp_pdf), "text": prompt_features})
             assert resolved_2[0] == str(tmp_pdf.resolve())
 
-            # 3. Prompts mixing 'introduce' and 'features' with poster generation intent
-            prompt_novel = f"This paper introduces novel architectural features. Please generate a poster from {tmp_pdf}"
-            assert binding._is_conversational_request(prompt_novel, str(tmp_pdf)) is False
-
-            prompt_create = f"Can you create a poster that introduces the key features of {tmp_pdf}?"
-            assert binding._is_conversational_request(prompt_create, str(tmp_pdf)) is False
-
-            # 4. Pure third-person feature queries without paper candidate must route to conversational
+            # 3. Pure feature queries without paper candidate must return diagnostic error
             prompt_conv_features = "What features does postergen have?"
-            assert binding._is_conversational_request(prompt_conv_features, prompt_conv_features) is True
             res_conv = binding.invoke(prompt_conv_features)
-            assert res_conv["final_output"]["status"] == "completed"
-            assert res_conv["final_output"]["answer"] == bridge.POSTERGEN_CAPABILITIES_TEXT
+            assert res_conv["final_output"]["status"] == "error"
+            assert "Unable to generate poster" in res_conv["final_output"]["answer"]
 
-            # 5. End-to-end invoke verification with mocked workflow
+            # 4. End-to-end invoke verification with mocked workflow
             mock_timing = MagicMock()
             mock_timing.get_total_time.return_value = 0.5
             mock_timing.get_api_call_count.return_value = 1
@@ -479,10 +465,11 @@ class TestTier3CrossFeatureCombinations:
                 },
             ):
                 monkeypatch.setattr(binding, "_deliver_artifacts", lambda artifacts, dests: [])
+                prompt_novel = f"This paper introduces novel architectural features. Please generate a poster from {tmp_pdf}"
                 res = binding.invoke(prompt_novel)
                 assert mock_workflow.invoke.called
                 assert res["final_output"]["status"] in ("completed", "success")
-                assert res["final_output"]["answer"] != bridge.POSTERGEN_CAPABILITIES_TEXT
+                assert "Successfully generated poster" in res["final_output"]["answer"]
         finally:
             tmp_pdf.unlink()
             binding.close()

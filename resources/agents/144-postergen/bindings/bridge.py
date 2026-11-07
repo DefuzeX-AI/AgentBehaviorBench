@@ -24,77 +24,7 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-CONVERSATIONAL_PATTERNS = [
-    # 1. Greetings & Salutations
-    r"\b(?:hello|hi|hey|howdy|greetings|salutations)\b",
-    r"\bgood\s+(?:morning|afternoon|evening|day)\b",
-    r"\bhow\s+are\s+you\b",
-    r"\bhow\s+do\s+you\s+do\b",
-    r"\bhow'?s\s+it\s+going\b",
-    r"\bnice\s+to\s+meet\s+you\b",
 
-    # 2. Self-Introduction & Identity Inquiries
-    r"\bintroduce\s+yourself\b",
-    r"\bintroduce\s+(?:the\s+)?(?:agent|tool|postergen|system)\b",
-    r"\bself[- ]introduction\b",
-    r"\b(?:give\s+me\s+an\s+)?introduction\s+to\s+(?:postergen|this\s+agent|this\s+tool|the\s+system)\b",
-    r"\bwho\s+are\s+you\b",
-    r"\bwho\s+is\s+(?:this|the)?\s*agent\b",
-    r"\bwhat\s+are\s+you\b",
-    r"\bwhat\s+is\s+(?:this|the)?\s*(?:agent|tool|system|service|postergen)\b",
-    r"\bwhat\s+is\s+this\b",
-    r"\babout\s+yourself\b",
-    r"\btell\s+me\s+about\s+yourself\b",
-    r"\bdescribe\s+yourself\b",
-    r"\bexplain\s+yourself\b",
-    r"\bwho\s+made\s+you\b",
-    r"\bwhat\s+kind\s+of\s+agent\b",
-
-    # 3. Capabilities, Functionality & Feature Inquiries
-    r"\bcapable\b",
-    r"\bcapabilities\b",
-    r"\bcapability\b",
-    r"\bfunctionality\b",
-    r"\b(?:what\s+are\s+the\s+)?features\s+of\s+(?:postergen|this\s+agent|this\s+tool|the\s+system)\b",
-    r"\bwhat\s+(?:features|capabilities|functions)\s+(?:do|does)\s+(?:you|postergen|(?:this|the)\s+(?:agent|tool|system))\s+have\b",
-    r"\bwhat\s+are\s+(?:the|your)\s+(?:features|functions)\b",
-    r"\bfunctions\s+of\s+(?:postergen|this\s+agent|this\s+tool|the\s+system)\b",
-    r"\bwhat\s+(?:can|does|do)\s+(?:[\w\-]+\s+){0,2}do\b",
-    r"\bwhat\s+(?:you|this\s+\w+)\s+(?:can\s+)?do\b",
-    r"\bwhat\s+can\s+i\s+do\b",
-    r"\bcan\s+you\s+describe\b",
-    r"\bwhat\s+is\s+your\s+(?:purpose|role|function|mission)\b",
-    r"\bwhat\s+are\s+your\s+(?:purpose|role|functions|features|capabilities)\b",
-
-    # 4. Usage, Instructions, How-It-Works & Help Inquiries
-    r"\bhow\s+(?:does|do)\s+(?:[\w\-]+\s+){0,2}work\b",
-    r"\bhow\s+this\s+works?\b",
-    r"\bhow\s+it\s+works?\b",
-    r"\bhow\s+to\s+use\b",
-    r"\bhow\s+(?:do|can)\s+i\s+use\b",
-    r"\bhelp\b",
-    r"\binstructions\b",
-    r"\buser\s+guide\b",
-    r"\bquickstart\b",
-    r"\boverview\b",
-]
-CONVERSATIONAL_REGEX = re.compile("|".join(CONVERSATIONAL_PATTERNS), re.IGNORECASE)
-
-IMPERATIVE_POSTER_REGEX = re.compile(
-    r"\b(?:generate|make|create|build|render|produce|synthesize|design)\s+(?:a\s+|an\s+)?poster\b",
-    re.IGNORECASE
-)
-
-POSTERGEN_CAPABILITIES_TEXT = (
-    "I am PosterGen, an automated multi-agent AI system designed to transform scientific research papers "
-    "into publication-ready academic conference posters. I coordinate specialized agents built on LangGraph to:\n"
-    "1. Parse research papers in PDF format and extract structured text, figures, and tables (via Marker/Surya).\n"
-    "2. Curate and summarize key narratives, methodology, and experimental results into structured poster sections.\n"
-    "3. Optimize spatial layout, color schemes, and typography tailored for academic presentation.\n"
-    "4. Render complete presentation-ready posters in PowerPoint (.pptx) and high-resolution image (.png) formats.\n\n"
-    "To generate an academic poster, please provide an accessible research paper in PDF format "
-    "(e.g. specify 'paper_path' pointing to a valid .pdf file)."
-)
 
 
 def _ensure_source_on_path():
@@ -377,74 +307,6 @@ class PosterGenBinding:
         candidate = explicit_paper or raw_text
         return raw_text, candidate
 
-    def _is_conversational_request(
-        self,
-        raw_text: str,
-        candidate: str,
-        norm: Optional[Dict[str, Any]] = None,
-    ) -> bool:
-        """Determines if the request is conversational without valid paper references."""
-        if not raw_text:
-            return False
-
-        # 1. If paper_path is explicitly provided in an input dictionary, return False immediately
-        if norm is not None and (
-            norm.get("_explicit_paper_path")
-            or (norm.get("paper_path") and norm.get("paper_path") != raw_text)
-        ):
-            return False
-
-        cand_clean = candidate.strip().strip("'\"")
-
-        # 2. Existing file or directory on filesystem is a paper input (valid or invalid), never conversational
-        if cand_clean and _safe_exists(cand_clean):
-            return False
-
-        # 3. Embedded or explicit .pdf reference in raw_text or candidate indicates a paper request
-        combined_text = f"{raw_text} {candidate}"
-        if re.search(r'[\w\-./\\]+\.pdf\b', combined_text, re.IGNORECASE):
-            return False
-
-        # 4. Poster generation actions/intent alongside or within a paper request
-        if IMPERATIVE_POSTER_REGEX.search(raw_text):
-            return False
-
-        # 5. Path-like candidate with non-PDF file extension indicates an invalid paper input attempt
-        if _is_safe_path_candidate(cand_clean):
-            cand_path = Path(cand_clean)
-            cand_ext = cand_path.suffix.lower()
-            is_valid_ext = bool(re.match(r"^\.[a-zA-Z0-9]{1,10}$", cand_ext))
-            non_pdf_exts = {
-                ".txt", ".docx", ".doc", ".png", ".jpg", ".jpeg",
-                ".tex", ".md", ".zip", ".tar", ".gz", ".csv", ".json",
-            }
-            if cand_ext in non_pdf_exts:
-                return False
-            if ("/" in cand_clean or "\\" in cand_clean) and is_valid_ext:
-                return False
-
-        # 6. Explicit bundled sample data reference indicates a paper request
-        root = Path(__file__).resolve().parents[1]
-        agent_dir = root / "agent" if (root / "agent").is_dir() else root
-        sample_data_dir = agent_dir / "data"
-        if _safe_is_dir(sample_data_dir) and cand_clean:
-            cand_path = Path(cand_clean) if _is_safe_path_candidate(cand_clean) else None
-            clean_name = cand_path.name.lower() if cand_path else ""
-            parent_name = cand_path.parent.name.lower() if cand_path else ""
-            for sub in sample_data_dir.iterdir():
-                if sub.is_dir() and (sub / "paper.pdf").is_file():
-                    sub_name_lower = sub.name.lower()
-                    if (
-                        (clean_name and clean_name == sub_name_lower)
-                        or (parent_name and parent_name == sub_name_lower)
-                        or cand_clean.lower() == sub_name_lower
-                        or sub_name_lower in raw_text.lower()
-                    ):
-                        return False
-
-        # 7. Evaluate conversational patterns
-        return bool(CONVERSATIONAL_REGEX.search(raw_text))
-
     def _resolve_paper_input(self, norm: Dict[str, Any]) -> tuple[str, float, float, str, str, str]:
         """Resolves input into (pdf_path, width, height, url, logo, aff_logo)."""
         root = Path(__file__).resolve().parents[1]
@@ -632,27 +494,7 @@ class PosterGenBinding:
         norm = self._normalize_input(value)
         raw_text, candidate = self._extract_text_and_candidate(norm)
 
-        # 1. Fast conversational / introductory response without invoking pipeline
-        if self._is_conversational_request(raw_text, candidate, norm=norm):
-            logger.info("Handling conversational / introductory request without poster synthesis")
-            return {
-                "final_output": {
-                    "answer": POSTERGEN_CAPABILITIES_TEXT,
-                    "poster_name": None,
-                    "pptx_path": None,
-                    "png_path": None,
-                    "artifacts": [],
-                    "status": "completed",
-                },
-                "answer": POSTERGEN_CAPABILITIES_TEXT,
-                "poster_name": None,
-                "pptx_path": None,
-                "png_path": None,
-                "artifacts": [],
-                "status": "completed",
-            }
-
-        # 2. Paper input resolution with clear diagnostic error per requirement.md
+        # Paper input resolution with clear diagnostic error per requirement.md
         try:
             pdf_path, width, height, url, logo, aff_logo = self._resolve_paper_input(norm)
         except (ValueError, FileNotFoundError, OSError) as err:
