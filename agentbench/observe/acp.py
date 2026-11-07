@@ -2,6 +2,7 @@
 from uuid import uuid4
 from .store import TraceStore, atomic_json, redact
 from .acp_evidence import TerminalSnapshots, ToolEvidence
+from .acp_evidence.permissions import SPAN_NAME as PERMISSION_SPAN, permission_evidence
 
 
 class ACPObserver:
@@ -16,7 +17,7 @@ class ACPObserver:
         self.terminals = TerminalSnapshots(self.secrets)
         self.prefix = uuid4().hex
         self.summary = {'coverage': 'protocol_events', 'internal_model_spans': 'not_observed',
-                        'tool_calls': 0, 'incomplete_tools': []}
+                        'tool_calls': 0, 'permission_requests': 0, 'incomplete_tools': []}
 
     def on_acp_event(self, name, data):
         self.events.record(name, **data)
@@ -33,6 +34,8 @@ class ACPObserver:
             self.summary[name] = data
         if name == 'stderr_truncated':
             self.summary['stderr_truncated'] = True
+        if name == 'permission':
+            self._permission(data)
         if name == 'session_update':
             update = data['update']
             if update.get('sessionUpdate') in ('tool_call', 'tool_call_update'):
@@ -50,6 +53,21 @@ class ACPObserver:
         self.summary['incomplete_tools'] = [key for key, state in self.tools.items()
                                           if not state['ended'] or state.get('boundary_closed')]
         atomic_json(self.directory / 'acp-summary.json', redact(self.summary, self.secrets))
+
+    def _permission(self, data):
+        # An SDK Judge receives span names and tool arguments/results, not span
+        # event attributes. The request and ABB's automatic answer therefore
+        # become one completed client-callback span under the requested tool.
+        self.summary['permission_requests'] += 1
+        request, decision = permission_evidence(data, self.secrets)
+        state = self.tools.get(request['tool_call'].get('toolCallId'))
+        parent = ({'parent_span_id': state['span']}
+                  if state and state['started'] and not state['ended'] else {})
+        span = f"{self.prefix}:permission:{self.summary['permission_requests']}"
+        # No tool_call_id: the native ID identifies the requested tool's span.
+        self.store.record('span_start', kind='tool', span_id=span, name=PERMISSION_SPAN,
+                          input=request, **parent)
+        self.store.record('span_end', span_id=span, tool_status='succeeded', output=decision)
 
     def _tool(self, update):
         identifier = update['toolCallId']

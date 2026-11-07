@@ -29,10 +29,15 @@ def test_callbacks_produce_actual_tool_spans_and_file_evidence(tmp_path, policy)
         adapter.close()
         observer.close()
     spans = [json.loads(line)['data'] for line in (tmp_path / 'trace/otel.jsonl').read_text().splitlines()]
-    tool = next(s for s in spans if s['attributes'].get('abb.kind') == 'tool')
+    tool = next(s for s in spans if s['attributes'].get('abb.kind') == 'tool' and s['name'] == 'Write file')
     attrs = tool['attributes']
     assert tool['parent_span_id'] is not None
     assert attrs['gen_ai.tool.call.id'] == 't1'
+    # The permission request is its own completed span under the requested tool.
+    asked = next(s for s in spans if s['name'] == 'acp.session/request_permission')
+    assert asked['parent_span_id'] == tool['span_id']
+    decision = json.loads(asked['attributes']['gen_ai.tool.call.result'])
+    assert (decision['policy'], decision['outcome']) == (policy, 'selected' if policy == 'allow_once' else 'cancelled')
     assert not any(s['attributes'].get('gen_ai.operation.name') == 'chat' for s in spans)
     if policy == 'allow_once':
         assert result.output == 'two\n'

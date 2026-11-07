@@ -59,12 +59,15 @@ class ACPClient:
 
     async def request_permission(self, session_id, tool_call, options, **kwargs):
         self.check_session(session_id)
+        policy = self.config.permission_policy
         selected = next((item for item in options if item.kind == 'allow_once'), None)
         outcome = (AllowedOutcome(outcome='selected', option_id=selected.option_id)
-                   if self.config.permission_policy == 'allow_once' and selected else
+                   if policy == 'allow_once' and selected else
                    DeniedOutcome(outcome='cancelled'))
+        # No person reviews the request: ABB's configured policy answers it.
         self.emit('permission', {'session_id': session_id, 'tool_call': plain(tool_call),
-                                'options': [plain(x) for x in options], 'outcome': plain(outcome)})
+                                'options': [plain(x) for x in options], 'outcome': plain(outcome),
+                                'decided_by': 'abb_permission_policy', 'policy': policy})
         return RequestPermissionResponse(outcome=outcome)
 
     async def ext_method(self, method, params):
