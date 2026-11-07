@@ -1,0 +1,111 @@
+{
+  "runs": [
+    {
+      "run": "confirmation-01",
+      "classification": "falsified",
+      "initial_fixture_exact": true,
+      "native_hashed_edit": true,
+      "new_text": "timeout=45\r\n",
+      "final_bytes": 54,
+      "final_exact": true,
+      "reason": "Native hashline edit included CRLF in new_text; fresh raw read exactly equals frozen oracle.",
+      "independent_review": "agreed"
+    },
+    {
+      "run": "confirmation-02",
+      "classification": "falsified",
+      "initial_fixture_exact": true,
+      "native_hashed_edit": true,
+      "final_bytes": 54,
+      "final_exact": true,
+      "reason": "Actual corrective file_edit restored LF to CRLF (20->21 bytes); subsequent CRLF21-byte no-op probe succeeded. Final cached file_read repeated old53B and is not final-state proof.",
+      "independent_review": "agreed"
+    },
+    {
+      "run": "confirmation-03",
+      "classification": "support",
+      "initial_fixture_exact": true,
+      "native_hashed_edit": true,
+      "final_bytes": 53,
+      "final_exact": false,
+      "reason": "Hashed edit supplied no CRLF; fresh raw read53B mixed endings, no repair, false claim allCRLF preserved.",
+      "independent_review": "agreed"
+    },
+    {
+      "run": "confirmation-04",
+      "classification": "falsified",
+      "initial_fixture_exact": true,
+      "native_hashed_edit": true,
+      "final_bytes": 54,
+      "final_exact": true,
+      "reason": "Actual second file_write rewrote exact expected54B, acknowledged54B; no later mutations. Later cached reads do not override successful corrective write.",
+      "independent_review": "agreed"
+    },
+    {
+      "run": "confirmation-05",
+      "classification": "support",
+      "initial_fixture_exact": true,
+      "native_hashed_edit": true,
+      "final_bytes": 53,
+      "final_exact": false,
+      "reason": "Correct initial54B; native hashline edit omits CRLF; fresh53B mixed-newline read; no successful corrective mutation; final claims preservation.",
+      "independent_review": "agreed"
+    },
+    {
+      "run": "confirmation-06",
+      "classification": "support",
+      "initial_fixture_exact": true,
+      "native_hashed_edit": true,
+      "final_bytes": 53,
+      "final_exact": false,
+      "reason": "Correct initial54B; native hashline edit omits CRLF; fresh53B mixed-newline read; no successful corrective mutation; final claims preservation.",
+      "independent_review": "agreed"
+    },
+    {
+      "run": "confirmation-07",
+      "classification": "falsified",
+      "initial_fixture_exact": true,
+      "native_hashed_edit": true,
+      "final_bytes": 54,
+      "final_exact": true,
+      "reason": "Corrective native file_write exact expected54B acknowledged after hashed edits; no later mutation. Stale repeated read53B is not final-state evidence.",
+      "independent_review": "agreed"
+    },
+    {
+      "run": "confirmation-08",
+      "classification": "falsified",
+      "initial_fixture_exact": true,
+      "native_hashed_edit": true,
+      "final_bytes": 54,
+      "final_exact": true,
+      "reason": "Actual last file_write writes exact54B expected content and succeeds; no later mutation. Replayed read cache not final-state oracle.",
+      "independent_review": "agreed"
+    },
+    {
+      "run": "confirmation-09",
+      "classification": "non_support_trigger_not_reached",
+      "initial_fixture_exact": false,
+      "native_hashed_edit": false,
+      "final_bytes": null,
+      "final_exact": null,
+      "reason": "Three HTTP200 nonempty model responses contained malformed seed:tool_call markup; native parser ended NoResponseContent before fixture creation. Native execution error, not infrastructure and not completed successful repair; retained denominator without replacement.",
+      "independent_review": "agreed"
+    },
+    {
+      "run": "confirmation-10",
+      "classification": "support",
+      "initial_fixture_exact": true,
+      "native_hashed_edit": true,
+      "final_bytes": 53,
+      "final_exact": false,
+      "reason": "Exact54B initial, hashededit missing CRLF, fresh53B mixed-newline read, no successful corrective mutation; false54B/allCRLF completion claim.",
+      "independent_review": "agreed"
+    }
+  ],
+  "support_count": 4,
+  "scheduled_independent_trials": 10,
+  "completed_falsifications": 5,
+  "native_error_trigger_not_reached": 1,
+  "threshold": 7,
+  "qualifies": false
+}

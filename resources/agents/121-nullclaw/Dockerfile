@@ -1,6 +1,6 @@
 # Outer ABB image for the nullclaw Agent unit (nullclaw/nullclaw @ 5f1cade05c19, version 2026.5.29).
 # Hand-written from the upstream Dockerfile's builder stage (alpine + the repo's own .github/scripts/install-zig.sh
-# for Zig 0.16.0, static x86_64-linux-musl ReleaseSmall build) plus a Debian runtime that carries python3 for the
+# for Zig 0.16.0, static target-platform Linux-musl ReleaseSmall build) plus a Debian runtime that carries python3 for the
 # BBA worker / ACP launcher / SDK overlay.
 
 # -- Stage 1: build the static nullclaw binary from the pinned source ------------------------------------------------
@@ -13,7 +13,13 @@ COPY agent/ ./
 RUN set -eu; mkdir -p /tmp/zig-path; \
     GITHUB_PATH=/tmp/zig-path/path RUNNER_TEMP=/opt bash .github/scripts/install-zig.sh 0.16.0; \
     ln -sf "$(cat /tmp/zig-path/path)/zig" /usr/local/bin/zig; test "$(zig version)" = "0.16.0"
-RUN zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSmall -Dversion=5f1cade05c19 \
+ARG TARGETARCH
+RUN set -eu; case "$TARGETARCH" in \
+      amd64) zig_target=x86_64-linux-musl ;; \
+      arm64) zig_target=aarch64-linux-musl ;; \
+      *) echo "Unsupported target architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    zig build -Dtarget="$zig_target" -Doptimize=ReleaseSmall -Dversion=5f1cade05c19 \
     && cp zig-out/bin/nullclaw /usr/local/bin/nullclaw && rm -rf zig-out .zig-cache /root/.cache/zig
 
 # -- Stage 2: runtime -------------------------------------------------------------------------------------------------
