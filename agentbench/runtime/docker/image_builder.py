@@ -80,7 +80,13 @@ class DockerImageBuilder:
                     control=control, deadline=deadline, timeout=self.build_timeout,
                     log_directory=log_directory,
                 )
-            except (RunCancelled, DockerCommandTimeout) as exc:
+            except DockerCommandTimeout as exc:
+                raise RuntimeInfrastructureError(
+                    f"Docker build for {tag} exceeded its {self.build_timeout:g} s build budget "
+                    "(raise ABB_RUNTIME_BUILD_TIMEOUT_SEC / ABB_RUNTIME_PREPARATION_TIMEOUT_SEC); "
+                    "daemon build state is unknown"
+                ) from exc
+            except RunCancelled as exc:
                 raise RuntimeInfrastructureError(
                     f"Docker build client interrupted for {tag}; daemon build state is unknown"
                 ) from exc
