@@ -13,6 +13,8 @@ def context_from_request(request, directory):
     from opentelemetry.sdk.trace import TracerProvider
     from agentbench.sdk.integration.telemetry import decode_span
     from kuma.evidence.runtime import build_runtime_evidence, runtime_submission_id
+    from kuma.evidence.assessment_contract import build_assessment_evidence
+    from .assessment import submission_options
 
     run_id, case_id = request['run_id'], request['case']['case_id']
     kinds = {'text' if isinstance(item['payload'], str) else 'structured' for item in request['case']['inputs']}
@@ -42,12 +44,20 @@ def context_from_request(request, directory):
                 submission_id=runtime_submission_id(run_id, item.input_id), root=directory,
                 status=status, output=result.get('output'), error=result.get('error'),
                 file_evidence=None, logs=(), trace_evidence=prepared.evidence)
+            options = submission_options(result)
+            assessment = build_assessment_evidence(options['public_messages'],
+                run_id=run_id, input_id=item.input_id, step_id=item.input_id,
+                submission_id=runtime_submission_id(run_id, item.input_id))
             submission = Submission(run_id, case_id, item.input_id, status,
                 output=result.get('output'), error=result.get('error'),
                 capture_status=CaptureStatus(traces=prepared.component),
                 missing=prepared.missing + runtime.missing,
                 dropped_count=prepared.dropped_count + runtime.dropped_count,
-                extensions={'trace_evidence': prepared.evidence,
+                extensions={'trace_capture_summary': prepared.capture_summary,
+                            'assessment_evidence': assessment,
+                            **({'agent_output_actor': options['agent_output_actor']}
+                               if 'agent_output_actor' in options else {}),
+                            'trace_evidence': prepared.evidence,
                             'runtime_evidence': runtime.evidence,
                             'runtime_file_sources': runtime.file_sources,
                             'file_observation_summary': runtime.file_summary})
@@ -61,6 +71,8 @@ def context_from_request(request, directory):
 
 class KumaJudge:
     def judge(self, request, *, directory, environ):
+        from .configuration import validate_host_judge_dependency
+        validate_host_judge_dependency()
         from kuma.providers import OfficialJudgeProvider, normalize_report
         from kuma.transport.backend import BackendClient
         from kuma import to_json
@@ -68,11 +80,13 @@ class KumaJudge:
         credential, _ = api_key(environ)
         context = context_from_request(request, directory)
         client = BackendClient(api_key=credential, base_url=backend_url(environ))
+        (directory / 'judge-state').mkdir(exist_ok=True)
         provider = OfficialJudgeProvider(client, state_root=directory / 'judge-state')
         report = to_json(normalize_report(provider.judge(context), run_id=request['run_id']))
         return {'schema': 'abb.judge.result.v1', 'request_id': request['request_id'],
                 'status': report['status'], 'confidence': report.get('confidence'),
-                'issues': report.get('issues', []), 'evidence_gaps': report.get('evidence_gaps', [])}
+                'issues': report.get('issues', []), 'evidence_gaps': report.get('evidence_gaps', []),
+                'extensions': report.get('extensions', {})}
 
 
 judge = KumaJudge()
