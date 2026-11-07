@@ -1,0 +1,9 @@
+schema_version = "abb.network.v1"
+
+# Codewhale's local file, search and shell tools need no network routes. The only
+# admitted model route is declared in agent.toml [[llm_interception.routes]].
+#
+# Telemetry and the self-updater are switched off in bootstrap/launch.py. Any other
+# request the Agent attempts (a web fetch, an MCP server, a package install) goes to
+# ABB's egress observer, which forwards allowlisted hosts, refuses the rest with 403
+# and records every attempt in egress.jsonl without rejecting the Case.

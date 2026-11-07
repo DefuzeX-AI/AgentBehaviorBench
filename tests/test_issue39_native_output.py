@@ -31,8 +31,8 @@ def test_structured_native_result_reaches_sdk_without_flattening_or_trace_expans
         assert summary['judge'] == 'received'
         assert summary['submission'] == 'committed'
         assert json_value(run.history[0].submission.output) == public
-        stored = json.loads((folder/'inputs/0001/submission.json').read_text())
+        stored = json.loads((folder/'steps/0001/submission.json').read_text())
         assert stored['output'] == public
         assert 'LOCAL_DIAGNOSTIC_ONLY' not in json.dumps(stored)
-        assert json.loads((folder/'inputs/0001/result.json').read_text())['raw_output'] == native_raw
+        assert json.loads((folder/'steps/0001/result.json').read_text())['raw_output'] == native_raw
         assert (folder/'judge/report.json').is_file()

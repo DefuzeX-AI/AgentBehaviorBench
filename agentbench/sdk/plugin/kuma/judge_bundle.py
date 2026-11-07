@@ -4,6 +4,54 @@ from kuma import (Case, KumaInput, Submission, HistoryItem, CaptureStatus,
 from kuma.providers import JudgeContext
 
 SCHEMA = 'abb.kuma.judge-context.v1'
+REFERENCE_SCHEMA = 'abb.kuma.judge-context.refs.v1'
+
+
+def save_context(files, run, case, *, upload_diff=False):
+    """Publish a small Judge context referencing already committed step records."""
+    import hashlib
+    import json
+    from agentbench.observe.store import redact
+    value = redact(export_context(run, case, upload_diff=upload_diff), files.secrets)
+
+    def reference(relative, expected):
+        raw = (files.directory / relative).read_bytes()
+        if json.loads(raw) != expected:
+            raise ValueError('Judge reference differs from committed execution: ' + relative)
+        return {'path': relative, 'sha256': hashlib.sha256(raw).hexdigest()}
+
+    value['case'] = reference('case.json', value['case'])
+    value['history'] = [
+        {**item, 'test_input': reference(f'steps/{index:04d}/input.json', item['test_input']),
+         'submission': reference(f'steps/{index:04d}/submission.json', item['submission'])}
+        for index, item in enumerate(value['history'], 1)]
+    value['schema'] = REFERENCE_SCHEMA
+    files.save('judge/context.json', value)
+
+
+def read_context(directory, value):
+    """Resolve checked references at Judge execution, without rewriting files."""
+    if value.get('schema') != REFERENCE_SCHEMA:
+        return value
+    import hashlib
+    import json
+    from agentbench.observe.artifact_paths import artifact_file
+    remaining = 32 * 1024 * 1024
+
+    def resolve(ref):
+        nonlocal remaining
+        path = artifact_file(directory, ref['path'])
+        if path.stat().st_size > remaining:
+            raise ValueError('Judge context exceeds the persisted evidence limit')
+        raw = path.read_bytes()
+        remaining -= len(raw)
+        if hashlib.sha256(raw).hexdigest() != ref['sha256']:
+            raise ValueError('Judge context reference was modified')
+        return json.loads(raw)
+
+    return {**value, 'schema': SCHEMA, 'case': resolve(value['case']),
+            'history': [{**item, 'test_input': resolve(item['test_input']),
+                         'submission': resolve(item['submission'])} for item in value['history']]}
 
 
 def export_context(run, case, *, upload_diff=False):

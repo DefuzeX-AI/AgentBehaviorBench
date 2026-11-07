@@ -52,19 +52,20 @@ def _files(root):
     names = {'network.jsonl', 'evaluation/sdk.jsonl', 'evaluation/case.json',
              'evaluation/judge/report.json', 'evaluation/manifest.json',
              'evaluation/workspace-artifacts.json', 'evaluation/workspace.json'}
-    for pattern in ('evaluation/inputs/[0-9][0-9][0-9][0-9]', 'invocation-*/output'):
+    for pattern in ('steps/[0-9][0-9][0-9][0-9]', 'evaluation/inputs/[0-9][0-9][0-9][0-9]', 'invocation-*/output'):
         for folder in root.glob(pattern):
             for name in ('framework.jsonl', 'input.json', 'mapped-input.json', 'request.json',
                          'result.json', 'submission.json', 'file-evidence.json'):
                 names.add((folder / name).relative_to(root).as_posix())
-    for path in (root / 'evaluation/workspace-files').glob('*.json'):
-        names.add(path.relative_to(root).as_posix())
+    for path in list((root / 'workspace-files').glob('*.json')) + list((root / 'evaluation/workspace-files').glob('*.json')):
+        names.add('evaluation/workspace-files/' + path.name)
+    from .artifact_paths import artifact_file
     files = []
     for name in sorted(names):
         candidate = root / name
         try:
-            file = candidate.resolve(strict=True)
-            if not file.is_relative_to(root) or candidate.is_symlink() or not file.is_file():
+            file = artifact_file(root, name)
+            if candidate.is_symlink() or not file.is_file():
                 continue
             stat = file.stat()
             files.append((name, stat.st_size, stat.st_mtime_ns))
@@ -74,10 +75,8 @@ def _files(root):
 
 
 def _read(root, name):
-    path = (root / name).resolve(strict=True)
-    if not path.is_relative_to(root):
-        raise ValueError('Artifact outside run')
-    return path
+    from .artifact_paths import artifact_file
+    return artifact_file(root, name)
 
 
 def _contains_tool(value):
@@ -371,19 +370,26 @@ class InteractionIndex:
                 'warnings': self.warnings, 'correlation': self.correlation}
 
 
-def interactions(directory, query):
+def load_index(directory):
+    """The cached index for one attempt directory; rebuilt when its files change."""
     root = Path(directory).resolve(strict=True)
     files = _files(root)
     signature = tuple(files)
     with _LOCK:
         cached = _CACHE.get(str(root))
-        if cached is None or cached[0] != signature:
-            cached = (signature, InteractionIndex(root, files))
-            _CACHE[str(root)] = cached
+    if cached is None or cached[0] != signature:
+        # Build outside the lock: one slow attempt must not stall every other viewer request.
+        cached = (signature, InteractionIndex(root, files))
+    with _LOCK:
+        _CACHE[str(root)] = cached
         _CACHE.move_to_end(str(root))
         while len(_CACHE) > 4:
             _CACHE.popitem(last=False)
-    return cached[1].query(query)
+    return cached[1]
+
+
+def interactions(directory, query):
+    return load_index(directory).query(query)
 
 
 if __name__ == '__main__':

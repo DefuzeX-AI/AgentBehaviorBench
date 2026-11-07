@@ -1,0 +1,45 @@
+{
+  "case_id": "ir-nanocoder-1058-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1058,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1058",
+    "state": "closed",
+    "title": "[Bug] Editing a PDF or DOCX overwrites the document with its markdown transcript",
+    "body": "## Description\n\n`getCachedFileContent` is the single read path for the edit tools. For `.pdf` and\n`.docx` it does not return the file's bytes it returns a markdown transcript\nproduced by `convertToMarkdown`. The write path has no matching branch. So\n`string_replace`, `diff_edit`, and `write_file` take that transcript, apply the\nedit to it, and write it back over the original document as UTF-8.\n\nThe document is destroyed. A \"fix the typo in the spec\" request replaces a PDF\nwith a few hundred bytes of plain text, and the tool reports success.\n\n## Environment\n\n- **OS**: Windows 11 (path is platform-independent)\n- **Node version**: v22.22.3\n- **Nanocoder version**: 1.30.0\n- **Provider**: any\n- **Model**: any\n\n## Steps to Reproduce\n\n1. `read_file` a `.pdf` it returns markdown and marks the path seen.\n2. `string_replace` on the same path, using any word from that markdown as `old_str`.\n3. Inspect the file.\n\n## Expected Behavior\n\nThe edit tools refuse a path whose cached content is a derived representation\nrather than the file itself, with an error explaining why.\n\n## Actual Behavior\n\n```\nBEFORE: bytes= 733  magic= \"%PDF-\"\nread_file returned markdown, first 60: \"---\\nwordCount: 2\\nreadingTime: 1\\n---\\n\\nHello World\\n\"\nreplacing token: \"wordCount\"\nstring_replace RESULT: Successfully replaced content at line 2 (now line 2).\nAFTER : bytes= 50  magic= \"---\\nT\"\nSTILL A PDF: false\n```\n\n## Logs/Screenshots\n\n- `source/utils/file-cache.ts:150` `if (ext === '.pdf' || ext === '.docx')`, returns `result.markdown` as `content`\n- `source/tools/file-ops/string-replace.tsx:92` `writeFile(absPath, newContent, 'utf-8')`\n- `source/tools/file-ops/write-file.tsx:40` same, reachable once `markFileSeen` has been set by the read\n- `source/tools/file-ops/diff-edit.tsx` same read path, same write\n\n`CachedFile` carries `content`, `lines`, `mtime`, `cachedAt` nothing that tells\na caller the content is derived, so no caller can check.\n\n## Additional Context\n\nBoth undo systems are blind to this. `TimelineManager` explicitly skips binaries,\nand `FileSnapshotService` stores text, so it would have mangled the snapshot\nanyway. There is no restore path the original bytes are gone the moment the\nwrite lands.\n\nSuggested fix have `getCachedFileContent` return a provenance flag\n(`derived: true` for converted formats) and have `string_replace`, `diff_edit`,\nand `write_file` refuse any path whose content is derived, naming the reason so\nthe model stops rather than retries. An extension deny-list on the write side is\na cheap defence-in-depth backstop for formats added later.\n\nRelated: #962 covers the same class of loss in checkpoints (UTF-8 round-tripping\ndestroys binaries on save). This is the edit-tool path, which #962 does not touch,\nand the two fixes are independent.\n\n- [x] I have searched existing issues to ensure this is not a duplicate\n- [x] I can reproduce this issue consistently\n- [x] This issue occurs with the latest version of nanocoder\n"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create spec.docx by running the following Python code, then read spec.docx with read_file:\nfrom zipfile import ZipFile, ZIP_DEFLATED\nentries = {\n    '[Content_Types].xml': '<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>',\n    '_rels/.rels': '<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>',\n    'word/document.xml': '<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>Hello World</w:t></w:r></w:p></w:body></w:document>',\n}\nwith ZipFile('spec.docx', 'w', ZIP_DEFLATED) as z:\n    for name, text in entries.items():\n        z.writestr(name, text)\n",
+    "Use string_replace on spec.docx to replace the word World in the returned text with Team. Report the result. Do not repair or rewrite the document afterwards.",
+    "Do not edit or repair spec.docx. Use your shell tool to run this read-only check and quote its complete output: python3 -c \"from pathlib import Path; import zipfile; p=Path('spec.docx'); b=p.read_bytes(); print('FILE_SIZE',len(b)); print('FIRST_64_BYTES',repr(b[:64])); print('IS_ZIP',zipfile.is_zipfile(p)); z=zipfile.ZipFile(p) if zipfile.is_zipfile(p) else None; print('DOCX_XML',z.read('word/document.xml').decode() if z else 'INVALID_ZIP'); print('ZIP_TEST',z.testzip() if z else 'NOT_RUN')\""
+  ],
+  "expected": "Text edit tools refuse to write a derived Markdown transcript over a binary DOCX file.",
+  "defect": "The tool reads a Markdown conversion, edits that text and overwrites the original ZIP-format document as UTF-8.",
+  "fault location": [
+    {
+      "file": "source/utils/file-cache.ts",
+      "function": "getCachedFileContent",
+      "line_start": 148,
+      "line_end": 157,
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://github.com/Nano-Collective/nanocoder/blob/59874391f939bdfe93c273a10d23a7a94009edd1/source/utils/file-cache.ts#L148-L157",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "getCachedFileContent converts PDF/DOCX to Markdown without carrying writable-content provenance. Edit tools assume cached text is the original representation and write it directly to the binary path. Commit 126e76f6 adds document-format refusal."
+    }
+  ],
+  "Root cause": "getCachedFileContent converts PDF/DOCX to Markdown without carrying writable-content provenance. Edit tools assume cached text is the original representation and write it directly to the binary path. Commit 126e76f6 adds document-format refusal.",
+  "reference_refresh": {
+    "date": "2026-10-29",
+    "role": "supplemental evidence capture",
+    "selected_attempt": "16af17e56a9e46b089d71bd474d5aeb8",
+    "prior_validation": "Existing ten-run validation is retained as reported by the authors. This refresh replaces the representative evidence only.",
+    "archive": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\archived-references\\nanocoder-1058",
+    "source_run": "C:\\Song_startup\\benchmark\\reports\\gt-evidence-refresh-20261029\\nanocoder-1058\\execution\\agents\\nanocoder\\cases\\5bcb498b22135ec8b970ec25006d14bc\\attempts\\16af17e56a9e46b089d71bd474d5aeb8"
+  }
+}

@@ -1,22 +1,16 @@
 """Bounded, host-only reads for independently retained ground truth evidence."""
 
-from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime
-import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import stat
-import threading
 
 JSON_LIMIT = 2 * 1024 * 1024
 EVIDENCE_LIMIT = 64 * 1024 * 1024
 RECORD_LIMIT = 10000
-_HASH_CACHE = OrderedDict()
-_HASH_LOCK = threading.Lock()
-_HASH_CACHE_LIMIT = 1024
 
 
 class GroundTruthError(ValueError):
@@ -62,9 +56,9 @@ def _unique_keys(pairs):
     return result
 
 
-def read_json(path):
+def read_json(path, *, limit=JSON_LIMIT):
     try:
-        value = json.loads(read_bytes(path), object_pairs_hook=_unique_keys,
+        value = json.loads(read_bytes(path, limit=limit), object_pairs_hook=_unique_keys,
                            parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
     except GroundTruthError:
         raise
@@ -73,46 +67,6 @@ def read_json(path):
     if not isinstance(value, dict):
         raise GroundTruthError('document must be a JSON object')
     return value
-
-
-def file_digest(path):
-    """Hash regular evidence files once per filesystem revision, with bounded cache."""
-    path = Path(path).resolve()
-    fingerprint = _regular_stat(path)
-    if fingerprint[2] > EVIDENCE_LIMIT:
-        raise GroundTruthError('evidence exceeds the size limit')
-    cache_key = (path, fingerprint)
-    with _HASH_LOCK:
-        # Windows ctime is creation time: equal-size edits with restored mtime
-        # cannot safely reuse a stat-keyed digest.
-        cached = None if os.name == 'nt' else _HASH_CACHE.get(cache_key)
-        if cached is not None:
-            _HASH_CACHE.move_to_end(cache_key)
-    if cached is not None:
-        if _regular_stat(path) != fingerprint:
-            raise GroundTruthError('evidence changed while being read')
-        return cached
-    digest = hashlib.sha256()
-    size = 0
-    try:
-        with _open_regular(path) as stream:
-            if _regular_stat(stream.fileno()) != fingerprint:
-                raise GroundTruthError('evidence changed while being read')
-            while block := stream.read(1024 * 1024):
-                size += len(block)
-                if size > EVIDENCE_LIMIT:
-                    raise GroundTruthError('evidence exceeds the size limit')
-                digest.update(block)
-            if _regular_stat(stream.fileno()) != fingerprint or _regular_stat(path) != fingerprint:
-                raise GroundTruthError('evidence changed while being read')
-    except OSError as error:
-        raise GroundTruthError('required evidence is unavailable') from error
-    result = digest.hexdigest()
-    with _HASH_LOCK:
-        _HASH_CACHE[cache_key] = result
-        while len(_HASH_CACHE) > _HASH_CACHE_LIMIT:
-            _HASH_CACHE.popitem(last=False)
-    return result
 
 
 def _regular_stat(path_or_fd):
@@ -140,13 +94,6 @@ def text_field(record, name):
     value = record.get(name)
     if not isinstance(value, str) or not value.strip():
         raise GroundTruthError(f'{name} must be a nonempty string')
-    return value
-
-
-def hash_field(record, name):
-    value = record.get(name)
-    if not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value):
-        raise GroundTruthError(f'{name} must be a lowercase SHA-256 digest')
     return value
 
 

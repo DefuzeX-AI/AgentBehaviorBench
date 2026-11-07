@@ -6,7 +6,7 @@ from types import ModuleType, SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/59-jobsmith'
+UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/52-jobsmith'
 spec = importlib.util.spec_from_file_location('jobsmith_test_bridge', UNIT / 'bindings/bridge.py')
 bridge = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bridge)

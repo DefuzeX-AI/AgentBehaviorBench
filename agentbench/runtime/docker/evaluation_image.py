@@ -92,7 +92,10 @@ def evaluation_image(agent, *, requirements, worker_module, control=None, deadli
             if manifest_transform is not None:
                 source = manifest_transform(source)
             (root / 'agent.toml').write_text(source, encoding='utf-8')
-            dockerfile = root / 'Dockerfile'
+            from agentbench.runtime.agentcontainer.config import docker_structure
+            manifest = tomllib.loads(source)
+            dockerfile = (docker_structure(root, manifest)[1] if 'build' in manifest
+                          else root / 'Dockerfile')
             original = dockerfile.read_text(encoding='utf-8')
             users = re.findall(r'(?im)^USER\s+(.+)$', original)
             if not users or users[-1].strip() in ('root', '0'):

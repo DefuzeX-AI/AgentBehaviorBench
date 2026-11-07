@@ -31,7 +31,8 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
     """
     files = Artifacts(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    trace = TraceStore(directory / 'sdk.jsonl', run.run_id, source='sdk')
+    (directory / 'logs').mkdir(parents=True, exist_ok=True)
+    trace = TraceStore(directory / 'logs/sdk.jsonl', run.run_id, source='sdk')
     summary = {'run_id': run.run_id, 'case_id': run.case_id, 'phase': 'input',
                'execution': 'pending', 'otel': 'pending', 'submission': 'pending',
                'judge': 'pending', 'evidence': 'pending', 'files': 'pending' if file_evidence_required else 'disabled', 'steps': []}
@@ -47,7 +48,7 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
         nonlocal active_input_id, result
         active_input_id = item.input_id
         number = len(summary['steps']) + 1
-        relative = f'inputs/{number:04d}'
+        relative = f'steps/{number:04d}'
         files.save(f'{relative}/input.json', item)
         trace.record('input_delivered', input_id=item.input_id, case_id=run.case_id,
                      artifact=f'{relative}/input.json')
@@ -55,9 +56,6 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
         files.save(f'{relative}/context.json', {
             'input_delivery': 'current_input', 'context_owner': 'agent',
             'session_id': run.run_id, 'input_id': item.input_id})
-        files.save(f'{relative}/mapped-input.json', payload)
-        trace.record('input_mapped', input_id=item.input_id, case_id=run.case_id,
-                     artifact=f'{relative}/mapped-input.json')
         summary['phase'] = 'execution'
         with span('Agent turn', kind='agent', input_id=item.input_id, case_id=run.case_id) as operation:
             result = await invoke(payload, directory / relative, provider)

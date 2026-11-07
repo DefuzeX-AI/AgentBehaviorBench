@@ -1,0 +1,51 @@
+# Manual ABB integration for Yanyutin753/LambChat (QuickAgent path).
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "lambchat"
+display_name = "LambChat (QuickAgent)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/Yanyutin753/LambChat"
+revision = "fd72d632ed2021c992b84485c5b598f0ce3be9fd"
+downloaded_on = "2026-10-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = ["OPENAI_MODEL", "CHECKPOINT_BACKEND"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "output"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"

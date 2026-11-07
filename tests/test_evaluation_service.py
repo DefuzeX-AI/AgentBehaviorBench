@@ -39,6 +39,26 @@ def run_one(service):
         {'input_id': 'a', 'payload': 'hello'}]}], concurrency=ConcurrencySettings(1))
 
 
+def test_execution_uses_prepared_unit_and_freezes_its_revision(project):
+    from dataclasses import replace
+    import shutil
+    from agentbench.harness.session.plan import source_digest
+    from agentbench.evaluation.targets import PreparedTarget
+    service, _, _ = project
+    original = service._registration('example')
+    path = service.root / 'prepared'
+    shutil.copytree(original.path, path)
+    manifest = path / 'agent.toml'
+    manifest.write_text(manifest.read_text() + '\n[source]\nrevision="' + 'a' * 40 + '"\n')
+    prepared = PreparedTarget(replace(original, path=path, requirement_path=path / 'requirement.md'),
+                              'a' * 40, 'fingerprint', source_digest(path))
+    result = service.execute('example', [{'case_id': 'one', 'inputs': [
+        {'input_id': 'a', 'payload': 'hello'}]}], target=prepared, concurrency=ConcurrencySettings(1))
+    assert result['suite']['summary']['execution_status'] == 'completed'
+    evidence = service.evidence(result['directory'], result['runs'][0]['id'])
+    assert evidence['trajectory']['metadata']['system_architecture']['source_revision'] == 'a' * 40
+
+
 def report(request, status='pass'):
     return {'schema': 'abb.judge.result.v1', 'request_id': request['request_id'],
             'status': status, 'confidence': 'high', 'issues': [], 'evidence_gaps': []}
@@ -99,29 +119,20 @@ def test_cli_reads_same_result_and_report(project, capsys):
 
 def install_test_gt(service, agent_id):
     """Synthetic GT for protocol tests, never a benchmark finding."""
-    from agentbench.harness.session.plan import source_digest, digest_json
-    from agentbench.harness.ground_truth.files import file_digest
-    unit = service.root / 'unit'
-    directory = unit / 'ground_truth'
-    directory.mkdir(exist_ok=True)
-    observations = []
-    for index in range(2):
-        path = directory / f'observation-{index}.txt'
-        path.write_text('Synthetic fixture: expected exact echo, observed modified output.')
-        observations.append({'id': str(index), 'case_sha256': 'a' * 64,
-            'evidence_path': path.name, 'evidence_sha256': file_digest(path)})
-    defect = {'id': 'echo-changed', 'title': 'Echo changed', 'expected_behavior': 'Echo input exactly',
-        'observed_behavior': 'Output contains an added turn counter', 'source_sha256': source_digest(unit),
-        'case_sha256': 'a' * 64, 'confirmed_by': 'synthetic-test-fixture',
-        'confirmed_at': '2026-10-21T00:00:00+00:00', 'observations': observations}
-    (directory / 'manifest.json').write_text(json.dumps({'schema': 'abb.agent.ground_truth.v1',
-        'agent_id': agent_id, 'defects': [defect]}))
-    (directory / 'matching.json').write_text(json.dumps({'schema': 'abb.gt.matching.v1', 'rules': [{
-        'ground_truth_id': defect['id'], 'ground_truth_sha256': digest_json(defect),
-        'review_status': 'approved', 'conditions': [{'id': 'C1', 'text': 'Output appends a counter to the requested exact echo.'}]}]}))
+    from agentbench.harness.ground_truth.manifests import MANIFEST_SCHEMA
+    from tests.test_ground_truth import reference_attempt
+    directory = service.root / 'unit/ground_truth/echo-changed'
+    directory.mkdir(parents=True)
+    reference_attempt(directory / 'attempts/reference', agent_id)
+    (directory / 'gt.json').write_text(json.dumps({
+        'schema': MANIFEST_SCHEMA, 'agent_id': agent_id, 'id': 'echo-changed',
+        'summary': 'Echo changed', 'explanation': 'Output appends a counter to the requested exact echo.',
+        'reference_attempts': ['reference'],
+        'decisive_step': {'attempt': 'reference', 'step_id': 2, 'reason': 'The final answer appends a counter.'}}))
+    (directory / 'case.json').write_text(json.dumps({'case_id': 'reference'}))
 
 
-def test_gt_reads_submitted_report_in_second_stage_only(project, monkeypatch):
+def test_gt_matches_submitted_summary_before_loading_saved_traces(project, monkeypatch):
     service, _, _ = project
     install_test_gt(service, 'example')
     result = run_one(service)
@@ -130,22 +141,25 @@ def test_gt_reads_submitted_report_in_second_stage_only(project, monkeypatch):
     response = {**report(request, 'issue'), 'issues': [{'input_id': 'a', 'message': 'Fixture finding'}]}
     service.submit_judge(suite, run, response)
     from agentbench.harness.ground_truth import evaluator
-    monkeypatch.setattr(evaluator, '_model', lambda _: SimpleNamespace(model='fixture', base_url='https://example.test'))
+    monkeypatch.setattr(evaluator, 'model_config', lambda _: SimpleNamespace(model='fixture', base_url='https://example.test'))
     calls = []
-    def ask(model, steps, **kwargs):
-        evidence = kwargs['payload']['evidence']
-        calls.append(evidence)
-        ref = next(k for k in evidence if k.endswith('result.json'))
+    def ask(model, **kwargs):
+        payload = kwargs['payload']
+        calls.append(payload)
+        assert payload['finding_summary'] == 'Fixture finding'
         if len(calls) == 1:
-            assert 'report' not in evidence
-            value = {'conditions': [{'id': 'C1', 'status': 'satisfied', 'reason': 'Fixture', 'evidence_refs': [ref]}]}
-        else:
-            assert evidence['report'] == response
-            value = {'detected': True, 'reason': 'Fixture', 'evidence_refs': ['report', ref]}
-        return value, json.dumps(value)
+            assert set(payload) == {'reference', 'finding_summary'}
+            return {'match': True, 'reason': 'Matching problem summaries'}
+        assert payload['reference_trajectories'][0]['step_refs'] == ['reference/1', 'reference/2']
+        assert payload['reference']['decisive_step']['step_ref'] == 'reference/2'
+        # The echo fixture makes no observed model call, so the candidate has no steps to cite.
+        assert payload['candidate_trajectory']['step_ids'] == []
+        return {'match': None, 'reason': 'Candidate trajectory has no observed steps',
+                'reference_step_ids': [], 'candidate_step_ids': [], 'candidate_decisive_step': None}
     gt = service.evaluate_gt(suite, ask=ask)
-    assert len(calls) == 2 and gt['scores']['discovery_coverage'] == 1
-    assert gt['status'] == 'completed' and gt['provisional']
+    assert len(calls) == 2 and gt['scores']['pending'] == 1 and gt['scores']['discovery_rate'] is None
+    assert gt['status'] == 'partial' and gt['provisional']
+    assert gt['decisions'][0]['localization']['reference_decisive_step'] == 'reference/2'
 
 
 def test_cli_execute_and_gt_use_shared_service(project, capsys):

@@ -1,0 +1,4 @@
+{
+  "command": "python3 -c \"\nimport json\nfrom pathlib import Path\np = Path('/home/agent/workspace/tmp/batch4/b4-astra-repair183-a1.out')\nobj = json.loads(p.read_text(encoding='utf-8'))\ns = obj['summary']\nunit = 'step completed; '\nprint('len:', len(s))\nprint('divides evenly by unit:', len(s) % len(unit) == 0, '->', len(s)//len(unit), 'copies')\nprint('equals unit*400 exactly:', s == unit*400)\nprint('unique chunks:', set(s[i:i+len(unit)] for i in range(0, len(s), len(unit))))\n\"",
+  "description": "Extract and verify full summary from the JSON file"
+}

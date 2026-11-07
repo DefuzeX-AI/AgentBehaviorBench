@@ -5,12 +5,20 @@ Model selection follows the Agent's declared integration constraints, not its fr
 | Deployment | Selection |
 | --- | --- |
 | Replacement-mode Agents, including LangGraph | Existing shared run-level model resolver |
-| ACP Agents 15-32 and 36, no provider pin | Same resolver, mapped to the Agent's native configuration |
-| MiniMax Code (12), native | Requires `MINIMAX_API_KEY` |
-| Claude Agent ACP (13), native | Requires its configured Anthropic Messages endpoint and `CODEX_*` settings |
-| Qwen Code (14), native | Requires `DASHSCOPE_API_KEY` and `QWEN_*`; native web search also uses DashScope Responses |
+| ACP Agents without a provider pin | Same resolver, mapped to the Agent's native configuration |
+| MiniMax Code (`minimax-code`), native | Requires `MINIMAX_API_KEY` |
+| Claude Agent ACP (`claude-agent-acp`), native | Requires its configured Anthropic Messages endpoint and `CODEX_*` settings |
+| Qwen Code (`qwen-code`), native | Requires `DASHSCOPE_API_KEY` and `QWEN_*`; native web search also uses DashScope Responses |
 
 ## Shared settings
+
+The supplied `.env.example` explicitly selects `ABB_MODEL_PROVIDER=deepseek`
+and `DEEPSEEK_MODEL=deepseek-flash`. Exp1 and Exp3 oracles read the same shared
+provider selection and provider-specific model from the loaded environment.
+Their model selection ignores target-only `--model` / `ABB_MODEL` overrides,
+Agent provider pins, and legacy Judge/GT overrides. Use the CLI's `--env-file`
+to choose another environment file; existing process environment variables retain
+the normal precedence over dotenv values.
 
 Without an explicit provider, ABB selects the first nonempty credential in this order:
 **OpenRouter -> DeepSeek -> GLM**. Configure that provider's key and model:
@@ -91,7 +99,7 @@ rejected explicitly; those richer routing options remain available in replacemen
 Cline selects its native OpenRouter, DeepSeek or ZhipuAI provider and validates model IDs
 against the catalog bundled with CLI 3.0.62 / `@cline/llms` 0.0.83. Unknown IDs fail instead
 of silently becoming the provider default. The catalog snapshot is in
-`resources/agents/18-cline/bootstrap/model-catalog.json`; refresh it when upgrading the
+`resources/agents/15-cline/bootstrap/model-catalog.json`; refresh it when upgrading the
 pinned distribution. Pi's provider-specific thinking options follow the selected service.
 
 For an integration that requires a provider, protocol or provider-owned tool service,

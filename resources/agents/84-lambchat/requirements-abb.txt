@@ -1,0 +1,30 @@
+# Minimal runtime for ABB QuickAgent path (not the full LambChat uv.lock).
+# Native QuickAgent needs deepagents.DeepAgentState plus LLMClient's OpenAI path.
+deepagents>=0.7.25,<0.8
+langgraph>=1.2.15
+langchain>=1.4.6
+langchain-core>=1.6.10
+langchain-openai>=1.7.2
+langchain-anthropic>=1.7.6
+langchain-google-genai>=4.4.2
+langchain-mcp-adapters>=0.3.2
+pydantic>=2.14.1
+pydantic-settings>=2.16.0
+httpx>=0.28.1
+openai>=1.66.3
+tiktoken>=0.14.0
+python-dotenv>=1.2.4
+colorama>=0.4.6
+orjson>=3.13.0
+langfuse>=5.0.1
+typing-extensions>=4.12.0
+# Imported at module load by storage helpers even when MemorySaver is used.
+pymongo>=4.19.0
+redis>=5.3.1
+email-validator>=2.3.0
+# Runtime scheduler / auth helpers imported during QuickAgent load.
+apscheduler>=3.11.3
+bcrypt>=5.0.0
+cryptography>=50.0.2
+# jieba/pypinyin are stubbed in bindings/bridge.py (jieba sdist is ~19MB and
+# has repeatedly blown the 30-minute Docker build budget).

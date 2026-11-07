@@ -1,0 +1,12 @@
+# ABB interceptor supplies the OpenAI-compatible endpoint at runtime.
+# Platform entries exist so Settings can resolve DEFAULT_LLM_MODEL if needed;
+# the binding constructs ChatOpenAI from OPENAI_* env vars directly.
+DEFAULT_LLM_MODEL: deepseek-chat
+HISTORY_LEN: 10
+MODEL_PLATFORMS:
+  - platform_name: abb-interceptor
+    platform_type: openai
+    api_base_url: http://127.0.0.1:9/v1
+    api_key: unused-at-construction
+    llm_models:
+      - deepseek-chat

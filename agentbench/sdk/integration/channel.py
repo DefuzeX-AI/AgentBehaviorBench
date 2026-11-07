@@ -53,7 +53,11 @@ def collect_response(source, destination, *, limits=None):
                                 if total > limits.max_bytes:
                                     raise byte_limit()
                                 stream.write(block)
-                        temporary.replace(target)
+                        if current.parts[0] == 'otel-payloads':
+                            from agentbench.observe.payloads import publish_payload
+                            publish_payload(temporary, target, destination)
+                        else:
+                            temporary.replace(target)
                     finally:
                         temporary.unlink(missing_ok=True)
                 else:

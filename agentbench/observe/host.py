@@ -26,7 +26,7 @@ class HostObservation:
 
     async def invoke(self, running, test_input, config):
         self.step += 1
-        folder = self.directory / 'evaluation' / 'inputs' / f'{self.step:04d}'
+        folder = self.directory / 'steps' / f'{self.step:04d}'
         invocation_id = uuid4().hex
         context = {'agent_id': self.agent.agent_id, 'input_id': test_input.input_id,
                    'invocation_id': invocation_id, 'sdk_run_id': self.run.run_id}

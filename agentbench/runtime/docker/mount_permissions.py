@@ -21,7 +21,13 @@ if uid == 0:
     raise ValueError('Private mounts require a non-root owner')
 def assign(path):
     import stat
-    info = os.lstat(path)
+    try:
+        info = os.lstat(path)
+    except OSError:
+        # Windows system files such as desktop.ini surface in os.listdir
+        # through the bind mount but cannot be stat'ed from the container;
+        # skip them rather than failing the whole mount preparation.
+        return
     if stat.S_ISLNK(info.st_mode):
         raise ValueError('Private mounts cannot contain links')
     if stat.S_ISDIR(info.st_mode):

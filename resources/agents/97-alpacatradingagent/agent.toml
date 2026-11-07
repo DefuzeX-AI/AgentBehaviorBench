@@ -1,0 +1,54 @@
+# Manual completion of the BBA-generated configuration facts.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "alpacatradingagent"
+display_name = "AlpacaTradingAgent — Multi-Agent Stock Analysis"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/huygiatrng/AlpacaTradingAgent"
+revision = "93a81064e3190c25daa733e5c70a132cfb1b6f5f"
+downloaded_on = "2026-10-24"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+# Analyst reports -> bull/bear debate -> trader plan -> risk debate ->
+# final decision; multi-round LLM calls, 1800s is required.
+timeout_sec = 1800
+env_keys = ["LLM_MODEL"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "input"
+binding = "alpaca_bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"

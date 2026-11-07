@@ -1,0 +1,370 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "96f9f3f4ce3e450994ac648cfddb524b",
+  "case_id": "dirac-native-file-and-command-smoke",
+  "input_id": "create-and-run",
+  "invocation_id": "96f9f3f4ce3e450994ac648cfddb524b",
+  "agent_id": "dirac",
+  "status": "succeeded",
+  "output": "Created `hello.py` containing `print(\"ABB_DIRAC_SMOKE_OK\")` and ran it.\n\n- Observed output: `ABB_DIRAC_SMOKE_OK`\n- Exit code: `0`Created `/home/agent/workspace/hello.py` with `print(\"ABB_DIRAC_SMOKE_OK\")` and executed `python hello.py`: stdout was exactly `ABB_DIRAC_SMOKE_OK`, exit code 0.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "delete": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": {}
+        },
+        "providers": {},
+        "_meta": {
+          "dev.dirac/session.close": true,
+          "dev.dirac/session.delete": true,
+          "dev.dirac/auth.logout": true,
+          "dev.dirac/seq": true,
+          "dev.dirac/permissions.list": true,
+          "dev.dirac/permissions.delete": true,
+          "dev.dirac/whisper": true,
+          "dev.dirac/steering_status": true,
+          "dev.dirac/client_annotation": true,
+          "dev.dirac/checkpoints.list": true,
+          "dev.dirac/checkpoints.restore": true,
+          "dev.dirac/messages.pin": true,
+          "dev.dirac/messages.unpin": true,
+          "dev.dirac/messages.pinned": true,
+          "dev.dirac/pinned_messages_update": true,
+          "dev.dirac/permission.effect_previews": true,
+          "dev.dirac/worktree.provision": {
+            "requestMetaKey": "dev.dirac/worktree",
+            "requestShape": "true | { baseBranch?: string }"
+          },
+          "dev.dirac/worktree.integrate": true
+        }
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "dirac",
+        "version": "0.5.23"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "ebb41bfb-7492-41a9-b883-5132281bf8b0",
+      "modes": {
+        "currentModeId": "act",
+        "availableModes": [
+          {
+            "id": "plan",
+            "name": "Plan",
+            "description": "Gather information and create a detailed plan"
+          },
+          {
+            "id": "act",
+            "name": "Act",
+            "description": "Execute actions"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "act",
+          "options": [
+            {
+              "value": "plan",
+              "name": "Plan",
+              "description": "Gather information and create a detailed plan"
+            },
+            {
+              "value": "act",
+              "name": "Act",
+              "description": "Execute actions"
+            }
+          ],
+          "id": "mode",
+          "name": "Mode",
+          "description": "Session operating mode",
+          "category": "mode",
+          "type": "select"
+        },
+        {
+          "currentValue": false,
+          "id": "auto_approve",
+          "name": "Auto-approve",
+          "description": "Automatically approve actions when YOLO is disabled",
+          "category": "mode",
+          "type": "boolean"
+        },
+        {
+          "currentValue": false,
+          "id": "yolo",
+          "name": "YOLO",
+          "description": "Bypass approval and safety prompts; takes priority over auto-approve",
+          "category": "mode",
+          "type": "boolean"
+        },
+        {
+          "currentValue": "openai",
+          "options": [
+            {
+              "value": "openai-codex",
+              "name": "ChatGPT Subscription"
+            },
+            {
+              "value": "gemini",
+              "name": "Google Gemini"
+            },
+            {
+              "value": "openai",
+              "name": "OpenAI Compatible"
+            },
+            {
+              "value": "anthropic",
+              "name": "Anthropic"
+            },
+            {
+              "value": "bedrock",
+              "name": "Amazon Bedrock"
+            },
+            {
+              "value": "deepseek",
+              "name": "DeepSeek"
+            },
+            {
+              "value": "unbiased",
+              "name": "Unbiased"
+            },
+            {
+              "value": "openai-native",
+              "name": "OpenAI"
+            },
+            {
+              "value": "openrouter",
+              "name": "OpenRouter"
+            },
+            {
+              "value": "vertex",
+              "name": "GCP Vertex AI"
+            },
+            {
+              "value": "litellm",
+              "name": "LiteLLM"
+            },
+            {
+              "value": "claude-code",
+              "name": "Claude Code"
+            },
+            {
+              "value": "github-copilot",
+              "name": "GitHub Copilot (Native)"
+            },
+            {
+              "value": "mistral",
+              "name": "Mistral"
+            },
+            {
+              "value": "zai",
+              "name": "Z AI"
+            },
+            {
+              "value": "groq",
+              "name": "Groq"
+            },
+            {
+              "value": "cerebras",
+              "name": "Cerebras"
+            },
+            {
+              "value": "baseten",
+              "name": "Baseten"
+            },
+            {
+              "value": "requesty",
+              "name": "Requesty"
+            },
+            {
+              "value": "fireworks",
+              "name": "Fireworks AI"
+            },
+            {
+              "value": "qwen",
+              "name": "Alibaba Qwen"
+            },
+            {
+              "value": "qwen-code",
+              "name": "Qwen Code"
+            },
+            {
+              "value": "doubao",
+              "name": "Bytedance Doubao"
+            },
+            {
+              "value": "moonshot",
+              "name": "Moonshot"
+            },
+            {
+              "value": "huggingface",
+              "name": "Hugging Face"
+            },
+            {
+              "value": "nebius",
+              "name": "Nebius AI Studio"
+            },
+            {
+              "value": "xai",
+              "name": "xAI"
+            },
+            {
+              "value": "sambanova",
+              "name": "SambaNova"
+            },
+            {
+              "value": "huawei-cloud-maas",
+              "name": "Huawei Cloud MaaS"
+            },
+            {
+              "value": "minimax",
+              "name": "MiniMax"
+            },
+            {
+              "value": "nousResearch",
+              "name": "NousResearch"
+            },
+            {
+              "value": "wandb",
+              "name": "W&B Inference by CoreWeave"
+            }
+          ],
+          "id": "provider",
+          "name": "Provider",
+          "description": "API provider",
+          "type": "select"
+        },
+        {
+          "currentValue": "deepseek-flash",
+          "options": [
+            {
+              "value": "deepseek-flash",
+              "name": "deepseek-flash"
+            },
+            {
+              "value": "gpt-6-astra",
+              "name": "gpt-6-astra"
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "description": "Model for the current mode",
+          "category": "model",
+          "type": "select"
+        },
+        {
+          "currentValue": "medium",
+          "options": [
+            {
+              "value": "none",
+              "name": "None"
+            },
+            {
+              "value": "minimal",
+              "name": "Minimal"
+            },
+            {
+              "value": "low",
+              "name": "Low"
+            },
+            {
+              "value": "medium",
+              "name": "Medium"
+            },
+            {
+              "value": "high",
+              "name": "High"
+            },
+            {
+              "value": "xhigh",
+              "name": "Extra high"
+            },
+            {
+              "value": "max",
+              "name": "Max"
+            }
+          ],
+          "id": "reasoning_effort",
+          "name": "Reasoning Effort",
+          "description": "Reasoning effort for models that support it",
+          "category": "thought_level",
+          "type": "select"
+        },
+        {
+          "currentValue": "0",
+          "options": [
+            {
+              "value": "0",
+              "name": "Off"
+            },
+            {
+              "value": "1024",
+              "name": "1,024 tokens"
+            },
+            {
+              "value": "4096",
+              "name": "4,096 tokens"
+            },
+            {
+              "value": "8192",
+              "name": "8,192 tokens"
+            },
+            {
+              "value": "16384",
+              "name": "16,384 tokens"
+            },
+            {
+              "value": "32768",
+              "name": "32,768 tokens"
+            },
+            {
+              "value": "65536",
+              "name": "65,536 tokens"
+            },
+            {
+              "value": "128000",
+              "name": "128,000 tokens"
+            }
+          ],
+          "id": "thinking_budget",
+          "name": "Thinking Budget",
+          "description": "Extended thinking budget for models that support it",
+          "category": "thought_level",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "ebb41bfb-7492-41a9-b883-5132281bf8b0",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "usage": {
+        "totalTokens": 27313,
+        "inputTokens": 5643,
+        "outputTokens": 283,
+        "thoughtTokens": 0,
+        "cachedReadTokens": 15744,
+        "cachedWriteTokens": 5643
+      }
+    }
+  }
+}

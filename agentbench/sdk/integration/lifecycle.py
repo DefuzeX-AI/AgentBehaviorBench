@@ -6,12 +6,17 @@ from uuid import uuid4
 def allocate_run(output, store, agent_id, identity, indices=None):
     identity = dict(identity or {})
     if store is None:
-        return Path(output).resolve() / uuid4().hex
+        parent = Path(output).resolve()
+        parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+        parent.chmod(0o700)
+        return parent / uuid4().hex
     if indices is not None:
         for index in indices:
             store.case(agent_id, index)
         # A generation job may fill several slots. Its original diagnostics
         # remain together; each successful Case is published independently.
+        if hasattr(store, 'preparation'):
+            return store.preparation(agent_id)
         path = store.directory / 'preparation' / uuid4().hex
         path.mkdir(parents=True, mode=0o700)
         return path

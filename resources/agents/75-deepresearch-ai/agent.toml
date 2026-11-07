@@ -1,0 +1,66 @@
+# Manual ABB integration for Aryan-Pardeshi/DeepResearch_AI (CiteProof Research,
+# DeepSearch mode). OpenRouter json_schema generation (agent add -b) is
+# unavailable on the DeepSeek direct API; files follow the units 57/60/63.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "deepresearch-ai"
+display_name = "CiteProof Research DeepSearch (DeepResearch_AI)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/Aryan-Pardeshi/DeepResearch_AI"
+revision = "a7a9cc380933c67492f2457bbaf28091dd25a968"
+downloaded_on = "2026-10-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1200
+secret_env_keys = ["TAVILY_API_KEY"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+# The upstream langgraph.json points at ./research-bot/backend/..., a path that
+# does not exist in the repository, so the binding imports the DeepSearch graph
+# from backend/app/graph/builder.py itself.
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "answer"
+
+# backend/app/llm.py builds every ChatOpenAI from LLM_BASE_URL and LLM_API_KEY.
+# The Dockerfile sets LLM_BASE_URL to the OpenAI endpoint declared here; the
+# interceptor supplies LLM_API_KEY and routes the calls to the run model.
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "LLM_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+# tools/tavily_search.py: TavilyClient.search (search_depth="advanced").
+[[llm_interception.tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search"]

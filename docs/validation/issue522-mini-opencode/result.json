@@ -1,0 +1,212 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "239b9ea2952145a88eadfb65f75fb1e2",
+  "case_id": "mini-opencode-file-and-shell-smoke-v1",
+  "input_id": "create-and-run",
+  "invocation_id": "239b9ea2952145a88eadfb65f75fb1e2",
+  "agent_id": "mini-opencode",
+  "status": "succeeded",
+  "output": "Done.\n\n**File:** `/workspace/mini-opencode/hello.py`\n```python\nprint('ABB mini-opencode smoke')\n```\n\n**Exact stdout from `python hello.py`:**\n```\nABB mini-opencode smoke\n```\n\nExit code: 0",
+  "raw_output": {
+    "answer": "Done.\n\n**File:** `/workspace/mini-opencode/hello.py`\n```python\nprint('ABB mini-opencode smoke')\n```\n\n**Exact stdout from `python hello.py`:**\n```\nABB mini-opencode smoke\n```\n\nExit code: 0",
+    "native_state": {
+      "messages": [
+        {
+          "content": "In the current project directory, create hello.py containing exactly one Python statement: print('ABB mini-opencode smoke'). Then actually run python hello.py using your shell tool. Report the exact stdout from that execution. Do not use web services or install packages; this task only needs your native file and shell tools.",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "human",
+          "name": null,
+          "id": "4f789396-a9df-4698-aa01-74a52af35fec"
+        },
+        {
+          "content": "I'll create the file and run it.",
+          "additional_kwargs": {
+            "refusal": null,
+            "reasoning_content": ""
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 79,
+              "prompt_tokens": 7796,
+              "total_tokens": 7875,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 0,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cached_tokens": 7552
+              },
+              "prompt_cache_hit_tokens": 7552,
+              "prompt_cache_miss_tokens": 244
+            },
+            "model_provider": "deepseek",
+            "model_name": "deepseek-flash",
+            "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+            "id": "6c5c759e-885b-4020-af63-6277a8194fb4",
+            "finish_reason": "tool_calls",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": "mini-opencode",
+          "id": "lc_run--01a1673d-fc10-77a0-ab5b-6062211f7964-0",
+          "tool_calls": [
+            {
+              "name": "write_file",
+              "args": {
+                "file_path": "/workspace/mini-opencode/hello.py",
+                "content": "print('ABB mini-opencode smoke')\n"
+              },
+              "id": "call_00_ET_29pcCubeKr2CGyMg3Qyi3779",
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "usage_metadata": {
+            "input_tokens": 7796,
+            "output_tokens": 79,
+            "total_tokens": 7875,
+            "input_token_details": {
+              "cache_read": 7552
+            },
+            "output_token_details": {
+              "reasoning": 0
+            }
+          }
+        },
+        {
+          "content": "Updated file /workspace/mini-opencode/hello.py",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "tool",
+          "name": "write_file",
+          "id": "dc9c5785-a603-4e45-9c4f-f9d2897d9f21",
+          "tool_call_id": "call_00_ET_29pcCubeKr2CGyMg3Qyi3779",
+          "artifact": null,
+          "status": "success"
+        },
+        {
+          "content": "",
+          "additional_kwargs": {
+            "refusal": null,
+            "reasoning_content": ""
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 48,
+              "prompt_tokens": 7899,
+              "total_tokens": 7947,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 0,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cached_tokens": 7680
+              },
+              "prompt_cache_hit_tokens": 7680,
+              "prompt_cache_miss_tokens": 219
+            },
+            "model_provider": "deepseek",
+            "model_name": "deepseek-flash",
+            "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+            "id": "f6d7b4bb-b0d5-45bd-a4c9-b01fa88927f2",
+            "finish_reason": "tool_calls",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": "mini-opencode",
+          "id": "lc_run--01a1673e-008e-7831-84d7-5c9163053437-0",
+          "tool_calls": [
+            {
+              "name": "execute",
+              "args": {
+                "command": "cd /workspace/mini-opencode && python hello.py"
+              },
+              "id": "call_00_ET_RWovF6IA0qyTpXJhyWb74430",
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "usage_metadata": {
+            "input_tokens": 7899,
+            "output_tokens": 48,
+            "total_tokens": 7947,
+            "input_token_details": {
+              "cache_read": 7680
+            },
+            "output_token_details": {
+              "reasoning": 0
+            }
+          }
+        },
+        {
+          "content": "ABB mini-opencode smoke\n\n[Command succeeded with exit code 0]",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "tool",
+          "name": "execute",
+          "id": "ae757e41-ec05-44e5-bf1a-290d090e0632",
+          "tool_call_id": "call_00_ET_RWovF6IA0qyTpXJhyWb74430",
+          "artifact": null,
+          "status": "success"
+        },
+        {
+          "content": "Done.\n\n**File:** `/workspace/mini-opencode/hello.py`\n```python\nprint('ABB mini-opencode smoke')\n```\n\n**Exact stdout from `python hello.py`:**\n```\nABB mini-opencode smoke\n```\n\nExit code: 0",
+          "additional_kwargs": {
+            "refusal": null,
+            "reasoning_content": ""
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 53,
+              "prompt_tokens": 7974,
+              "total_tokens": 8027,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 0,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cached_tokens": 7808
+              },
+              "prompt_cache_hit_tokens": 7808,
+              "prompt_cache_miss_tokens": 166
+            },
+            "model_provider": "deepseek",
+            "model_name": "deepseek-flash",
+            "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+            "id": "4fb5fc62-8cef-4065-986e-5041f76e25c3",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": "mini-opencode",
+          "id": "lc_run--01a1673e-0446-70f2-9de4-05dfa70494bb-0",
+          "tool_calls": [],
+          "invalid_tool_calls": [],
+          "usage_metadata": {
+            "input_tokens": 7974,
+            "output_tokens": 53,
+            "total_tokens": 8027,
+            "input_token_details": {
+              "cache_read": 7808
+            },
+            "output_token_details": {
+              "reasoning": 0
+            }
+          }
+        }
+      ]
+    },
+    "mcp_status": "loaded",
+    "mcp_tool_count": 3
+  }
+}

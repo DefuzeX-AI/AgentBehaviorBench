@@ -1,0 +1,54 @@
+# Hand-written from the pinned ggcode binary's native ACP server (`ggcode acp`) and a
+# generated ggcode.yaml with one OpenAI-protocol endpoint (key via ${ABB_AGENT_MODEL_API_KEY}).
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "ggcode"
+display_name = "ggcode (ACP, shared model provider)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "install"
+repository = "https://github.com/topcheer/ggcode"
+revision = "6b51d84e810424b29dbb3f9b1512c33596995cd8"
+downloaded_on = "2026-10-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1200
+env_keys = []
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 120
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
+
+# Model credentials and exact routes use the shared runtime default.

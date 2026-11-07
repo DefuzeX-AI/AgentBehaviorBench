@@ -1,0 +1,11 @@
+schema_version = "abb.network.v1"
+
+# kimchi's local file, shell, search and todo tools need no network routes. The only
+# admitted model route is the shared runtime default derived from the selected
+# provider. bootstrap/launch.py configures no Kimchi API key, so the Kimchi gateway
+# (model metadata, auto routing, billing, hosted web search) is not used, and it
+# switches off Kimchi telemetry, the self-update probe, Pi's catalog refresh, version
+# check and install telemetry, and mem0 telemetry. No MCP server or connector is
+# configured. kimchi's web_fetch tool fetches public URLs directly (no Playwright is
+# installed, so it uses plain fetch); such requests go through ABB's egress observer,
+# which forwards only the default package registries and refuses other hosts with 403.

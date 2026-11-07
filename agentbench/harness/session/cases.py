@@ -37,8 +37,8 @@ def retain_prepared(directory, agent_id, case, existing=None):
     if case.artifact_sha256 is not None and digest != case.artifact_sha256:
         raise SuiteProvenanceError('Prepared Case bytes do not match the declared artifact digest')
     # Agent IDs are public labels, never filesystem paths supplied to a writer.
-    agent_directory = hashlib.sha256(agent_id.encode()).hexdigest()[:24]
-    path = Path(directory) / 'cases' / agent_directory / str(case.case_index) / 'case.json'
+    from agentbench.sdk.integration.artifacts import FileArtifactStore
+    path = FileArtifactStore(directory).case(agent_id, case.case_index).directory / 'case.json'
     if path.exists() and path.read_bytes() != data:
         raise SuiteProvenanceError('A previously published Case artifact cannot be overwritten')
     from agentbench.sdk.integration.artifacts import FileCaseArtifacts

@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-BINDING = Path(os.environ.get('TSCI_TEST_BINDING', ROOT / 'resources/agents/56-timeseriesscientist/bindings/tsci_workflow.py'))
+BINDING = Path(os.environ.get('TSCI_TEST_BINDING', ROOT / 'resources/agents/50-timeseriesscientist/bindings/tsci_workflow.py'))
 
 class SDKClient:
     def __init__(self, timeout=600, max_retries=2):
@@ -312,7 +312,7 @@ class Issue384(unittest.TestCase):
 
     def test_manifest_pins_git_source_and_keeps_numeric_limit_public(self):
         import tomllib
-        manifest=tomllib.loads((ROOT/'resources/agents/56-timeseriesscientist/agent.toml').read_text())
+        manifest=tomllib.loads((ROOT/'resources/agents/50-timeseriesscientist/agent.toml').read_text())
         self.assertEqual(manifest['source']['method'],'git')
         self.assertEqual(len(manifest['source']['revision']),40)
         self.assertIn('TSCI_MODEL_OUTPUT_LIMIT',manifest['runtime']['env_keys'])

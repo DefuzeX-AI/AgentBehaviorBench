@@ -3,7 +3,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 
-from agentbench.sdk.integration.runner import ContainerSDKRunner
+from agentbench.sdk.integration.runner import ContainerSDKRunner, read
 from agentbench.sdk.judgment import DeferredJudgment
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.judges import build_request, execute_judge, resolve_judge
@@ -45,12 +45,12 @@ class NativeRunner(ContainerSDKRunner):
 
     def _read_result(self, directory, registration, case, document):
         result = super()._read_result(directory, registration, case, document)
-        manifest = json.loads((Path(directory) / 'evaluation/manifest.json').read_bytes())
+        manifest = read(Path(directory) / 'manifest.json')
         expected = document['case']['inputs']
         if len(manifest['steps']) > len(expected):
             raise ValueError('Execution exceeds the imported Case')
         for index, step in enumerate(manifest['steps']):
-            actual = json.loads((Path(directory) / 'evaluation' / step['directory'] / 'input.json').read_bytes())
+            actual = read(Path(directory) / step['directory'] / 'input.json')
             if actual != {key: expected[index][key] for key in ('input_id', 'payload')}:
                 raise ValueError('Executed input differs from the imported Case')
         if len(manifest['steps']) != len(expected) and not result.failures:
@@ -77,10 +77,10 @@ class NativeRunner(ContainerSDKRunner):
         request['judge'] = self.judge_reference
         request['request_id'] = digest(case_bytes({k: v for k, v in request.items() if k != 'request_id'}))
         files = Artifacts(directory, environ=self.context.environ)
-        saved = Path(directory) / 'evaluation/judge/request.json'
+        saved = Path(directory) / 'judge/request.json'
         if saved.exists() and json.loads(saved.read_bytes()) != request:
             raise ValueError('Saved Judge request differs; keep each assessment separate')
-        files.save('evaluation/judge/request.json', request)
+        files.save('judge/request.json', request)
         return request
 
     def _assess(self, directory, registration, case, result):

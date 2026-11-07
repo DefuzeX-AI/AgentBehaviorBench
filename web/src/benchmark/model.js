@@ -43,7 +43,7 @@ export function groundTruthProgress(value) {
   const hasResult = count > 0 && assessed > 0 && metrics.discovery_rate != null;
   const { percent, label } = hasResult ? caseProgress(count, metrics.discovered_defect_count || 0) : { percent: null, label: '—' };
   const detail = count > 0 ? `${assessed} of ${count} defects assessed` : state;
-  const found = hasResult ? (metrics.discovered_defect_count || 0).toLocaleString() : '—';
+  const found = configured && count > 0 && metrics.discovered_defect_count != null ? metrics.discovered_defect_count.toLocaleString() : '—';
   return { known: configured ? count.toLocaleString() : '—', found, percent, label, state, detail,
     description: hasResult ? `${metrics.discovered_defect_count || 0} discovered of ${count} known defects; ${detail}` : `${state}; discovery rate unavailable` };
 }

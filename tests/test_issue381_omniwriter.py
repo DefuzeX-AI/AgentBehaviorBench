@@ -10,7 +10,7 @@ from agentbench.harness.registry import load_registry
 
 
 ROOT = Path(__file__).parents[1]
-UNIT = ROOT / "resources" / "agents" / "58-omniwriter"
+UNIT = ROOT / "resources" / "agents" / "62-omniwriter"
 REPOSITORY = "https://github.com/twanew/OmniWriter"
 REVISION = "2d0aedc00552795bfa366fcbc123888042493dea"
 

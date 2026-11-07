@@ -46,9 +46,9 @@ def test_native_import_execute_no_judge_and_roundtrip(tmp_path, unit, monkeypatc
     assert len({r['session_id'] for r in agent.requests}) == 1
     assert all(p.closed for p in processes)
     directory = runner.directory
-    request = json.loads((directory / 'evaluation/judge/request.json').read_bytes())
+    request = json.loads((directory / 'judge/request.json').read_bytes())
     assert request['schema'] == 'abb.judge.request.v1' and len(request['steps']) == 2
-    assert not (directory / 'evaluation/judge/report.json').exists()
+    assert not (directory / 'judge/report.json').exists()
     from agentbench.harness.session.codec import benchmark_from_json, benchmark_to_json
     assert benchmark_from_json(benchmark_to_json(result)).execution_only
     from agentbench.harness.result import CaseResult
@@ -69,14 +69,14 @@ def test_failed_agent_stops_remaining_inputs(tmp_path, unit, monkeypatch):
     runner, _ = native_runner(tmp_path, unit, monkeypatch, agent=agent)
     result = runner.run_case(unit, runner.prepare_cases(unit)[0])
     assert len(agent.requests) == 1 and result.execution_status == 'failed'
-    request = json.loads((runner.directory / 'evaluation/judge/request.json').read_bytes())
+    request = json.loads((runner.directory / 'judge/request.json').read_bytes())
     assert request['unexecuted_input_ids'] == ['b']
 
 
 def test_independent_judge_uses_saved_evidence_and_rejects_tampering(tmp_path, unit, monkeypatch):
     runner, _ = native_runner(tmp_path, unit, monkeypatch)
     runner.run_case(unit, runner.prepare_cases(unit)[0])
-    request = json.loads((runner.directory / 'evaluation/judge/request.json').read_bytes())
+    request = json.loads((runner.directory / 'judge/request.json').read_bytes())
     calls = []
     class Judge:
         def judge(self, request, **kwargs):
@@ -87,7 +87,7 @@ def test_independent_judge_uses_saved_evidence_and_rejects_tampering(tmp_path, u
     assert execute_judge(judge, request, directory=runner.directory, environ={}).status == 'issue'
     assert execute_judge(judge, request, directory=runner.directory, environ={}).status == 'issue'
     assert len(calls) == 1
-    (runner.directory / 'evaluation/inputs/0001/spans.jsonl').write_text('changed')
+    (runner.directory / 'steps/0001/spans.jsonl').write_text('changed')
     with pytest.raises(ValueError, match='evidence changed'):
         execute_judge(judge, request, directory=runner.directory, environ={})
 
@@ -116,7 +116,7 @@ def test_host_judge_after_cleanup_preserves_execution(tmp_path, unit, monkeypatc
         with pytest.raises(TimeoutError):
             runner.run_case(unit, case)
         assert json.loads((runner.directory / 'run.json').read_bytes())['status'] == 'succeeded'
-        assert json.loads((runner.directory / 'evaluation/judge/delivery.json').read_bytes())['status'] == 'failed'
+        assert json.loads((runner.directory / 'judge/delivery.json').read_bytes())['status'] == 'failed'
     else:
         ticket = runner.execute_case(unit, case)
         assert calls == []
@@ -151,7 +151,7 @@ def test_kuma_adapter_translation_is_offline(tmp_path, unit, monkeypatch):
     from agentbench.sdk.plugin.kuma.native_judge import context_from_request
     runner, _ = native_runner(tmp_path, unit, monkeypatch)
     runner.run_case(unit, runner.prepare_cases(unit)[1])
-    request = json.loads((runner.directory / 'evaluation/judge/request.json').read_bytes())
+    request = json.loads((runner.directory / 'judge/request.json').read_bytes())
     context = context_from_request(request, runner.directory)
     assert len(context.history) == 1 and context.case.case_id == 'audit-2'
     assert context.history[0].test_input.payload == 'hello'

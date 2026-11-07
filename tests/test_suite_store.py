@@ -100,7 +100,8 @@ def test_case_bytes_are_immutable_and_corruption_is_detected(tmp_path):
     with SuiteStore.begin(tmp_path / 'suites', 'suite_case', [agent]) as store:
         original = prepared(tmp_path)
         stable = store.retain_case(agent.agent_id, original)
-        assert stable.artifact_path.is_relative_to(store.directory)
+        assert stable.artifact_path.is_relative_to(tmp_path / 'agents' / agent.agent_id)
+        assert not stable.artifact_path.is_relative_to(store.directory)
         revision = store.snapshot()['revision']
         assert store.retain_case(agent.agent_id, original) == stable
         assert store.snapshot()['revision'] == revision

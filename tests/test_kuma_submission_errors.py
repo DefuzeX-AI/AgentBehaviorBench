@@ -22,14 +22,14 @@ def test_native_error_reaches_committed_sdk_submission(tmp_path, status, sdk_sta
         (folder / 'otel-status.json').write_text('{"status":"complete"}')
         return {'status': status, 'error': error}
 
-    output = tmp_path / 'evaluation'
+    output = tmp_path
     with sdk_run(tmp_path / 'repo', ['task']) as (run, provider):
         summary = asyncio.run(drive_run(run, invoke, output, provider=provider))
         assert summary['submission'] == 'committed'
         assert summary['judge'] == 'received'
         assert run.history[0].submission.status == sdk_status
         assert run.history[0].submission.error == error
-    saved = json.loads((output / 'inputs/0001/submission.json').read_text(encoding='utf-8'))
+    saved = json.loads((output / 'steps/0001/submission.json').read_text(encoding='utf-8'))
     assert saved['error'] == error
 
 
@@ -43,7 +43,7 @@ def test_native_error_redacts_only_credentials_before_sdk_submission(tmp_path, m
         (folder / 'otel-status.json').write_text('{"status":"complete"}')
         return {'status': 'failed', 'error': original}
 
-    output = tmp_path / 'evaluation'
+    output = tmp_path
     with sdk_run(tmp_path / 'repo', ['task']) as (run, provider):
         submitted = []
         submit = run.submit
@@ -57,5 +57,5 @@ def test_native_error_redacts_only_credentials_before_sdk_submission(tmp_path, m
         assert summary['judge'] == 'received'
         assert submitted[0]['error'] == expected
         assert run.history[0].submission.error == expected
-    result = json.loads((output / 'inputs/0001/result.json').read_text(encoding='utf-8'))
+    result = json.loads((output / 'steps/0001/result.json').read_text(encoding='utf-8'))
     assert result['error'] == expected

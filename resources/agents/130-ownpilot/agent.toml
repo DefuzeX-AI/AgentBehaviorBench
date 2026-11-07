@@ -1,0 +1,49 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "ownpilot"
+display_name = "OwnPilot (native ACP)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "git"
+repository = "https://github.com/ownpilot/OwnPilot"
+revision = "568cf7eee2ec5fa82d66ffdb984e2202171bffce"
+downloaded_on = "2026-10-26"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 600
+env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 120
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []

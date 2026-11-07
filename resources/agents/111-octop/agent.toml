@@ -1,0 +1,55 @@
+# Hand-written from the pinned Octop 1.0.2 release and its inbound ACP server
+# (`octop acp`, docs/acp.md). Octop ships its own ACP implementation through
+# octop-harness, so no binding layer is needed.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "octop"
+display_name = "Octop (ACP, self-hosted multi-agent assistant)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "install"
+repository = "https://github.com/TencentCloud/Octop"
+revision = "dd9dce470844c25d59effb50615bb3c667ea25cd"
+downloaded_on = "2026-10-24"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = []
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 180
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
+
+# Model credentials and the exact route come from the shared runtime default.

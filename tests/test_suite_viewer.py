@@ -75,6 +75,25 @@ def test_attempt_catalog_rejects_foreign_suite_artifact(store, tmp_path):
     assert SuiteRunCatalogAPI(store.path).route('/api/observe/runs', {})['runs'] == []
 
 
+@pytest.mark.parametrize('foreign', [False, True])
+def test_missing_artifact_id_is_recovered_only_from_validated_directory(store, tmp_path, foreign):
+    directory = artifact(tmp_path, 'native-run',
+                         suite_id='foreign-suite' if foreign else 'suite_view')
+    store.append({'event': 'case_attempt_started', 'agent_id': 'alpha', 'case_index': 0,
+                  'attempt_id': 'attempt-1', 'attempt_number': 1,
+                  'artifact_directory': str(directory), 'artifact_run_id': None})
+    original = store.path.read_bytes()
+    result = viewer.parse_result_log(store.path)
+    case = result['jobs'][0]['cases'][0]
+    expected = None if foreign else 'native-run'
+    assert case['attempts'][0]['artifact_run_id'] == expected
+    assert case['artifact_run_id'] == expected
+    assert store.path.read_bytes() == original
+    if not foreign:
+        assert SuiteRunCatalogAPI(store.path).route(
+            '/api/observe/runs/native-run/files', {})['entries'][0]['name'] == 'run.json'
+
+
 def test_result_files_are_bound_to_registered_attempt_and_imported_preparation(store, tmp_path):
     selected = artifact(tmp_path, 'selected')
     foreign = artifact(tmp_path, 'unregistered')

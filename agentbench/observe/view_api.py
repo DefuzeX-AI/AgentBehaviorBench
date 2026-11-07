@@ -163,10 +163,8 @@ class RunViewAPI:
         self.run_id = directory.name
 
     def file(self, relative):
-        path = (self.directory / relative).resolve(strict=True)
-        if not path.is_relative_to(self.directory) or path == self.directory:
-            raise ValueError('Path outside run')
-        return path
+        from .artifact_paths import artifact_file
+        return artifact_file(self.directory, relative)
 
     def read(self, relative):
         try:
@@ -180,7 +178,8 @@ class RunViewAPI:
             inputs = self.file('evaluation/inputs')
         except FileNotFoundError:
             return folders
-        return folders + [f'evaluation/inputs/{p.name}' for p in sorted(inputs.iterdir())
+        prefix = 'steps' if (self.directory / 'steps').is_dir() else 'evaluation/inputs'
+        return folders + [f'{prefix}/{p.name}' for p in sorted(inputs.iterdir())
                           if p.is_dir() and re.fullmatch(r'\d{4}', p.name)]
 
     def spans(self):
@@ -227,7 +226,31 @@ class RunViewAPI:
             'inputs': [{'step': Path(folder).name, 'failures': tool_failures(self, folder), **{key: self.read(f'{folder}/{name}.json')
                        for key, name in {'input': 'input', 'result': 'result',
                                          'submission': 'submission', 'evidence': 'evidence'}.items()}}
-                       for folder in self.outputs() if folder.startswith('evaluation/')]}
+                       for folder in self.outputs() if folder.startswith(('evaluation/', 'steps/'))]}
+
+    def trajectory(self):
+        """The saved trajectory.json; pending while the attempt still runs.
+
+        trajectory.json is written once after both containers stop, so a running
+        attempt has none yet. Historical packages that never had one are derived
+        on read; a running attempt is not, so the viewer never shows a partial
+        sequence that the saved file later contradicts.
+        """
+        from agentbench import trajectory
+        saved = trajectory.read(self.directory)
+        if saved is not None:
+            return saved
+        metadata = self.read('run.json') or {}
+        identity = {'schema': trajectory.SCHEMA, 'run_id': metadata.get('run_id') or self.run_id,
+                    'agent_id': metadata.get('agent_id') or 'unknown'}
+        if metadata.get('status') == 'running':
+            return {**identity, 'status': 'pending',
+                    'reason': 'The attempt is still running; trajectory.json is written when it finishes.'}
+        try:
+            return trajectory.load(self.directory)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            return {**identity, 'status': 'failed', 'derived_on_read': True,
+                    'error_type': type(exc).__name__, 'error': str(exc)}
 
     def events(self, offset):
         if offset < 0:
@@ -286,14 +309,15 @@ class RunViewAPI:
         if route == 'timeline':
             from .timeline import timeline
             return timeline(self)
+        if route == 'trajectory':
+            return self.trajectory()
         match = re.fullmatch(r'otel/([0-9a-f]{16})/payload/(input|output|error|metadata|events)', route)
         if match:
             span = next(s for s in self.spans()['spans'] if s['span_id'] == match[1])
-            output = self.file(span['output_directory'])
             ref = span['attributes'][f'abb.{match[2]}_ref']
-            target = (output / ref).resolve(strict=True)
-            if not target.is_relative_to(output):
+            if Path(ref).is_absolute() or '..' in Path(ref).parts:
                 raise ValueError('Payload outside output')
+            target = self.file(span['output_directory'] + '/' + ref)
             with target.open(encoding='utf-8') as stream:
                 payload = [json.loads(line) for line in stream if line.strip()] if match[2] == 'events' else json.load(stream)
             return {'payload': payload}

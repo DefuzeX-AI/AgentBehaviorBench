@@ -8,6 +8,7 @@ import time
 def timeline(api):
     operations, warnings = {}, []
     names = ['timing.jsonl', 'evaluation/timing.jsonl']
+    names.extend(p.relative_to(api.directory).as_posix() for p in sorted((api.directory / 'logs').glob('*timing*.jsonl')))
     names.extend(sorted(path.name for path in api.directory.glob('timing-recovery-*.jsonl')))
     names.extend(sorted(path.name for path in api.directory.glob('timing-judge-*.jsonl')))
     for name in names:

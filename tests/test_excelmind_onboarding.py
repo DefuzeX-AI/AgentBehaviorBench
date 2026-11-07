@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / 'resources/agents/49-excelmind'
+UNIT = ROOT / 'resources/agents/43-excelmind'
 
 
 def test_pinned_upstream_source_unchanged():

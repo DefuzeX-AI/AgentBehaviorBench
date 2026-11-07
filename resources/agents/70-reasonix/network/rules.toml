@@ -1,0 +1,11 @@
+schema_version = "abb.network.v1"
+
+# Reasonix's built-in developer tools (bash, file read/edit/write, search, todo)
+# run inside its own process and need no network routes. The pinned release makes
+# no startup call other than the model endpoint, and the launcher keeps telemetry
+# off; agent tools that do reach the network (`web_fetch`, the browser tools) are
+# ordinary tools whose traffic goes to ABB's egress observer, which records it in
+# egress.jsonl and refuses hosts outside its allowlist with 403. A refused fetch
+# is Agent behavior and does not reject the Case.
+#
+# The only admitted model route is declared in agent.toml [[llm_interception.routes]].

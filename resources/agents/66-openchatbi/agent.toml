@@ -1,0 +1,59 @@
+# Manual ABB integration for zhongyu09/openchatbi (OpenChatBI).
+# The upstream repository is a LangGraph project without a langgraph.json; the
+# outer binding drives the real graph factory the headless run_cli.py uses.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "openchatbi"
+display_name = "OpenChatBI chat-BI agent (LangGraph)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/zhongyu09/openchatbi"
+revision = "97818e4fdcea85535cdfa53d8ae4054878342af1"
+downloaded_on = "2026-10-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+# One question can run the text2sql subgraph (table selection, information
+# extraction, SQL generation with up to three repair retries, visualization
+# DSL) plus the data-analysis sub-agent and Python execution, each a separate
+# chat completion.
+timeout_sec = 900
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+input_key = "message"
+output_key = "answer"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"

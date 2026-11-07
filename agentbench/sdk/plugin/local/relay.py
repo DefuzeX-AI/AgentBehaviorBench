@@ -131,7 +131,7 @@ class JudgeRelay:
     """Answer the first local Judge request of one running container."""
 
     def __init__(self, directory, model, *, environ=None, ask=ask_model, interval=0.2):
-        self.evaluation = directory / 'evaluation'
+        self.evaluation = directory
         self.files = Artifacts(directory, environ=environ)
         self.model = model
         self.ask = ask

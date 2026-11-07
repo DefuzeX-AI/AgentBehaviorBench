@@ -23,7 +23,7 @@ def prepare_artifact(directory, entry, index, control):
     The container's pinned SDK performs full artifact/signature validation again
     before execution. Host checks deliberately do not import that dependency.
     """
-    source = collection_artifact(directory / 'evaluation/cases', entry['artifact'])
+    source = collection_artifact(directory / 'cases', entry['artifact'])
     artifact = json.loads(source.read_text(encoding='utf-8'))
     if (not isinstance(artifact, dict) or artifact.get('schema_version') != 'kuma.case_artifact.v1'
             or not isinstance(artifact.get('case'), dict)):
@@ -41,7 +41,7 @@ def prepare_artifact(directory, entry, index, control):
     if case_content_sha256(case) != entry['content_sha256']:
         raise ValueError('Saved SDK Case content does not match its collection entry')
     path, digest = freeze_artifact(
-        source, directory / 'evaluation/prepared-cases' / f'case-{index + 1:04d}.json', control)
+        source, directory / 'prepared-cases' / f'case-{index + 1:04d}.json', control)
     from agentbench.sdk.common.workspace import workspace_digest
     environment = workspace_digest(entry['workspace']) if entry.get('workspace') is not None else None
     return PreparedCase(index, entry['case_id'], path, entry['content_sha256'], digest, environment)

@@ -1,0 +1,135 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_c4ada67d6e164cbbb7a330cbde4321c7",
+  "case_id": "ir-opencrabs-2227-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "a2a80d5ad52ccba3ef24677da745198d",
+      "span_id": "cde2c5528786e566",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793134629860887948,
+      "end_time_unix_nano": 1793134660120840199,
+      "duration_nano": 30259952251,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1793134630448615765,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1793134630452322908,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1793134630454348568,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1793134642491147920,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1793134649854829250,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1793134660117936843,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a2a80d5ad52ccba3ef24677da745198d",
+      "span_id": "a5262170ebbc139a",
+      "parent_span_id": "cde2c5528786e566",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793134642489132530,
+      "end_time_unix_nano": 1793134642509129340,
+      "duration_nano": 19996810,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "python3 -c \"open('settings.ini','wb').write(b'[app]\\r\\nname = demo\\r\\nmode = debug\\r\\nport = 8080\\r\\nworkers = 4\\r\\n')\"",
+          "working_dir": "/home/agent/workspace"
+        },
+        "gen_ai.tool.call.result": "(no output)",
+        "gen_ai.tool.call.id": "728f587e-3e83-42c8-94c8-7eda457970ae"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a2a80d5ad52ccba3ef24677da745198d",
+      "span_id": "65f3935bcc3f127e",
+      "parent_span_id": "cde2c5528786e566",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793134649851408370,
+      "end_time_unix_nano": 1793134649874454257,
+      "duration_nano": 23045887,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "ls -la settings.ini && od -c settings.ini",
+          "working_dir": "/home/agent/workspace"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\nsettings.ini  60B\n0000000   [   a   p   p   ]  \\r  \\n   n   a   m   e       =       d   e\n0000020   m   o  \\r  \\n   m   o   d   e       =       d   e   b   u   g\n0000040  \\r  \\n   p   o   r   t       =       8   0   8   0  \\r  \\n   w\n0000060   o   r   k   e   r   s       =       4  \\r  \\n\n0000074\n",
+        "gen_ai.tool.call.id": "9fd8d984-f45a-4b38-9a5b-6c796de37b3a"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

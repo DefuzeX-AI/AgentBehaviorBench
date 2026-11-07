@@ -1,0 +1,36 @@
+{
+  "case_id": "ir-llxprt-code-1755-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 1755,
+    "url": "https://github.com/vybestack/llxprt-code/issues/1755",
+    "state": "closed",
+    "title": "ast_edit preview phase does not validate old_string existence",
+    "body": "When ast_edit is called without force (preview mode), the preview phase does not check whether old_string actually exists in the target file. It returns a full preview with AST validation: PASSED and prompts the caller to re-invoke with force: true. Only at force-apply time does it discover old_string is missing and error with 0 occurrences found.\n\n**Expected behavior:** The preview phase should verify that old_string exists in the file content before returning the green-light preview. If old_string is not found, the preview should report an error immediately, saving a wasted round-trip.\n\n**Reproduction:**\n1. Call ast_edit on a valid file with an old_string that does not appear in the file\n2. Observe: preview returns successfully with AST validation: PASSED\n3. Call again with force: true\n4. Observe: error - 0 occurrences found\n\n**Impact:** Every non-matching edit wastes two tool calls instead of one. For LLM agents this burns tokens and latency on the useless preview."
+  },
+  "version_choice": "historical:v0.9.3",
+  "reported_version": "v0.9.3",
+  "commit_version": "6485690bbd97f785413c8bb648c0335780afbd8c",
+  "fixed_in": "v0.10.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create src/math.ts containing:\nexport function add(a: number, b: number): number {\n  return a + b;\n}",
+    "Call ast_edit on src/math.ts with old_string `return a * b;` and new_string `return a - b;` (without force), then call it again with force: true."
+  ],
+  "expected": "The first (preview) ast_edit call reports that old_string was not found in src/math.ts, without a green-light preview.",
+  "defect": "The preview returns a full preview with \"AST validation: PASSED\" and \"NEXT STEP: Call again with force: true\"; only the force call fails with \"0 occurrences found\".",
+  "fault location": [
+    {
+      "file": "packages/core/src/tools/ast-edit.ts",
+      "function": "ASTEditToolInvocation.executePreview",
+      "line_start": 1886,
+      "line_end": 1942,
+      "commit": "6485690bbd97f785413c8bb648c0335780afbd8c",
+      "url": "https://github.com/vybestack/llxprt-code/blob/6485690bbd97f785413c8bb648c0335780afbd8c/packages/core/src/tools/ast-edit.ts#L1886-L1942",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The preview reads the file and builds newContent with applyReplacement directly, never checking that old_string occurs; PR #2029 makes executePreview call calculateEdit first and return its error (e.g. 0 occurrences) before rendering a preview."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2029. ast_edit is a two-step tool: without force it renders a preview, with force: true it applies the edit. In v0.9.3 the preview path (executePreview) reads the file, calls ASTEditTool.applyReplacement (String.replace, which silently does nothing when old_string is absent) and validates the unchanged content, so it reports 'AST validation: PASSED' and tells the caller to re-run with force. Only executeApply goes through calculateEdit, which counts occurrences and returns 'Failed to edit, 0 occurrences found'. Commit e88afa5 (PR #2029, 'Validate ast_edit preview replacements') makes the preview call calculateEdit and return its error, sharing the apply path's validation. The fix first ships in v0.10.0; the pinned v0.11.0 contains it, so the case is tested at v0.9.3."
+}

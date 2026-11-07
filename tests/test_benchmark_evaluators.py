@@ -6,7 +6,7 @@ import json
 
 from agentbench.cli.viewer_catalog import ViewerSuiteCatalog
 from agentbench.cli.viewer_overview import benchmark_evaluators
-from agentbench.harness.ground_truth import ASSESSMENTS_SCHEMA, benchmark_ground_truth, digest_json
+from agentbench.harness.ground_truth import benchmark_ground_truth
 from agentbench.harness.session import SuiteStore
 from agentbench.observe.evaluation_source import evaluation_source
 from tests.test_ground_truth import ground_truth_fixture, write_json
@@ -81,51 +81,33 @@ def test_unknown_mixed_partial_and_custom_sdk_identities_are_distinct(tmp_path):
     assert evaluators['__mixed__']['evaluation_source']['sdk'] == '__mixed__'
 
 
-def test_discovery_is_recomputed_per_sdk_and_excludes_agents_that_sdk_never_ran(tmp_path):
+def test_discovery_is_recomputed_per_sdk_and_excludes_agents_that_sdk_never_ran(tmp_path, monkeypatch):
     kuma = ground_truth_fixture(tmp_path, 'alpha', 'suite_kuma')
-    kuma.save_reviews(kuma.review)
-    record_source(kuma.record, 'kuma')
-    # The same Agent and defect can be discovered by one SDK and missed by another.
-    local = deepcopy(kuma.record)
-    directory = tmp_path / 'results/suites/suite_local'
-    local['directory'] = directory
-    local['plan']['suite_id'] = local['snapshot']['suite_id'] = 'suite_local'
-    artifact = directory / 'cases/alpha/0/case.json'
-    write_json(artifact, json.loads(kuma.artifact.read_text()))
-    local['snapshot']['jobs'][0]['cases'][0]['prepared_case']['artifact_path'] = str(artifact)
-    record_source(local, 'local')
-    local_assessment = directory / 'ground_truth/assessments.json'
-    missed = {**kuma.review, 'judge_detected': False}
-    write_json(local_assessment, {'schema': ASSESSMENTS_SCHEMA, 'suite_id': 'suite_local', 'assessments': [missed]})
+    local = ground_truth_fixture(tmp_path, 'alpha', 'suite_local')
     beta = ground_truth_fixture(tmp_path, 'beta', 'suite_beta')
-    beta.save_reviews(beta.review)
-    record_source(beta.record, 'kuma')
-    # A registered Agent with no saved Suite must not inflate an SDK denominator.
     ground_truth_fixture(tmp_path, 'not-run', 'suite_unused')
-    records = [kuma.record, local, beta.record]
-
+    fixtures = [kuma, local, beta]
+    for f, sdk in zip(fixtures, ['kuma', 'local', 'kuma']):
+        record_source(f.record, sdk)
+    scores = {'suite_kuma': 1, 'suite_local': 0, 'suite_beta': 1}
+    monkeypatch.setattr('agentbench.harness.session.read_suite', lambda directory: ({}, []))
+    def read(directory, plan, events):
+        return {'status': 'completed', 'decisions': [{'agent_id': plan['agents'][0]['agent_id'],
+                'ground_truth_id': 'known-defect', 'score': scores[plan['suite_id']]}]}
+    monkeypatch.setattr('agentbench.harness.ground_truth.evaluator.read_evaluation', read)
+    records = [f.record for f in fixtures]
     def groups():
         return {row['id']: row for row in benchmark_evaluators(tmp_path, records)}
-
     result = groups()
     assert result['kuma']['ground_truth']['defect_count'] == 2
     assert result['kuma']['ground_truth']['discovered_defect_count'] == 2
     assert result['kuma']['ground_truth']['discovery_rate'] == 1
     assert result['local']['ground_truth']['defect_count'] == 1
-    assert result['local']['ground_truth']['discovered_defect_count'] == 0
     assert result['local']['ground_truth']['discovery_rate'] == 0
-    assert result['local']['totals']['agent_count'] == 1
-    assert [agent['agent_id'] for agent in result['local']['agents']] == ['alpha']
-    assert all(not group['ground_truth']['warnings'] for group in result.values())
-    # Reviews refresh without Suite events or a catalog cache invalidation.
-    write_json(local_assessment, {'schema': ASSESSMENTS_SCHEMA, 'suite_id': 'suite_local',
-                                 'assessments': [kuma.review]})
+    scores['suite_local'] = None
+    assert groups()['local']['ground_truth']['discovery_rate'] is None
+    scores['suite_local'] = 1
     assert groups()['local']['ground_truth']['discovered_defect_count'] == 1
-    kuma.save_reviews({**kuma.review, 'judge_detected': False})
-    result = groups()
-    assert result['kuma']['ground_truth']['discovered_defect_count'] == 1
-    assert result['local']['ground_truth']['discovered_defect_count'] == 1
-    # The preexisting all-SDK API retains its registered-but-unrun Agent behavior.
     assert benchmark_ground_truth(tmp_path, records, ['alpha', 'beta'])['totals']['defect_count'] == 3
 
 
@@ -139,17 +121,23 @@ def test_empty_catalog_has_no_evaluators_and_scoped_ground_truth_is_empty(tmp_pa
     assert scoped['totals']['defect_count'] == 0
 
 
-def test_partial_suite_discovery_is_not_credited_to_its_only_known_sdk(tmp_path):
+def test_partial_suite_discovery_is_not_credited_to_its_only_known_sdk(tmp_path, monkeypatch):
     partial = ground_truth_fixture(tmp_path, 'alpha', 'suite_partial')
-    partial.result['benchmark']['provider_mode'] = 'official-container'
-    partial.record['snapshot']['jobs'][0]['cases'].append({'case_index': 1})
-    partial.save_reviews({**partial.review, 'result_sha256': digest_json(partial.result)})
+    result = partial.attempt['result']
+    result['benchmark']['provider_mode'] = 'official-container'
+    partial.snapshot['jobs'][0]['cases'][0]['result'] = result
+    partial.snapshot['jobs'][0]['cases'].append({'case_index': 1})
     record_source(partial.record, None)
-    assert partial.record['snapshot']['evaluation_source']['status'] == 'partial'
+    assert partial.snapshot['evaluation_source']['status'] == 'partial'
     kuma = deepcopy(partial.record)
     kuma['snapshot']['suite_id'] = kuma['plan']['suite_id'] = 'suite_kuma'
     kuma['directory'] = tmp_path / 'results/suites/suite_kuma'
     record_source(kuma, 'kuma')
+    monkeypatch.setattr('agentbench.harness.session.read_suite', lambda directory: ({}, []))
+    monkeypatch.setattr('agentbench.harness.ground_truth.evaluator.read_evaluation',
+        lambda directory, plan, events: {'status': 'completed', 'decisions': [
+            {'agent_id': 'alpha', 'ground_truth_id': 'known-defect', 'score': 1}]
+            } if plan['suite_id'] == 'suite_partial' else None)
     groups = {row['id']: row for row in benchmark_evaluators(tmp_path, [partial.record, kuma])}
     assert groups['@partial']['ground_truth']['discovered_defect_count'] == 1
     assert groups['kuma']['ground_truth']['discovered_defect_count'] == 0

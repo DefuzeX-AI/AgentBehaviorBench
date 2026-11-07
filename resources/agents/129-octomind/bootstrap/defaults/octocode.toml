@@ -1,0 +1,202 @@
+# Default configuration for Octocode
+# This file contains all default values and serves as the template for new installations
+# Version: 2
+version = 3
+
+[llm]
+# Model in provider:model format (e.g., "openai:gpt-4o-mini", "anthropic:claude-3-5-haiku-20241022")
+# Recommended: Fast, cost-effective models for tooling
+model = "openrouter:openai/gpt-4o-mini"
+timeout = 120
+temperature = 0.7
+max_tokens = 4000
+# API keys set via environment variables: OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, etc.
+
+[index]
+chunk_size = 2000
+chunk_overlap = 100
+embeddings_batch_size = 16  # 16 files per batch - table.add() every 16 files for better persistence
+embeddings_max_tokens_per_batch = 100000  # Keep existing token limit
+flush_frequency = 2  # Flush every 2 batches = every 32 files for coordinated persistence
+require_git = true  # Require git repository for indexing
+# When true, the MCP server runs background indexing + a file watcher to keep the index
+# fresh while serving. When false (default), MCP serves search, view_signatures, and
+# structural_search over the EXISTING index read-only and never (re)indexes in-process.
+# The `index` CLI command is unaffected — this gates only the in-process MCP indexer.
+mcp_index = false
+quantization = true  # Enable RaBitQ quantization (32x compression) vs IVF_HNSW_SQ (4x compression)
+# Contextual chunk enrichment: use LLM to generate natural language descriptions
+# of code chunks at indexing time. Descriptions are prepended to chunk content before
+# embedding (not stored), dramatically improving search recall by bridging the
+# vocabulary gap between natural language queries and code tokens.
+# Requires a configured LLM in [llm] section. Structural context (file path, language,
+# symbols) is ALWAYS prepended regardless of this setting.
+contextual_descriptions = false
+# Model for contextual descriptions in provider:model format
+contextual_model = "openrouter:openai/gpt-4o-mini"
+# Number of code chunks to send per LLM description batch
+contextual_batch_size = 10
+
+# Project-specific final-extension associations. Keys may include a leading dot;
+# values must name an existing Octocode language. Explicit associations override
+# built-in detection. Use OCTOCODE_CONFIG_PATH to select a project-specific config.
+[index.file_associations]
+# inc = "php"
+
+[search]
+max_results = 20
+similarity_threshold = 0.65
+output_format = "markdown"
+max_files = 10
+context_lines = 3
+search_block_max_characters = 400  # Maximum characters to display per code/text/doc block
+graph_expansion = false  # Expand code results with GraphRAG-related files before reranking (requires [graphrag] enabled)
+
+[search.reranker]
+enabled = true
+# Reranker model in provider:model format
+# Supported providers: voyage (VOYAGE_API_KEY), cohere (COHERE_API_KEY), jina (JINA_API_KEY), fastembed (local)
+# fastembed:jina-reranker-v2-base-multilingual — local, no API key, code-aware, multilingual, ~15x faster than bge-reranker-v2-m3
+# Remote API alternatives (higher quality, require API keys):
+#   model = "voyage:rerank-2.5"
+#   model = "cohere:rerank-english-v3.0"
+model = "fastembed:jina-reranker-v2-base-multilingual"
+# Number of candidates to fetch from vector search before reranking
+top_k_candidates = 50
+# Number of final results to return after reranking
+final_top_k = 10
+
+[search.hybrid]
+# Enable hybrid search combining vector similarity with keyword matching
+enabled = true
+# Weight for vector similarity signal (0.0-1.0)
+default_vector_weight = 0.6
+# Weight for keyword matching signal (0.0-1.0)
+default_keyword_weight = 0.4
+# RRF dampening constant k (Cormack et al. 2009). Lower k lets the very top ranks dominate.
+rrf_k = 60.0
+# Tilt vector/keyword weights per query by a deterministic (no-LLM) shape heuristic:
+# identifier/symbol lookups lean keyword, natural-language queries lean vector.
+auto_weight = false
+
+[search.reasoning]
+# PageIndex-style reasoning retrieval: after hybrid retrieval, an LLM reasons over each
+# candidate's code (path, symbols, body) and re-ranks by true relevance, fused with the
+# hybrid rank via RRF. Benchmark lift over hybrid: MRR +36%, NDCG@10 +27%, Hit@5 +0.13.
+# Costs one LLM call per search. Off by default; leaves structural_search as pure grep.
+enabled = false
+# Reasoning model, provider:model (deepseek / openrouter / ollama / voyage / ...).
+model = "deepseek:deepseek-v4-flash"
+# How many top candidates to reason over (more is not better — 25 beat 40 on the benchmark).
+max_candidates = 25
+# How many results to keep after reasoning.
+final_top_k = 10
+# Per-candidate context fed to the LLM: "full" | "snippets" | "signatures".
+# "full" (whole code body) wins clearly — the model must see the code, not just the names.
+context_level = "full"
+# Weight of the reasoning rank vs the hybrid rank in the RRF fusion. The hybrid rank always
+# contributes as a recall floor; >1 leans on the LLM ordering. 2.0 was the benchmark optimum.
+reasoning_weight = 2.0
+# Thinking budget for the ranking call.
+# Valid values: "low", "medium", "high", "xhigh", "max".
+# Ranking is selection, not deliberation, so "low" is right here: left to a thinking
+# model's own default it spends all of llm.max_tokens on chain-of-thought before the
+# JSON (measured: 4000 of 4000 for 25 candidates), returns empty content, and is then
+# retried three more times to no effect.
+reasoning_effort = "low"
+
+[embedding]
+# Local models via fastembed (no API key required, downloaded on first use to system cache)
+# code_model: jina-embeddings-v2-base-code — purpose-built for code search, 768d, fast CPU inference
+# text_model: nomic-embed-text-v1.5 — best local general-text model (Matryoshka, 8K ctx, Apache 2.0)
+# Remote API alternatives (higher quality, require API keys):
+#   code_model = "voyage:voyage-code-3"
+#   text_model = "voyage:voyage-3.5-lite"
+#   code_model = "jina:jina-embeddings-v3"
+code_model = "fastembed:jinaai/jina-embeddings-v2-base-code"
+text_model = "fastembed:nomic-ai/nomic-embed-text-v1.5"
+
+# API keys (only needed for remote providers):
+# JINA_API_KEY, VOYAGE_API_KEY, GOOGLE_API_KEY
+
+[graphrag]
+# The lightweight Tree-sitter file/symbol graph is always available through MCP.
+# This flag enables the persisted GraphRAG layer used for indexed enrichment and CLI graph commands.
+enabled = false
+# Optional LLM enrichment for the persisted graph; ignored when enabled = false.
+use_llm = false
+
+[graphrag.llm]
+# Models for GraphRAG AI enhancements in provider:model format
+description_model = "openrouter:openai/gpt-4o-mini"
+relationship_model = "openrouter:openai/gpt-4o-mini"
+
+# AI processing batch size - how many files to analyze per AI call
+# Smaller values reduce API costs and token usage, larger values improve efficiency
+ai_batch_size = 8
+
+# Maximum tokens per batch request to avoid exceeding model limits
+# Controls the total token count across all files in a single batch
+max_batch_tokens = 16384
+
+# Timeout for batch AI requests in seconds
+# Longer timeouts accommodate larger batches but may delay processing
+batch_timeout_seconds = 60
+
+# Whether to fallback to individual AI calls if batch processing fails
+# Recommended: true for reliability, false for strict batch-only processing
+fallback_to_individual = true
+
+# Maximum content sample size sent to AI for analysis (in tokens)
+# Controls token usage and context window management using existing token estimation
+max_sample_tokens = 1500
+
+# Confidence threshold for filtering AI-discovered relationships (0.0-1.0)
+# Higher values = more selective, only high-confidence relationships
+# Recommended: 0.6 for balanced results, 0.8 for high precision
+confidence_threshold = 0.6
+
+# Weight assigned to architectural relationships discovered by AI
+# Higher values make AI-discovered relationships more prominent in graph
+architectural_weight = 0.9
+
+# System prompt for AI architectural relationship discovery
+# Pure system instructions without data embedding
+relationship_system_prompt = """You are an expert software architect specializing in code analysis. Analyze the provided code files and identify meaningful ARCHITECTURAL relationships that go beyond simple imports.
+
+Focus on these relationship types:
+- 'imports': Module/package imports and dependencies
+- 'implements': Interface implementation, trait implementation
+- 'extends': Class inheritance, module extension
+- 'calls': Function/method calls between modules
+- 'uses': Utility usage, service consumption
+- 'configures': Configuration setup, dependency injection
+- 'factory_creates': Factory pattern instantiation
+- 'observer_pattern': Event listening, callback registration
+- 'strategy_pattern': Algorithm selection, behavior delegation
+- 'adapter_pattern': Interface adaptation, wrapper usage
+- 'architectural_dependency': High-level system dependencies
+
+Respond with a JSON array of relationships. Each relationship must include:
+- source_path: relative path of source file
+- target_path: relative path of target file
+- relation_type: one of the types listed above
+- description: specific explanation of HOW the relationship works
+- confidence: 0.0-1.0 confidence score (use 0.8+ for clear relationships)
+
+Only include relationships with clear architectural significance. Avoid trivial imports."""
+
+# System prompt for AI file description generation
+# Pure system instructions - file data sent separately
+description_system_prompt = """You are a senior software engineer analyzing code architecture. Provide a concise 2-3 sentence description of the file's ROLE and PURPOSE in the system.
+
+Focus on:
+- What architectural layer this file belongs to (API, business logic, data access, utilities, etc.)
+- Its primary responsibility and how it contributes to the system
+- Key patterns or architectural decisions it implements
+
+Avoid listing specific functions/classes. Instead, describe the file's architectural significance and how it fits into the larger system design."""
+
+[commits]
+use_llm = false
+co_authored_by = []

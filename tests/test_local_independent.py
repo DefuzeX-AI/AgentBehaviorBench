@@ -45,7 +45,7 @@ def test_local_does_not_label_execution_failure_a_defect(tmp_path, unit, monkeyp
     from agentbench.sdk.judges import execute_judge
     runner, _ = native_runner(tmp_path, unit, monkeypatch, agent=FakeAgent(result_status='failed'))
     runner.run_case(unit, runner.prepare_cases(unit)[0])
-    request = json.loads((runner.directory/'evaluation/judge/request.json').read_bytes())
+    request = json.loads((runner.directory/'judge/request.json').read_bytes())
     monkeypatch.setattr(provider, 'ask_model', lambda *a, **kw: pytest.fail('Should not call model'))
     report = execute_judge(provider.judge, request, directory=runner.directory, environ={})
     assert report.status == 'inconclusive' and not report.issues

@@ -1,0 +1,110 @@
+# oh-my-pi ACP deployment
+
+This unit installs the pinned [oh-my-pi](https://github.com/can1357/oh-my-pi)
+release `18.2.11` (npm `@oh-my-pi/pi-coding-agent`, tag `v18.2.11`, commit
+`e4151593`, MIT) and drives its **native** ACP server (`omp acp`) over stdio.
+oh-my-pi is a large fork of the Pi coding agent (unit `17-pi-coding-agent`), but
+unlike upstream Pi it needs no `pi-acp` bridge. ABB keeps each Case in a separate
+empty workspace. No upstream source is vendored or modified.
+
+`agent.toml` `[source]` and `source-manifest.json` pin the repository commit that
+npm `18.2.11` was published from.
+
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
+
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
+
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
+
+## Installation
+
+`install/` holds only a `package.json` and `package-lock.json` that pin
+`@oh-my-pi/pi-coding-agent@18.2.11` and `bun@1.4.2`. omp's CLI is a Bun program
+(`engines.bun >= 1.3.14`), so the Bun runtime comes from the same lock (the
+`@oven/bun-linux-*` optional package) instead of a curl installer. The image runs
+`npm ci --ignore-scripts` (integrity-checked) and then only Bun's own
+`install.js`, which copies the binary out of the locked platform package without
+network access. Other install scripts are skipped: `onnxruntime-node` (an optional
+dependency of an unused local-embedding feature) would download binaries.
+
+At build time `bootstrap/list_providers.ts` reads the installed catalog and writes
+`/opt/agent/builtin-providers.json`, the ids of every built-in provider
+(bundled, models.dev-overlay and endpoint-discovery providers). It makes no
+network calls.
+
+## Launcher behavior
+
+For every Case `bootstrap/launch.py` validates the three variables, creates a
+disposable `HOME` under `/tmp` and writes omp's native config there
+(`~/.omp/agent`, also passed as `PI_CODING_AGENT_DIR`, files mode 0600):
+
+- `models.yml` declares a custom `abb` provider with `api: openai-completions`,
+  the base URL, and one model `$ABB_AGENT_MODEL` (`reasoning: true`, 200k context,
+  32k max output, `compat.supportsDeveloperRole: false` because DeepSeek rejects the
+  `developer` role). `apiKey` is the environment variable *name* `ABB_AGENT_MODEL_API_KEY`,
+  which omp resolves at request time, so the credential never touches disk or argv.
+- `config.yml` sets `modelRoles.default: abb/$ABB_AGENT_MODEL`, because ACP
+  `session/new` does not select a model, and `disabledProviders` to every
+  built-in provider id from `builtin-providers.json` plus the implicit local
+  providers (`ollama`, `llama.cpp`, `lm-studio`), except the built-in `web`
+  provider, whose models (`web/tavily`, `web/exa`, …) are the `web_search` backends.
+
+Why `disabledProviders`: after each session is created omp starts a background
+model-catalog refresh that probes keyless provider endpoints and the models.dev
+mirror for every enabled built-in provider. The first local run was rejected by
+host acceptance with `egress_denied` for `GET catalog.stencil.so/models.json.zstd`,
+`coding-intl.dashscope.aliyuncs.com/v1/models`, `hyper.charm.land/v1/models`,
+`api.venice.ai/api/v1/models`, `api.kilo.ai/api/gateway/models`,
+`zenmux.ai/api/v1/models` and `api.commandcode.ai/provider/v1/models`. omp has no
+offline switch for this refresh; disabling the unused providers through its own
+setting leaves only the configured `abb` provider and needs no extra egress.
+
+The launcher also sets `OTEL_SDK_DISABLED=true` (omp's own OTLP exporter stays
+off; ABB's evidence comes from ACP events and model interception) and
+`npm_config_update_notifier=false` for commands the agent runs. The disposable `HOME` keeps omp's sessions, logs, model cache and
+Bun's transpiler cache writable by whichever unprivileged uid the runtime
+chooses, and isolates Cases.
+
+## Web tools and package installs
+
+omp's `web_search` and `fetch` tools are on by default and run natively. With
+`TAVILY_API_KEY` supplied (`optional_secret_env_keys`), `web_search` uses Tavily
+(`POST https://api.tavily.com/search`), declared in `network/rules.toml` as a tool
+route. Without it (or when Tavily fails), omp falls back to keyless scrapers; the
+DuckDuckGo HTML provider (`POST https://html.duckduckgo.com/html/`) is declared as a
+tool route too, so search works without a key. The other scrapers are refused by
+the egress observer. `fetch` contacts the URL the model chooses. Non-model traffic
+without a route goes to ABB's egress observer, which forwards allowlisted hosts
+(including `registry.npmjs.org`, so `npm install` in the bash tool works), refuses
+the rest with 403 and records every attempt in `egress.jsonl`. A refusal is Agent
+behavior and does not reject the Case (#137); `ABB_EGRESS_ALLOW=host[:port],...`
+admits more hosts for a run. Before #137 any undeclared request rejected the whole
+trace, so the launcher also set `npm_config_offline=true` and no search backend was
+passed.
+
+The `browser` helper in the eval prelude uses Puppeteer with Debian's Chromium
+(`PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/abb-chromium`, set in the launcher; no Chrome
+download). `abb-chromium` imports the interceptor CA into Chromium's NSS store (Chromium
+ignores `SSL_CERT_FILE`) and pins Puppeteer's `--remote-debugging-port=0` into
+`127.0.0.1:9222-9231`, the loopback tool route in `network/rules.toml` (the runtime
+redirects loopback TCP too). `zz-abb-lean` keeps Chromium within the 128-pid budget
+(#158). A browser opened with an explicit profile/app path chooses its own random port
+and cannot be reached (#156).
+
+omp does not run a sandbox of its own, so no sandbox switch is needed under the
+container's `--cap-drop=ALL` limits.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

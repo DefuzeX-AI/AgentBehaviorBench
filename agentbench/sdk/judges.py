@@ -36,13 +36,16 @@ def resolve_judge(reference):
 
 def build_request(directory, registration, document):
     root = Path(directory)
-    read = lambda name: json.loads((root / name).read_bytes())
-    manifest = read('evaluation/manifest.json')
+    from agentbench.observe.artifact_paths import artifact_file
+    read = lambda name: json.loads(artifact_file(root, name).read_bytes())
+    manifest = read('manifest.json')
     files, steps = {}, []
     for index, step in enumerate(manifest['steps'], 1):
-        prefix = f'evaluation/inputs/{index:04d}'
-        if step['directory'] != f'inputs/{index:04d}':
+        prefix = f'steps/{index:04d}'
+        if step['directory'] not in (f'steps/{index:04d}', f'inputs/{index:04d}'):
             raise ValueError('Unexpected evidence step path')
+        if step['directory'].startswith('inputs/'):
+            prefix = 'evaluation/' + step['directory']
         # Retain payloads and file evidence referenced by spans as well as indexes.
         # These are execution-owned output files, never the Agent unit or GT.
         for path in sorted((root / prefix).rglob('*')):
@@ -54,6 +57,11 @@ def build_request(directory, registration, document):
                                    'size_bytes': path.stat().st_size}
         steps.append({'input': read(prefix + '/input.json'),
                       'result': read(prefix + '/result.json'), 'evidence_prefix': prefix})
+    # The derived step sequence lives at the package root beside the raw evidence.
+    derived = root / 'trajectory.json'
+    if derived.is_file() and not derived.is_symlink():
+        files['trajectory.json'] = {'sha256': hashlib.sha256(derived.read_bytes()).hexdigest(),
+                                    'size_bytes': derived.stat().st_size}
     body = {'schema': 'abb.judge.request.v1', 'agent_id': registration.agent_id,
             'run_id': manifest['run_id'], 'case': document['case'],
             'case_sha256': digest(case_bytes(document['case'])),
@@ -73,7 +81,8 @@ def validate_evidence(request, directory):
         path = root / relative
         if path.is_symlink() or not path.resolve().is_relative_to(root):
             raise ValueError('Unsafe Judge attachment')
-        content = path.read_bytes()
+        from agentbench.observe.artifact_paths import artifact_file
+        content = artifact_file(root, relative).read_bytes()
         if len(content) != metadata['size_bytes'] or digest(content) != metadata['sha256']:
             raise ValueError('Judge evidence changed')
 
@@ -102,26 +111,30 @@ def _execute_judge(judge, request, *, directory, environ):
     validate_evidence(request, directory)
     files = Artifacts(directory, environ=environ)
     identity = request['request_id']
-    delivery_path = Path(directory) / 'evaluation/judge/delivery.json'
-    prior = json.loads(delivery_path.read_bytes()) if delivery_path.exists() else None
+    delivery_path = Path(directory) / 'judge/delivery.json'
+    from agentbench.observe.artifact_paths import artifact_file
+    try:
+        prior = json.loads(artifact_file(directory, 'judge/delivery.json').read_bytes())
+    except FileNotFoundError:
+        prior = None
     if prior is not None and prior.get('request_id') != request['request_id']:
         raise ValueError('Existing Judge task belongs to a different request')
     if prior is not None and prior.get('status') != 'received':
         raise ValueError('Previous Judge submission requires reconciliation; automatic resubmission disabled')
-    files.save('evaluation/judge/delivery.json', {'status': 'submitting', 'request_id': request['request_id']})
+    files.save('judge/delivery.json', {'status': 'submitting', 'request_id': request['request_id']})
     try:
-        response = (json.loads((Path(directory) / 'evaluation/judge/report.json').read_bytes())
+        response = (json.loads(artifact_file(directory, 'judge/report.json').read_bytes())
                     if prior is not None else judge.judge(request, directory=Path(directory), environ=environ))
         if request.get('request_id') != identity:
             raise ValueError('Judge changed its request')
         validate_evidence(request, directory)
         validate_response(response, request)
-        files.save('evaluation/judge/report.json', response)
-        files.save('evaluation/judge/delivery.json', {'status': 'received', 'request_id': request['request_id']})
-        safe = json.loads((Path(directory) / 'evaluation/judge/report.json').read_bytes())
+        files.save('judge/report.json', response)
+        files.save('judge/delivery.json', {'status': 'received', 'request_id': request['request_id']})
+        safe = json.loads(artifact_file(directory, 'judge/report.json').read_bytes())
         return RecoveredReport(safe)
     except Exception as exc:
-        files.save('evaluation/judge/delivery.json', {'status': 'failed', 'request_id': request['request_id'],
+        files.save('judge/delivery.json', {'status': 'failed', 'request_id': request['request_id'],
                                                       'error_type': type(exc).__name__})
         exc.artifacts = {'directory': str(directory), 'phase': 'judge',
                          'judge_delivery_status': 'failed', 'evidence_status': 'captured',

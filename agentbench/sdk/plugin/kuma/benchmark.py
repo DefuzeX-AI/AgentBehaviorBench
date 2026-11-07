@@ -152,7 +152,7 @@ class KumaContainerRunner:
         try:
             directory = (previous_result.artifacts or {}).get('directory')
             if directory and ((Path(directory) / 'judge-task.json').is_file()
-                              or (Path(directory) / 'evaluation/judge/context.json').is_file()):
+                              or (Path(directory) / 'judge/context.json').is_file()):
                 from agentbench.sdk.judgment import DeferredJudgment
                 from .judge_tasks import prepare_task
                 from .diagnostics import read_diagnostic
@@ -243,7 +243,7 @@ class KumaContainerRunner:
                     case_count=registration.case_count, **{**identity, 'phase': 'judge'})
                 return ticket
             result = read_result(directory, registration.agent_id, provider_mode=self.provider_mode)
-            executed = json.loads((directory / 'evaluation/case.json').read_text())
+            executed = json.loads((directory / 'case.json').read_text())
             if executed['case_id'] != case.case_id:
                 raise RuntimeError('Executed Case does not match the prepared Case ID')
             if case_content_sha256(executed) != case.content_sha256:
@@ -270,7 +270,7 @@ class KumaContainerRunner:
 
 def replay_input_events(directory, result, on_start, on_complete, on_failure):
     """Emit recorded success/failure callbacks in the original Case Input order."""
-    case = json.loads(artifact_path(directory, 'evaluation/case.json').read_text(encoding='utf-8'))
+    case = json.loads(artifact_path(directory, 'case.json').read_text(encoding='utf-8'))
     outcomes = {step.input_id: (step, on_complete) for step in result.steps}
     outcomes.update({failure.input_id: (failure, on_failure) for failure in result.failures})
     for item in case['inputs']:
@@ -295,7 +295,7 @@ def read_result(directory, agent_id, *, recovered_report=None, provider_mode='of
         path = artifact_path(directory, relative)
         return json.loads(path.read_text(encoding='utf-8'))
     host = read('run.json')
-    summary = read('evaluation/manifest.json')
+    summary = read('manifest.json')
     if recovered_report is not None:
         if host.get('host_trace_validation') != 'succeeded' or host.get('cleanup_status') != 'succeeded':
             raise ValueError('Recovery requires original cleanup and host trace acceptance')
@@ -319,8 +319,8 @@ def read_result(directory, agent_id, *, recovered_report=None, provider_mode='of
                            'evidence':'captured', 'judge':'received', 'phase':'finished'}.items():
         if summary.get(key) != expected:
             raise RuntimeError(f'Incomplete {key}; artifacts: {directory}')
-    case = read('evaluation/case.json')
-    report = read('evaluation/judge/report.json') if recovered_report is None else recovered_report
+    case = read('case.json')
+    report = read('judge/report.json') if recovered_report is None else recovered_report
     if report.get('status') not in ('pass', 'issue', 'insufficient_evidence'):
         raise ValueError('Invalid Judge verdict')
     if (case['case_id'] != summary['case_id'] or report['run_id'] != summary['run_id']
@@ -328,10 +328,10 @@ def read_result(directory, agent_id, *, recovered_report=None, provider_mode='of
         raise RuntimeError('Case / Judge identity mismatch')
     from .completion import validate_input_prefix
     last = summary['steps'][-1] if summary.get('steps') else {}
-    validate_input_prefix(case, summary, read(f"evaluation/{last['directory']}/result.json") if last else {})
+    validate_input_prefix(case, summary, read(f"{last['directory']}/result.json") if last else {})
     steps, failures = [], []
     for step, expected_input in zip(summary['steps'], case['inputs']):
-        prefix = 'evaluation/' + step['directory']
+        prefix = step['directory']
         item, result, submission = (read(f'{prefix}/{name}.json') for name in ('input', 'result', 'submission'))
         request = read(f'{prefix}/request.json')
         succeeded = result.get('status') == 'succeeded'

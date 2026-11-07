@@ -1,0 +1,58 @@
+{
+  "case_id": "ir-reasonix-10067-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 10067,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/10067",
+    "state": "closed",
+    "title": "[Bug]: [tools] After edit_file, all bash commands that might write files remain blocked: read_file reports the requirement satisfied, but bash still considers it unmet (inconsistent state)",
+    "body": "### Version line\n\nv2 — Go rewrite (1.x), main-v2 (active development)\n\n### Exact version\n\nv1.38.0 ~ v1.38.3\n\n### What happened?\n\n- Reasonix: v1.38.3 (stable) — 问题在 v1.38.0 ~ v1.38.3 均出现\n- OS: Windows (windows/amd64)，桌面版\n- 模型: deepseek/deepseek-v4-flash\n- 说明: 桌面 App 内使用（bash 工具 + 文件工具混合工作流）\n\n### Describe the bug\n在一次会话中，只要先用 `edit_file` 修改过工作区里的某个文件，\n之后**任何\"可能写文件\"的 bash 命令（matlab / python / 重定向 / touch）都会被拒绝**，\n报错要求先满足一个 \"read-evidence requirement\"。\n\n矛盾点在于：对同一个文件调用 `read_file`（含 `intent=full`）时，系统明确回复\n\"该读取要求已在当前未变更版本上满足\"，但 bash 的拦截判定仍然认为它 outstanding，\n两个子系统状态不一致，导致**永远解不开**。\n\n纯只读命令（`cat`/`ls`/`echo`）可以通过，因此可以确定拦截针对的是\"写文件\"这一类命令。\n\n### Steps to reproduce\n\n1. 在会话中用 `edit_file` 修改工作区任意文件（例：`mc_bin/foo.m`）。\n2. 紧接着执行会写文件的 bash，例：\n   `matlab -batch \"addpath(...); some_script();\"`\n   或 `python -c \"import scipy\"`，甚至 `echo x > tmp.txt`。\n3. 观察：bash 被拒绝，返回：\n   `[evidence required] bash cannot declare which files it changes while a read-evidence requirement is outstanding (<file>); use the exact file tool for those paths`\n4. 用 `read_file` 读取该文件（含 `intent=full`），得到：\n   `Repeated read: ... The requested read requirement is already satisfied on this unchanged source version.`\n5. 再次执行第 2 步 → **仍被拒绝**（状态未清除）。\n\n补充：修改前的受保护检查也会单独触发：\n`[evidence required] edit_file targets <file>, but the model has not seen its current content (missing lines 1-93); read <file> in a previous provider round, then retry; reads from the same batch do not count`\n以及一类写入前的门槛：\n`[evidence required] establish a concrete todo and acceptance criteria before this class of write`\n\n### Expected behavior\n- `read_file` 报告\"读取要求已满足\"后，该要求在 bash 侧也应被同步清除，bash 应正常执行；\n- 或者：拦截信息应指明\"**具体要读哪个文件的哪个版本**\"，并提供一个确定的解除方式；\n- 期望不存在\"read 侧已满足 / bash 侧未满足\"的双重真相。\n\n### Actual behavior\n- read-evidence 状态不一致，一旦触发便无法通过任何工具调用自行解除；\n- 只有两种**不可靠**的绕过：\n  1. 用 `write_file` 整体重写该文件 → 再 `read_file` → 再 bash（成功与否不稳定，时好时坏）；\n  2. **用户必须手动发一条新消息**（触发新回合）才会解除——即用户被迫介入才能让 agent 继续。\n- 结果：同一动作反复失败、重复重试、工作流中断。\n\n### Logs / Evidence\n拦截原文（多次出现，指向同一文件）：\n\n### OS / platform\n\nWindows 11\n\n### Relevant logs or output\n\n```shell\n\n```"
+  },
+  "version_choice": "historical:1.38.3",
+  "reported_version": "1.38.0-1.38.3",
+  "commit_version": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "fixed_in": "1.x v1.38.8 (#10223 read-evidence gate removed)",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a small script by running exactly this shell command:\n\n```bash\nmkdir -p tools && printf '%s\\n' 'import sys' \"print('v1')\" > tools/foo.py && cat tools/foo.py\n```",
+    "1. Use edit_file to change `print('v1')` to `print('v2')` in tools/foo.py.\n2. Then run `echo x > tmp.txt` with bash.\n3. Then read tools/foo.py with read_file (intent=full).\n4. Then run `echo x > tmp.txt` with bash again."
+  ],
+  "expected": "Once read_file reports the requirement satisfied, the same bash write runs (issue's expected behaviour: no 'read side satisfied / bash side outstanding' split).",
+  "defect": "bash stays refused with the read-evidence gate message after read_file (intent=full) reported the requirement already satisfied.",
+  "fault location": [
+    {
+      "file": "internal/agent/operation_evidence.go",
+      "function": "checkOperationEvidence",
+      "line_start": 43,
+      "line_end": 60,
+      "commit": "fa018e4109268c912063c8cc619302fccdb57d74",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/fa018e4109268c912063c8cc619302fccdb57d74/internal/agent/operation_evidence.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "internal/agent/operation_evidence.go",
+      "function": "applyEvidenceGates",
+      "line_start": 310,
+      "line_end": 331,
+      "commit": "fa018e4109268c912063c8cc619302fccdb57d74",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/fa018e4109268c912063c8cc619302fccdb57d74/internal/agent/operation_evidence.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "internal/agent/read_pipeline.go",
+      "function": "outstandingReadEvidence",
+      "line_start": 188,
+      "line_end": 212,
+      "commit": "fa018e4109268c912063c8cc619302fccdb57d74",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/fa018e4109268c912063c8cc619302fccdb57d74/internal/agent/read_pipeline.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "A refused edit is retained in turn.evidenceBlocked with its original arguments. After a successful retry changes the file, outstandingReadEvidence rechecks the obsolete edit target. Target declaration can now fail because the old string no longer exists, leaving evidence debt that blocks unrelated bash writes even after a full read. The retained second turn and the local historical before/after report support this stale-state mechanism."
+}

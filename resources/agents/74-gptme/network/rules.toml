@@ -1,0 +1,10 @@
+schema_version = "abb.network.v1"
+
+# gptme's local shell, Python, file and patch tools need no network routes. The
+# only admitted model route is the selected base URL's /chat/completions, which
+# the runtime derives from the shared provider selection. tiktoken's BPE files are
+# baked into the image (TIKTOKEN_CACHE_DIR), so token counting makes no download.
+# The browser tool is unavailable (no Playwright or lynx in the image). Any other
+# request the Agent makes from its shell or Python tools goes to ABB's egress
+# observer, which forwards allowlisted hosts, refuses the rest with 403 and
+# records every attempt in egress.jsonl without rejecting the Case.

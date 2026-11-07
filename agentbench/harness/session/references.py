@@ -103,6 +103,20 @@ def collect_suite_references(project_root):
         if directory in indexed and indexed[directory] != plan['suite_id']:
             raise ValueError('Suite reference identity changed; history was not moved')
         paths = {directory}
+        # The journal's immutable records are dependencies too. Inspect only
+        # host-owned reference fields, never paths inside Agent output values.
+        from .event_refs import FIELDS
+        stored_events = json.loads((directory / 'events.json').read_text(encoding='utf-8'))
+        for event in stored_events:
+            for key in FIELDS:
+                ref = event.get(key)
+                if isinstance(ref, dict) and ref.get('schema') == 'abb.artifact-reference.v1':
+                    paths.add((directory / ref['path']).resolve())
+        if (directory / 'gt.json').is_file():
+            from agentbench.harness.ground_truth.storage import read as read_gt_references
+            read_gt_references(directory)  # Validate paths and digests before protecting them.
+            for ref in json.loads((directory / 'gt.json').read_bytes())['references']:
+                paths.add((directory / ref['path']).resolve())
         try:
             for event in events:
                 paths.update(_event_paths(event))

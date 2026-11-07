@@ -148,7 +148,7 @@ async def execute_case(factory, root, repository, settings, files, summary, *, s
                 limit = settings['sdk_options'].get('max_steps')
                 if limit is not None and number > limit:
                     raise ValueError('SDK exceeded the requested max_steps')
-                relative = f'inputs/{number:04d}'
+                relative = f'steps/{number:04d}'
                 folder = files.directory / relative
                 record = {'input_id': item.input_id, 'directory': relative, 'submitted': False}
                 summary['steps'].append(record)

@@ -1,0 +1,65 @@
+# Manual ABB integration for ai-christianson/RA.Aid. OpenRouter json_schema
+# generation (agent add -b) is unavailable on the DeepSeek direct API; files
+# follow the LangGraph unit conventions of 57/60/63/64.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "ra-aid"
+display_name = "RA.Aid (ReAct Aid) coding agent"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/ai-christianson/RA.Aid"
+revision = "e71bb83dcfdf8796d41c746ad99bf4838d1d5914"
+downloaded_on = "2026-10-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1800
+optional_secret_env_keys = ["TAVILY_API_KEY"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+# RA.Aid is a CLI with no langgraph.json; its agents are LangGraph graphs built
+# inside ra_aid.__main__.main(), which the binding runs as `ra-aid -m ...`.
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "answer"
+
+# --provider deepseek: ra_aid/llm.py builds ChatDeepSeek (deepseek-chat, base
+# https://api.deepseek.com/v1) and ChatDeepseekReasoner (expert,
+# https://api.deepseek.com) with DEEPSEEK_API_KEY.
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "deepseek"
+agent_env = "DEEPSEEK_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "deepseek-chat"
+host_patterns = ["api.deepseek.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/chat/completions", "/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "deepseek"
+
+# ra_aid/tools/web_search_tavily.py (enabled only when TAVILY_API_KEY is set).
+[[llm_interception.tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search"]

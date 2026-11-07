@@ -27,7 +27,7 @@ class LocalRunner(NativeRunner):
                 settings=self._settings(registration, mode='context', agent_context=agent_context(registration)),
                 execute_agent=False)
             accepted(directory, execution=False)
-            public_context = read(directory / 'evaluation/agent-context.json')
+            public_context = read(directory / 'agent-context.json')
             self.sdk_options['cases'] = generate_cases(registration, limit=limit,
                 environ=self.context.environ, output=self.output, context=public_context)
         return super().prepare_cases(registration, **kwargs)
