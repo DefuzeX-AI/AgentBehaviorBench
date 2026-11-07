@@ -285,3 +285,18 @@ def test_registered_units_omit_redundant_model_defaults():
     for name in metadata_only:
         assert set(declarations[name]) == {'metadata_paths'}, name
         assert declarations[name]['metadata_paths'] in ([], ['/models']), name
+
+
+def test_chat_thinking_changes_replacement_provenance_and_rejects_old_resume(root):
+    (root/'agent.toml').write_text(REPLACEMENT_MANIFEST)
+    agents, before = provenance(root, ENV)
+    plan = build_plan('thinking', agents, configuration=before)
+    _, after = provenance(root, {**ENV, 'ABB_CHAT_THINKING': 'disabled'})
+    assert after['agent_models']['shared']['routing']['targets']['default']['chat_thinking'] == 'disabled'
+    with pytest.raises(SuiteProvenanceError):
+        validate_provenance(plan, agents, after)
+
+
+def test_chat_thinking_cannot_be_silently_ignored_by_native_launcher(root):
+    with pytest.raises(ValueError, match='only supported in replacement mode'):
+        provenance(root, {**ENV, 'ABB_CHAT_THINKING': 'disabled'})

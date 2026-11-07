@@ -183,3 +183,18 @@ def test_zhipu_serves_openai_and_anthropic_routes_and_is_never_auto_selected():
     assert '/messages' not in glm.endpoint_paths
     override = {**env, 'ZHIPU_API_BASE_URL': 'https://api.z.ai/api'}
     assert resolve_model_provider(environ=override).resolve(override).base_url == 'https://api.z.ai/api'
+
+
+def test_chat_thinking_is_opt_in_and_reaches_service_config(tmp_path):
+    env = {'OPENROUTER_API_KEY': 'test-secret', 'OPENROUTER_MODEL': 'test-model'}
+    provider = resolve_model_provider(environ=env)
+    assert provider.resolve(env).chat_thinking is None
+    env['ABB_CHAT_THINKING'] = 'disabled'
+    config = InterceptionConfig('pem-env', MappingProxyType({}),
+        (CredentialConfig('native', 'OPENAI_API_KEY', 'bearer-token'),), ())
+    data, _ = prepare_service_config(config, agent_id='fixture', max_trace_bytes=4096,
+        secret_dir=tmp_path, secret_resolver=EnvironmentSecretResolver(env), environ=env)
+    assert data['target']['chat_thinking'] == 'disabled'
+    env['ABB_CHAT_THINKING'] = 'typo'
+    with pytest.raises(InterceptionConfigurationError, match='ABB_CHAT_THINKING'):
+        provider.resolve(env)

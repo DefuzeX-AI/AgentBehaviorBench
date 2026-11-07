@@ -51,6 +51,33 @@ class ConfiguredTargetsTest(unittest.TestCase):
         self.assertEqual(self.request.content, original)
         self.assertFalse(hasattr(self.request, 'host'))
 
+    def test_chat_thinking_override_preserves_original_request_and_tools(self):
+        self.payload['thinking'] = {'type': 'enabled'}
+        self.request.content = json.dumps(self.payload).encode()
+        target = Target('custom', 'compatible-json', 'https://custom.example',
+                        'chosen', {}, chat_thinking='disabled')
+        result = self.adapter.prepare_request(self.request, route=self.route, target=target)
+        self.assertEqual(result.source_payload, self.payload)
+        self.assertEqual(result.payload, {**self.payload, 'model': 'chosen',
+                                         'thinking': {'type': 'disabled'}})
+        self.assertEqual(json.loads(self.request.content), result.payload)
+
+    def test_chat_thinking_does_not_change_other_protocols(self):
+        target = Target('custom', 'compatible-json', 'https://custom.example',
+                        'chosen', {}, chat_thinking='disabled')
+        route = Route('test', (), (), (), (), 'openai-responses', 'key')
+        payload = {'model': 'source', 'input': 'hello'}
+        request = SimpleNamespace(content=json.dumps(payload).encode(), headers={})
+        result = self.adapter.prepare_request(request, route=route, target=target)
+        self.assertEqual(result.payload, {**payload, 'model': 'chosen'})
+
+    def test_chat_thinking_config_rejects_invalid_values(self):
+        data = dict(provider_id='custom', target_plugin='compatible-json',
+                    base_url='https://custom.example', model='chosen', headers={})
+        for value in ('', 'typo', {}, True):
+            with self.subTest(value=value), self.assertRaises(ServiceConfigurationError):
+                _target({**data, 'chat_thinking': value})
+
     def test_service_config_validates_endpoint_paths(self):
         data = dict(provider_id='custom', target_plugin='compatible-json',
                     base_url='https://custom.example', model='chosen', headers={})

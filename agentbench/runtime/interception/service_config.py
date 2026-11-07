@@ -36,6 +36,8 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
         prepared = {'provider_id': target.provider_id, 'target_plugin': target.target_plugin,
                     'base_url': target.base_url, 'model': target.model, 'headers': dict(target.headers),
                     'secret_file': f'/run/secrets/{filename}', 'input_modalities': list(plan.inputs[name])}
+        if target.chat_thinking is not None:
+            prepared['chat_thinking'] = target.chat_thinking
         if getattr(target, 'endpoint_paths', None) is not None:
             prepared['endpoint_paths'] = dict(target.endpoint_paths)
         prepared_targets[name] = prepared

@@ -77,6 +77,8 @@ def resolve_shared_model(manifest, environ, model_provider=None):
     _validate_target(target)
     if target.target_plugin not in ('openrouter', 'compatible-json'):
         raise InterceptionConfigurationError('Shared native Agents require an OpenAI Chat Completions compatible provider')
+    if target.chat_thinking is not None:
+        raise InterceptionConfigurationError('ABB_CHAT_THINKING is only supported in replacement mode')
     if target.headers:
         raise InterceptionConfigurationError('Shared native launchers do not support custom provider headers; remove header overrides')
     endpoint = (target.endpoint_paths or {}).get('/chat/completions', '/chat/completions')
