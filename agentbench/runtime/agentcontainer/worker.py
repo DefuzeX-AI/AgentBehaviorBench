@@ -56,6 +56,8 @@ def exception_details(exc):
         details['error_code'] = str(get(exc, 'code'))
     if get(exc, 'raw_output') is not None:
         details['raw_output'] = get(exc, 'raw_output')
+    if get(exc, 'public_messages') is not None:
+        details['public_messages'] = get(exc, 'public_messages')
     response = get(exc, 'response')
     status = get(exc, 'status_code') or get(response, 'status_code')
     if type(status) is int:
@@ -131,6 +133,8 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
             with span('Invoke Agent', kind='execution', invocation_id=run_id, **{k: v for k, v in context.items() if k != 'invocation_id'}):
                 invocation = await adapter.ainvoke(envelope["input"], run_config=config)
         result.update(status="succeeded", output=invocation.output, raw_output=invocation.raw_output)
+        if getattr(invocation, 'public_messages', None) is not None:
+            result['public_messages'] = invocation.public_messages
         store.record("execution_end", output=invocation.output)
     except BaseException as exc:
         from agentbench.adapter.acp.errors import AgentAborted
