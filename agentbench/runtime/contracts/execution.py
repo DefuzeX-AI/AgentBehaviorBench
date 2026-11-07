@@ -78,6 +78,9 @@ class RuntimeLimits:
     startup_seconds: float = 45
     execution_seconds: float = 2400
     cleanup_seconds: float = 45
+    # Model calls may still be streaming when the Agent exits (#417); allow
+    # their terminal events to reach the trace before validation rejects them.
+    trace_drain_seconds: float = 30
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str]) -> "RuntimeLimits":
@@ -86,6 +89,7 @@ class RuntimeLimits:
         for name, key in (
             ("build_seconds", "ABB_RUNTIME_BUILD_TIMEOUT_SEC"),
             ("preparation_seconds", "ABB_RUNTIME_PREPARATION_TIMEOUT_SEC"),
+            ("trace_drain_seconds", "ABB_TRACE_DRAIN_TIMEOUT_SEC"),
         ):
             if key in environ:
                 try:

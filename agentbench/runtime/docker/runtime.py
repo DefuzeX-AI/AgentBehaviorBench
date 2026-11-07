@@ -687,7 +687,10 @@ class DockerRuntime:
             # The session API supplies a checkpoint, but zero new model calls
             # is valid (cached answers, input rejection or deterministic work).
             # Always drain and validate the calls that were actually observed.
-            if not trace_state.wait_for_idle(control=self.control):
+            # A late response or disconnect still terminates the call (#417);
+            # wait_for_idle returns as soon as every call has ended.
+            limits = getattr(self, "_limits", None) or RuntimeLimits()
+            if not trace_state.wait_for_idle(timeout=limits.trace_drain_seconds, control=self.control):
                 if trace_state.operation_failure:
                     raise DockerRuntimeError('Required Agent network operation failed: ' + trace_state.diagnostic())
                 raise DockerRuntimeError("Model trace is incomplete: " + trace_state.diagnostic())
