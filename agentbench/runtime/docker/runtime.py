@@ -52,6 +52,7 @@ from .interceptor_image import LocalInterceptorImageProvider, default_intercepto
 from .interceptor_policy import InterceptorPolicy
 from .policy import DockerPolicy, EgressSettings
 from .session import DockerSession
+from .network_pool import NetworkPool
 from .resources import ResourceRegistry
 from .worker_build import worker_build_context
 
@@ -95,6 +96,7 @@ class DockerRuntime:
         command_environ: Mapping[str, str] | None = None,
         egress_observer_image_provider: InterceptorImageProvider | None = None,
         egress_sink: TraceSink | None = None,
+        network_pool: NetworkPool | None = None,
     ) -> None:
         if trace_max_bytes < 1024:
             raise ValueError("trace_max_bytes must be at least 1024")
@@ -107,6 +109,7 @@ class DockerRuntime:
         self._limits = limits or RuntimeLimits.from_environment(self._environ)
         self._resources = resource_registry or ResourceRegistry()
         self._uncertain_resources: set[tuple[str, str]] = set()
+        self._network_pool = network_pool
         client_environment = dict(os.environ if command_environ is None else command_environ)
         client_environment.update(self._environ)
         self._commands = DockerCommandRunner(executable, environ=client_environment)
@@ -201,6 +204,8 @@ class DockerRuntime:
         egress_observer: RunningEgressObserver | None = None
         trace_state: InterceptionTraceState | None = None
         planned_network = False
+        pooled_network = False
+        internal_network = interception is None
         planned_agent = False
         process: subprocess.Popen[str] | None = None
         session: DockerSession | None = None
@@ -249,7 +254,17 @@ class DockerRuntime:
                         egress_observer.close(deadline=deadline)
                     except Exception as exc:
                         errors.append(str(exc))
-                if planned_network:
+                if pooled_network and not errors:
+                    # Every container on it is gone; hand it to the next Case.
+                    self._network_pool.release(network_name, internal_network)
+                elif pooled_network:
+                    # A container may still be attached; never reuse this network.
+                    self._network_pool.discard(network_name)
+                    try:
+                        self._remove_resource("network", network_name, deadline=deadline)
+                    except Exception as exc:
+                        errors.append(str(exc))
+                elif planned_network:
                     # Remove the Docker network created for this job last.
                     try:
                         self._remove_resource("network", network_name, deadline=deadline)
@@ -266,11 +281,15 @@ class DockerRuntime:
                 # The interception path records trace state and creates an isolated network.
                 trace_state = InterceptionTraceState()
                 self._require_non_root_image(image, deadline=preparation)
-                self._plan_resource("network", network_name, "network", suffix)
-                planned_network = True
-                self._create_resource("network", network_name,
-                                      ["network", "create", *self._labels("network", suffix), network_name],
-                                      deadline=preparation)
+                if self._network_pool is not None:
+                    network_name = self._lease_network(internal=False, deadline=preparation)
+                    pooled_network = True
+                else:
+                    self._plan_resource("network", network_name, "network", suffix)
+                    planned_network = True
+                    self._create_resource("network", network_name,
+                                          ["network", "create", *self._labels("network", suffix), network_name],
+                                          deadline=preparation)
                 if self._egress.uses_observer:
                     # Non-model traffic goes to its own service and event stream.
                     egress_observer = self._start_egress_observer(
@@ -306,11 +325,15 @@ class DockerRuntime:
                 ]
             else:
                 # Without interception, create an internal network with no direct egress.
-                self._plan_resource("network", network_name, "network", suffix)
-                planned_network = True
-                self._create_resource("network", network_name,
-                                      ["network", "create", "--internal", *self._labels("network", suffix), network_name],
-                                      deadline=preparation)
+                if self._network_pool is not None:
+                    network_name = self._lease_network(internal=True, deadline=preparation)
+                    pooled_network = True
+                else:
+                    self._plan_resource("network", network_name, "network", suffix)
+                    planned_network = True
+                    self._create_resource("network", network_name,
+                                          ["network", "create", "--internal", *self._labels("network", suffix), network_name],
+                                          deadline=preparation)
                 network_arguments = ["--network", network_name]
 
             # Assemble docker-create arguments without starting the Agent yet.
@@ -755,6 +778,41 @@ class DockerRuntime:
             raise DockerRuntimeError(
                 "Transparent interception requires an Agent image with a non-root USER"
             )
+
+    @timed('Lease Case network', kind='preparation')
+    def _lease_network(self, *, internal: bool, deadline: Deadline | None) -> str:
+        """Take an empty Suite pool network for this Case, creating one only when none is free."""
+        pool = self._network_pool
+        while (name := pool.take(internal)) is not None:
+            inspected = self._run_quiet("network", "inspect", "-f", "{{len .Containers}}", name,
+                                        capture=True, deadline=deadline)
+            if inspected is not None and inspected.returncode == 0 and inspected.stdout.strip() == "0":
+                return name
+            # A leftover attachment or a vanished network: retire it, never share it.
+            pool.discard(name)
+            try:
+                self._remove_resource("network", name, deadline=deadline)
+            except DockerCleanupError:
+                pass  # Recorded in the registry; the Suite close reports it.
+        name = pool.new_name(internal)
+        token = name.split("-")[2]
+        self._plan_resource("network", name, "network", token)
+        try:
+            self._create_resource(
+                "network", name,
+                ["network", "create", *(["--internal"] if internal else []),
+                 *self._labels("network", token), "--label", "defuzex.pool=1", name],
+                deadline=deadline,
+            )
+        except BaseException as original:
+            # Release a partially created network exactly as per-Case cleanup would.
+            try:
+                self._remove_resource("network", name)
+            except DockerCleanupError as exc:
+                raise exc from original
+            raise
+        pool.adopt(name, lambda value: self._remove_resource("network", value))
+        return name
 
     @timed('Check Docker availability', kind='preparation')
     def _check_available(self, *, deadline: Deadline | None = None) -> None:
