@@ -19,6 +19,13 @@ class LocalRunner(NativeRunner):
         judge_model(self.context.environ)
         return super().validate_sdk(registration)
 
+    def _run(self, registration, *, settings, context, on_progress, **kwargs):
+        if settings.get('mode') == 'execute':
+            from .file_evidence import capture_workspace
+            kwargs['capture_workspace'] = capture_workspace
+        return super()._run(registration, settings=settings, context=context,
+                            on_progress=on_progress, **kwargs)
+
     def prepare_cases(self, registration, **kwargs):
         if 'cases' not in self.sdk_options:
             limit = self.sdk_options.get('max_steps') or getattr(registration, 'max_steps', None) or DEFAULT_MAX_STEPS
