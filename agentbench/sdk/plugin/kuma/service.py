@@ -13,11 +13,13 @@ class EvaluationPolicy(ControllerExecutionPolicy):
     """Compatibility for callers supplying KUMA's ledger directory."""
 
     def __init__(self, state, *, repository=None, target=SDK_REPOSITORY,
-                 writable=False, replay=None, channel=None, publications=()):
+                 writable=False, replay=None, channel=None, publications=(),
+                 policy=None):
         state = state.resolve()
         super().__init__(state.parent, repository=repository or state.parent,
                          target=target, writable=writable, replay=replay,
-                         channel=channel, publications=publications)
+                         channel=channel, publications=publications,
+                         policy=policy)
 
 
 def _completed_execution(directory):

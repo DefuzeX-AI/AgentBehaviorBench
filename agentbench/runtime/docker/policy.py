@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import math
+import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -71,14 +74,100 @@ class EgressSettings:
         return self.mode in ("observe", "open")
 
 
+MEMORY_ENV = "ABB_DOCKER_MEMORY"
+CPUS_ENV = "ABB_DOCKER_CPUS"
+
+# Positive integer followed by a unit [k, m, g, K, M, G].
+_MEMORY_REGEX = re.compile(r"^[1-9][0-9]*[kmgKMG]$")
+
+MIN_CPUS = 0.0
+MAX_CPUS = 1024.0
+
+
+def _validate_docker_memory(memory: str) -> str:
+    """Validate a Docker ``--memory`` limit such as ``8g`` or ``512m``.
+
+    ``0g``, negative or fractional values, a missing unit and non-string values
+    are rejected before Docker receives the argument.
+    """
+    if not isinstance(memory, str):
+        raise ValueError(f"Memory limit must be a string, got {type(memory).__name__}")
+    stripped = memory.strip()
+    if not _MEMORY_REGEX.fullmatch(stripped):
+        raise ValueError(
+            f"Invalid memory limit format: {memory!r}. "
+            f"Must match positive integer with unit [kmgKMG] (e.g. '8g', '512m', '2G')."
+        )
+    return stripped
+
+
+def _validate_docker_cpus(cpus: float | int | str) -> float | int:
+    """Validate a Docker ``--cpus`` quota within ``0.0 < float(cpus) <= 1024.0``.
+
+    Booleans, NaN, infinities and out-of-range values are rejected. Integers are
+    returned unchanged so ``--cpus=2`` is not rendered as ``--cpus=2.0``.
+    """
+    if isinstance(cpus, bool):
+        raise ValueError(f"Invalid cpus value {cpus!r}: boolean is not allowed.")
+    try:
+        value = float(cpus)
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid cpus format: {cpus!r}. Must parse as a positive float.")
+    if math.isnan(value) or math.isinf(value) or value <= MIN_CPUS or value > MAX_CPUS:
+        raise ValueError(
+            f"Invalid cpus value: {value}. Must be a positive float within 0.0 < float(cpus) <= 1024.0."
+        )
+    if isinstance(cpus, int) and not isinstance(cpus, str):
+        return cpus
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class DockerPolicy:
+    """Security and resource limits applied to every agent container.
+
+    Constructor arguments are always honored. :meth:`from_environment`
+    optionally resolves ``ABB_DOCKER_MEMORY`` and ``ABB_DOCKER_CPUS`` from an
+    explicit environment mapping for CPU- or memory-intensive Agents such as
+    Marker/Surya OCR pipelines, which otherwise hit the 1 GiB default.
+    """
+
     cpus: float = 1.0
     memory: str = "1g"
     pids_limit: int = 128
     # Capacity limit, not a reservation; tmpfs usage also counts toward memory.
     tmpfs_size: str = "1g"
     egress: EgressSettings = EgressSettings()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "memory", _validate_docker_memory(self.memory))
+        object.__setattr__(self, "cpus", _validate_docker_cpus(self.cpus))
+
+    @classmethod
+    def from_environment(
+        cls,
+        environ: Mapping[str, str] | None = None,
+        base: DockerPolicy | None = None,
+    ) -> DockerPolicy:
+        """Build a policy from an explicit environment mapping or ambient ``os.environ``.
+
+        An explicit empty mapping uses defaults without ambient bleed. ``base``
+        supplies values for settings the environment does not override.
+        """
+        env = os.environ if environ is None else environ
+        base_policy = base or cls()
+
+        memory = env.get(MEMORY_ENV, base_policy.memory)
+        raw_cpus = env.get(CPUS_ENV)
+        cpus = base_policy.cpus if raw_cpus is None else _validate_docker_cpus(raw_cpus.strip())
+
+        return cls(
+            cpus=cpus,
+            memory=memory,
+            pids_limit=base_policy.pids_limit,
+            tmpfs_size=base_policy.tmpfs_size,
+            egress=EgressSettings.from_environment(env, base=base_policy.egress),
+        )
 
     def run_arguments(self) -> tuple[str, ...]:
         return (
