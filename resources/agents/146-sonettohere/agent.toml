@@ -1,0 +1,62 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "sonettohere"
+display_name = "SonettoHere (LangGraph ReAct, DeepSeek provider)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "git"
+repository = "https://github.com/Miso2233/SonettoHere"
+revision = "f428f816f303d5aec9e7e3b2f02496b0853047df"
+downloaded_on = "2026-10-24"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = ["DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL"]
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+input_key = "message"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "deepseek"
+agent_env = "DEEPSEEK_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "deepseek-chat"
+host_patterns = ["api.deepseek.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/chat/completions", "/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "deepseek"
