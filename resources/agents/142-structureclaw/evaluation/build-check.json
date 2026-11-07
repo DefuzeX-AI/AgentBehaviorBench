@@ -1,0 +1,55 @@
+{
+  "architecture": "x86_64",
+  "opensees_version": "3.7.1",
+  "status": "passed",
+  "image": "defuzex-agentbench/structureclaw:7a67d8b490f7f548b8326ce011c47bdd86a51343350a29ccd37b2bfc91a0bfed",
+  "dockerfile_sha256": "9940ed5d04affff2aa43f140059decbb28de7efd5bd16dee7764668936ed7be8",
+  "build_assertion": "python -c \"import openseespy.opensees as ops; print(ops.version())\"",
+  "runtime_check_network": "none",
+  "required_system_libraries": [
+    "libgomp1",
+    "libquadmath0",
+    "libblas3"
+  ],
+  "upstream_openseespylinux_wheel_elf_machine": 62,
+  "architecture_limitation": "Published OpenSees shared library is x86-64; ARM Docker hosts require amd64 emulation.",
+  "build_assertion_log": [
+    "#14 30.81 3.7.1",
+    "#14 30.85 Process 0 Terminating",
+    "#14 DONE 30.9s"
+  ],
+  "offline_native_import": {
+    "native_service": true,
+    "skills": 42,
+    "tools": [
+      "detect_structure_type",
+      "extract_draft_params",
+      "build_model",
+      "validate_model",
+      "run_analysis",
+      "run_code_check",
+      "generate_report",
+      "calculate",
+      "ask_user_clarification",
+      "set_session_config",
+      "memory",
+      "analyze_file",
+      "glob_files",
+      "grep_files",
+      "read_file",
+      "write_file",
+      "replace_in_file",
+      "move_path",
+      "delete_path",
+      "shell"
+    ]
+  },
+  "worker_startup_check": {
+    "worker_startup": "passed",
+    "observation_initialized": true,
+    "binding_loaded": true,
+    "expected_input_rejection": "StructureClaw requires a nonempty message",
+    "model_calls": 0
+  },
+  "worker_build_assertion": "ABB worker imports OK"
+}
