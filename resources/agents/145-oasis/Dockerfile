@@ -14,7 +14,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /opt/agent
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g; s|security.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true \
+    && apt-get update && apt-get install -y --no-install-recommends \
         git \
         libpango-1.0-0 \
         libharfbuzz0b \

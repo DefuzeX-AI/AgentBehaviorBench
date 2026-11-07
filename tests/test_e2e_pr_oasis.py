@@ -111,39 +111,34 @@ class TestTier1FeatureCoverage:
 class TestTier2BoundaryValueAnalysis:
     """Tier 2: Edge cases, envelope shapes, and boundary inputs."""
 
-    def test_conversational_detection_boundary_cases(self):
+    def test_safe_file_candidate_boundary_cases(self):
         bridge = _load_bridge_module()
-        # Pure greetings and capability queries -> conversational
-        assert bridge._is_conversational_query("hello") is True
-        assert bridge._is_conversational_query("  Hi there! What can you do?  ") is True
-        assert bridge._is_conversational_query("Who are you?") is True
-        assert bridge._is_conversational_query("What vulnerabilities do you scan?") is True
-
-        # Queries containing code patterns -> NOT conversational (route to scan)
-        assert bridge._is_conversational_query("def foo():\n    pass") is False
-        assert bridge._is_conversational_query("SELECT * FROM users") is False
-        assert bridge._is_conversational_query("eval(user_input)") is False
-        assert bridge._is_conversational_query("import os; os.system('ls')") is False
+        assert bridge._is_safe_file_candidate("") is False
+        assert bridge._is_safe_file_candidate("foo\nbar") is False
+        assert bridge._is_safe_file_candidate("a" * 256) is False
+        assert bridge._is_safe_file_candidate(str(UNIT / "agent.toml")) is True
+        assert bridge._is_safe_file_candidate("/nonexistent/file/path/that/does/not/exist.py") is False
 
     def test_input_envelope_shape_handling(self):
         bridge = _load_bridge_module()
         graph = bridge.create_graph()
 
-        # String input
-        r1 = graph.invoke("What can you do?")
-        assert isinstance(r1, dict) and "answer" in r1
+        with patch.object(graph, "_run_scan", return_value={"answer": "mock report"}):
+            # String input
+            r1 = graph.invoke("def foo(): pass")
+            assert isinstance(r1, dict) and r1.get("answer") == "mock report"
 
-        # Dict with 'prompt'
-        r2 = graph.invoke({"prompt": "What can you do?"})
-        assert isinstance(r2, dict) and "answer" in r2
+            # Dict with 'prompt'
+            r2 = graph.invoke({"prompt": "def foo(): pass"})
+            assert isinstance(r2, dict) and r2.get("answer") == "mock report"
 
-        # Dict with 'message'
-        r3 = graph.invoke({"message": "What can you do?"})
-        assert isinstance(r3, dict) and "answer" in r3
+            # Dict with 'message'
+            r3 = graph.invoke({"message": "def foo(): pass"})
+            assert isinstance(r3, dict) and r3.get("answer") == "mock report"
 
-        # Dict with 'input'
-        r4 = graph.invoke({"input": "What can you do?"})
-        assert isinstance(r4, dict) and "answer" in r4
+            # Dict with 'input'
+            r4 = graph.invoke({"input": "def foo(): pass"})
+            assert isinstance(r4, dict) and r4.get("answer") == "mock report"
 
     @requires_oasis
     def test_scanner_nonzero_exit_and_missing_report_raise_failure(self):
@@ -196,7 +191,6 @@ class TestTier2BoundaryValueAnalysis:
         # Input > 255 chars containing slashes must not raise OSError 36
         long_query = "Please scan this function: " + ("a" * 300) + "/test.py"
         assert bridge._is_safe_file_candidate(long_query) is False
-        assert bridge._is_conversational_query(long_query) is False
 
         # Input with code fence
         fenced_input = (
@@ -206,7 +200,6 @@ class TestTier2BoundaryValueAnalysis:
             "```\n"
         )
         assert bridge._is_safe_file_candidate(fenced_input) is False
-        assert bridge._is_conversational_query(fenced_input) is False
 
 
 # ==============================================================================
@@ -220,21 +213,19 @@ class TestTier3CombinatorialInteractions:
         bridge = _load_bridge_module()
         graph = bridge.create_graph()
 
-        # Mock scanner and report to verify forwarding without network call
-        mock_scanner = MagicMock()
-        mock_scanner.report.output_dir = None
-        mock_scanner.run.return_value = 0
-
         config = {
             "configurable": {"thread_id": "test_session_123"},
             "metadata": {"abb_run_id": "run_test_abc"},
             "callbacks": [],
         }
 
-        # Verify invoke accepts and propagates run_config
-        res = graph.invoke("Introduce yourself", config=config)
-        assert "answer" in res
-        assert "OASIS" in res["answer"]
+        with patch.object(graph, "_run_scan", return_value={"answer": "mock report"}) as mock_run:
+            res = graph.invoke("def foo(): pass", config=config)
+            assert "answer" in res
+            assert res["answer"] == "mock report"
+            mock_run.assert_called_once()
+            args, kwargs = mock_run.call_args
+            assert args[1] == config
 
     def test_interception_environment_variables(self):
         with (UNIT / "agent.toml").open("rb") as stream:
@@ -256,26 +247,27 @@ class TestTier3CombinatorialInteractions:
             assert k in runtime["optional_secret_env_keys"]
 
     @requires_oasis
-    def test_resilient_model_inventory_and_concurrency_guards(self):
+    def test_native_workflow_and_clean_adapter_contract(self):
         bridge = _load_bridge_module()
+        bridge._ensure_import_path()
         from oasis.backends.openai_compat import OpenAICompatClient, OpenAICompatManager
+        from oasis.embedding import EmbeddingManager
+        from oasis.analyze import EmbeddingAnalyzer, SecurityAnalyzer
+        from oasis.oasis import OasisScanner
 
-        # Ensure qualnames are strictly preserved
+        # Verify no monkey-patching in bridge
+        assert not hasattr(bridge, "_install_concurrency_and_inventory_guards")
+        assert not hasattr(bridge, "_capability_response")
+        assert not hasattr(bridge, "_is_conversational_query")
+
+        # Verify upstream methods retain native qualnames
         assert OpenAICompatClient.embeddings.__qualname__ == "OpenAICompatClient.embeddings"
         assert OpenAICompatManager.ensure_model_available.__qualname__ == "OpenAICompatManager.ensure_model_available"
         assert OpenAICompatClient.list.__qualname__ == "OpenAICompatClient.list"
-
-        # Verify fallback inventory provides configured models when /models is unrouted
-        with patch.dict(os.environ, {"OPENAI_MODEL": "deepseek-flash", "OPENAI_EMBEDDING_MODEL": "text-embedding-3-small"}):
-            client = OpenAICompatClient("http://127.0.0.1:9", api_key="dummy")
-            models_info = client.list()
-            model_names = [m["name"] for m in models_info.get("models", [])]
-            assert "deepseek-flash" in model_names
-            assert "text-embedding-3-small" in model_names
-
-            manager = OpenAICompatManager("http://127.0.0.1:9", api_key="dummy")
-            assert manager.ensure_model_available("deepseek-flash") is True
-            assert manager.ensure_model_available("non-existent-model-xyz") is False
+        assert EmbeddingManager.index_code_files.__qualname__ == "EmbeddingManager.index_code_files"
+        assert EmbeddingAnalyzer._execute_parallel_analysis.__qualname__ == "EmbeddingAnalyzer._execute_parallel_analysis"
+        assert SecurityAnalyzer.search_vulnerabilities.__qualname__ == "SecurityAnalyzer.search_vulnerabilities"
+        assert OasisScanner.run_analysis_mode.__qualname__ == "OasisScanner.run_analysis_mode"
 
     @requires_oasis
     def test_scanner_receives_independent_embedding_configuration(self):
@@ -348,44 +340,7 @@ class TestTier3CombinatorialInteractions:
                 assert parsed_args.get("--embed-api-key") == "unified-secret-key"
 
     @requires_oasis
-    def test_vulnerability_embedding_retry_and_failure_surfacing(self):
-        bridge = _load_bridge_module()
-        bridge._ensure_import_path()
-        from oasis.embedding import EmbeddingManager
-
-        mock_client = MagicMock()
-        mock_args = MagicMock()
-        mock_args.embed_model = "text-embedding-3-small"
-        mock_args.chunk_size = 500
-        mock_args.embeddings_analyze_type = "file"
-        mock_args.cache_dir = None
-        mock_backend = MagicMock()
-        mock_backend.get_client.return_value = mock_client
-        em = EmbeddingManager(mock_args, mock_backend)
-        em.ollama_client = mock_client
-        em.embedding_model = "test-model"
-
-        # Case 1: Rich prompt fails with 405, concise prompt retry succeeds
-        calls = []
-        def side_effect_recover(model, prompt):
-            calls.append(prompt)
-            if "Common patterns" in prompt:
-                raise RuntimeError("OpenAI-compatible server returned 405 Method Not Allowed")
-            return {"embedding": [0.1, 0.2, 0.3]}
-
-        mock_client.embeddings.side_effect = side_effect_recover
-        vec = em.get_vulnerability_embedding({"name": "SQL Injection", "description": "desc", "patterns": ["pat"], "impact": "imp", "mitigation": "mit"})
-        assert vec == [0.1, 0.2, 0.3]
-        assert len(calls) == 2
-        assert "Vulnerability: SQL Injection" in calls[1]
-
-        # Case 2: Both rich prompt and retry fail -> must raise RuntimeError, never return None
-        mock_client.embeddings.side_effect = RuntimeError("OpenAI-compatible server returned 405 Method Not Allowed")
-        with pytest.raises(RuntimeError, match="Failed to generate embedding for vulnerability type 'SQL Injection'"):
-            em.get_vulnerability_embedding({"name": "SQL Injection", "description": "desc", "patterns": ["pat"], "impact": "imp", "mitigation": "mit"})
-
-    @requires_oasis
-    def test_zero_vulnerability_types_report_raises_runtime_error(self):
+    def test_scanner_empty_report_raises_runtime_error(self):
         bridge = _load_bridge_module()
         graph = bridge.create_graph()
 
@@ -396,51 +351,11 @@ class TestTier3CombinatorialInteractions:
         mock_scanner.embedding_manager.code_base = {"/target/vuln.py": {"embedding": [0.1, 0.2]}}
         mock_scanner.setup_argument_parser.return_value.parse_args.return_value = MagicMock()
 
-        # Mock report output containing the hollow 0-type summary
-        with patch.object(graph, "_collect_report_text", return_value="## Overview\nAnalyzed 0 vulnerability types across the codebase."):
+        # Mock report output containing empty summary
+        with patch.object(graph, "_collect_report_text", return_value=""):
             with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
-                with pytest.raises(RuntimeError, match="analyzed 0 vulnerability types across the codebase"):
+                with pytest.raises(RuntimeError, match="completed without producing report or findings"):
                     graph._run_scan(Path("/unused"), None)
-
-    @requires_oasis
-    def test_openai_compat_embeddings_fallback_on_array_rejection(self):
-        bridge = _load_bridge_module()
-        bridge._ensure_import_path()
-        from oasis.backends.openai_compat import OpenAICompatClient
-
-        client = OpenAICompatClient("http://127.0.0.1:9999", api_key="dummy")
-        posted_payloads = []
-
-        def fake_post_json(path, payload, timeout=None):
-            posted_payloads.append(payload)
-            if isinstance(payload.get("input"), list):
-                raise RuntimeError("OpenAI-compatible server returned 405 for /embeddings")
-            return {"data": [{"embedding": [0.42, 0.84]}]}
-
-        with patch.object(client, "_post_json", side_effect=fake_post_json):
-            res = client.embeddings(model="test-embed", prompt="single text prompt")
-            assert res == {"embedding": [0.42, 0.84]}
-            assert len(posted_payloads) == 2
-            assert posted_payloads[0]["input"] == ["single text prompt"]
-            assert posted_payloads[1]["input"] == "single text prompt"
-
-    @requires_oasis
-    def test_search_vulnerabilities_propagates_embedding_failure(self):
-        bridge = _load_bridge_module()
-        bridge._ensure_import_path()
-        from oasis.analyze import SecurityAnalyzer
-
-        analyzer = SecurityAnalyzer.__new__(SecurityAnalyzer)
-        analyzer.embedding_manager = MagicMock()
-        analyzer.embedding_manager.get_vulnerability_embedding.side_effect = RuntimeError(
-            "Failed to generate embedding for vulnerability type 'SQL Injection'"
-        )
-        analyzer.code_base = {"/target/app.py": {"embedding": [0.1, 0.2]}}
-        analyzer.analyze_by_function = False
-
-        # Guard 6 must propagate the RuntimeError rather than returning []
-        with pytest.raises(RuntimeError, match="Failed to generate embedding for vulnerability type 'SQL Injection'"):
-            analyzer.search_vulnerabilities({"name": "SQL Injection"}, threshold=0.5)
 
 
 # ==============================================================================

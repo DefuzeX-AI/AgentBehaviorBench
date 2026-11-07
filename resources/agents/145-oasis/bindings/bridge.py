@@ -6,15 +6,14 @@ LangGraph analysis state machine:
 
 The binding:
 - Accepts code text, file paths, or directories as benchmark input.
-- Intercepts conversational and capability queries cleanly without false scanning overhead.
 - Materializes code submissions into isolated temporary workspaces.
 - Connects OASIS to ABB's OpenAI-compatible model interceptor (`/v1/chat/completions`)
-  using DeepSeek (`deepseek-flash`).
-- Routes embedding requests natively through ABB's OpenAI-compatible
-  embedding interceptor (`/v1/embeddings`) with legitimate route declaration.
+  and embedding interceptor (`/v1/embeddings`).
 - Forwards LangGraph execution configuration (`config=config`) and applies
   `set_config_context` so OpenTelemetry callbacks and framework node spans
   are captured accurately.
+- Preserves native workflow and failure semantics without monkey-patching upstream
+  methods or substituting canned conversational responses.
 - Formats security reports and findings into structured markdown responses.
 """
 
@@ -50,226 +49,6 @@ def _ensure_import_path() -> None:
                 pkg_dir = _SOURCE_ROOT / "oasis"
                 if pkg_dir.is_dir():
                     m.__path__ = [str(pkg_dir)]
-    _install_concurrency_and_inventory_guards()
-
-
-def _install_concurrency_and_inventory_guards() -> None:
-    """Safeguard process concurrency and model inventory for in-process threaded runtime.
-
-    1. OpenAICompatClient.list:
-       Queries /models with a short (2.0s) timeout so unrouted discovery calls
-       do not hang for the default 240s httpx timeout. When /models is unrouted
-       or unavailable in container sandboxes, falls back to declared models from
-       the environment, preserving real model verification in ensure_model_available.
-       Preserves native qualname and untouched native OpenAICompatClient.embeddings.
-    2. EmbeddingManager.index_code_files & EmbeddingAnalyzer._execute_parallel_analysis:
-       Executes directly in-process when single item, or via ThreadPoolExecutor when
-       multiple items, eliminating multiprocessing.Pool deadlocks on macOS arm64 (spawn).
-    """
-    try:
-        from concurrent.futures import ThreadPoolExecutor
-        from oasis.analyze import EmbeddingAnalyzer, analyze_item_parallel, SecurityAnalyzer
-        from oasis.backends.openai_compat import OpenAICompatClient
-        from oasis.embedding import EmbeddingManager, process_file_parallel
-        from oasis.oasis import OasisScanner
-    except (ImportError, Exception):
-        return
-
-    # Guard 1: Resilient model inventory check (no 240s hang on unrouted /models)
-    if not getattr(OpenAICompatClient, "_abb_guarded", False):
-        orig_list = OpenAICompatClient.list
-
-        def _safe_list(self: Any) -> dict[str, Any]:
-            try:
-                old_timeout = getattr(self, "_default_timeout", None)
-                try:
-                    self._default_timeout = 2.0
-                    return orig_list(self)
-                finally:
-                    self._default_timeout = old_timeout
-            except Exception:
-                pass
-            declared: list[dict[str, str]] = []
-            for k in (
-                "OPENAI_MODEL",
-                "DEEPSEEK_MODEL",
-                "MODEL",
-                "CHAT_MODEL",
-                "OPENAI_EMBEDDING_MODEL",
-                "EMBED_MODEL",
-                "EMBEDDING_MODEL",
-            ):
-                v = os.environ.get(k)
-                if v and v.strip() and not any(m["model"] == v.strip() for m in declared):
-                    declared.append({"model": v.strip(), "name": v.strip()})
-            for default_model in ("deepseek-flash", "deepseek-chat", "text-embedding-3-small"):
-                if not any(m["model"] == default_model for m in declared):
-                    declared.append({"model": default_model, "name": default_model})
-            return {"models": declared}
-
-        _safe_list.__qualname__ = "OpenAICompatClient.list"
-        OpenAICompatClient.list = _safe_list
-        OpenAICompatClient._abb_guarded = True
-
-    # Guard 2: Sequential / ThreadPool indexing to eliminate macOS arm64 multiprocessing spawn deadlock
-    if not getattr(EmbeddingManager, "_abb_guarded", False):
-        def _safe_index_code_files(
-            self: Any,
-            files: list[Any],
-            *,
-            embedding_progress_hook: Any = None,
-            embedding_progress_min_interval_sec: float = 0.5,
-        ) -> None:
-            process_args = self._build_index_process_args(files)
-            if not process_args:
-                return
-            workers = min(4, len(process_args))
-            if workers <= 1:
-                for arg in process_args:
-                    res = process_file_parallel(arg)
-                    self._store_index_result(res)
-                return
-            with ThreadPoolExecutor(max_workers=workers) as executor:
-                for res in executor.map(process_file_parallel, process_args):
-                    self._store_index_result(res)
-
-        EmbeddingManager.index_code_files = _safe_index_code_files
-        EmbeddingManager._abb_guarded = True
-
-    # Guard 3: Sequential / ThreadPool analysis to eliminate macOS arm64 multiprocessing spawn deadlock
-    if not getattr(EmbeddingAnalyzer, "_abb_guarded", False):
-        def _safe_execute_parallel_analysis(self: Any, process_args: list[Any]) -> list[Any]:
-            if not process_args:
-                return []
-            workers = min(4, len(process_args))
-            if workers <= 1:
-                results = []
-                for arg in process_args:
-                    res = analyze_item_parallel(arg)
-                    if res and "error" not in res:
-                        results.append(res)
-                return results
-            with ThreadPoolExecutor(max_workers=workers) as executor:
-                results = [
-                    res for res in executor.map(analyze_item_parallel, process_args)
-                    if res and "error" not in res
-                ]
-            return results
-
-        EmbeddingAnalyzer._execute_parallel_analysis = _safe_execute_parallel_analysis
-        EmbeddingAnalyzer._abb_guarded = True
-
-    # Guard 4: Resilient vulnerability embedding with retry & error surfacing
-    if not getattr(EmbeddingManager, "_abb_vuln_embed_guarded", False):
-        def _safe_get_vulnerability_embedding(self: Any, vulnerability: Any) -> list[float]:
-            from oasis.embedding import build_vulnerability_embedding_prompt
-            vuln_name = (
-                vulnerability.get("name") or vulnerability.get("tag") or str(vulnerability)
-                if isinstance(vulnerability, dict)
-                else str(vulnerability)
-            )
-            resp = None
-            try:
-                prompt = build_vulnerability_embedding_prompt(vulnerability)
-                resp = self.ollama_client.embeddings(model=self.embedding_model, prompt=prompt)
-            except Exception:
-                resp = None
-
-            if resp and "embedding" in resp and isinstance(resp["embedding"], list):
-                return resp["embedding"]
-
-            # Retry with concise single vulnerability name as prompt
-            try:
-                resp = self.ollama_client.embeddings(
-                    model=self.embedding_model, prompt=f"Vulnerability: {vuln_name}"
-                )
-                if resp and "embedding" in resp and isinstance(resp["embedding"], list):
-                    return resp["embedding"]
-            except Exception as retry_err:
-                raise RuntimeError(
-                    f"Failed to generate embedding for vulnerability type '{vuln_name}': {retry_err}"
-                ) from retry_err
-
-            raise RuntimeError(
-                f"Failed to generate embedding for vulnerability type '{vuln_name}': empty or invalid response from embedding model."
-            )
-
-        _safe_get_vulnerability_embedding.__qualname__ = "EmbeddingManager.get_vulnerability_embedding"
-        EmbeddingManager.get_vulnerability_embedding = _safe_get_vulnerability_embedding
-        EmbeddingManager._abb_vuln_embed_guarded = True
-
-    # Guard 5: OpenAICompatClient.embeddings array/string payload resilience
-    if not getattr(OpenAICompatClient, "_abb_embed_guarded", False):
-        orig_embeddings = OpenAICompatClient.embeddings
-
-        def _safe_embeddings(self: Any, model: str, prompt: Any) -> dict[str, Any]:
-            input_payload = [prompt] if isinstance(prompt, str) else prompt
-            payload = {"model": model, "input": input_payload}
-            try:
-                data = self._post_json("/embeddings", payload)
-            except Exception as err:
-                if isinstance(prompt, str):
-                    try:
-                        data = self._post_json("/embeddings", {"model": model, "input": prompt})
-                    except Exception:
-                        raise err
-                else:
-                    raise err
-            rows = data.get("data") if isinstance(data, dict) else None
-            if not rows or not isinstance(rows[0], dict):
-                raise RuntimeError("OpenAI-compatible embeddings response missing data[0]")
-            embedding = rows[0].get("embedding")
-            if not isinstance(embedding, list):
-                raise RuntimeError("OpenAI-compatible embeddings response missing 'embedding' vector")
-            return {"embedding": embedding}
-
-        _safe_embeddings.__qualname__ = "OpenAICompatClient.embeddings"
-        OpenAICompatClient.embeddings = _safe_embeddings
-        OpenAICompatClient._abb_embed_guarded = True
-
-    # Guard 6: SecurityAnalyzer.search_vulnerabilities error surfacing (no silent empty results on embedding failure)
-    if not getattr(SecurityAnalyzer, "_abb_search_guarded", False):
-        def _safe_search_vulnerabilities(self: Any, vulnerability: Any, threshold: float = 0.5) -> list[Any]:
-            vuln_name = (
-                vulnerability.get("name") or vulnerability.get("tag") or str(vulnerability)
-                if isinstance(vulnerability, dict)
-                else str(vulnerability)
-            )
-            vuln_vector = self.embedding_manager.get_vulnerability_embedding(vulnerability)
-            if not vuln_vector:
-                raise RuntimeError(
-                    f"Failed to get embedding for vulnerability type '{vuln_name}'. No embedding returned."
-                )
-            results = []
-            for file_path, data in self.code_base.items():
-                if self.analyze_by_function:
-                    self._process_functions(file_path, data, vuln_vector, threshold, results)
-                else:
-                    self._process_file(file_path, data, vuln_vector, threshold, results)
-            return sorted(results, key=lambda x: x[1], reverse=True)
-
-        _safe_search_vulnerabilities.__qualname__ = "SecurityAnalyzer.search_vulnerabilities"
-        SecurityAnalyzer.search_vulnerabilities = _safe_search_vulnerabilities
-        SecurityAnalyzer._abb_search_guarded = True
-
-    # Guard 7: OasisScanner.run_analysis_mode non-zero exit on hollow zero-vulnerability scan
-    if not getattr(OasisScanner, "_abb_analysis_mode_guarded", False):
-        orig_run_analysis_mode = OasisScanner.run_analysis_mode
-
-        def _safe_run_analysis_mode(self: Any, main_models: list[str], scan_model: list[str], vuln_mapping: Any) -> bool:
-            res = orig_run_analysis_mode(self, main_models, scan_model, vuln_mapping)
-            if not res:
-                return False
-            rep = getattr(self, "report", None)
-            if rep:
-                last_results = getattr(rep, "_last_summary_results", None)
-                if isinstance(last_results, dict) and len(last_results) == 0:
-                    return False
-            return True
-
-        _safe_run_analysis_mode.__qualname__ = "OasisScanner.run_analysis_mode"
-        OasisScanner.run_analysis_mode = _safe_run_analysis_mode
-        OasisScanner._abb_analysis_mode_guarded = True
 
 
 _ensure_import_path()
@@ -283,63 +62,6 @@ def _is_safe_file_candidate(text: str) -> bool:
         return Path(text).exists()
     except OSError:
         return False
-
-
-def _is_conversational_query(text: str) -> bool:
-    """Check if input is a conversational question rather than code to scan."""
-    stripped = text.strip()
-    if not stripped:
-        return True
-
-    # If explicit code syntax or language markers are present, route to scanning
-    code_indicators = (
-        "def ", "class ", "import ", "select ", "from ", "function ",
-        "<?php", "eval(", "exec(", "<script", "system(", "popen(", "curl ",
-        "```", "sqlite3", "cursor."
-    )
-    lower = stripped.lower()
-    if any(ind in lower for ind in code_indicators):
-        return False
-
-    if "/" in stripped or "\\" in stripped:
-        # Might be a file path
-        if _is_safe_file_candidate(stripped) or stripped.endswith((".py", ".js", ".php", ".go", ".c", ".cpp")):
-            return False
-
-    if len(stripped.splitlines()) > 3:
-        return False
-
-    # Check conversational phrases anywhere in short queries
-    conversational_keywords = (
-        "introduce yourself", "who are you", "what are you", "what can you do",
-        "what can you help", "tell me about yourself", "how do you work",
-        "how do you scan", "what vulnerabilities", "what types of vulnerabilities",
-        "help with", "hello", "hi there", "greetings"
-    )
-    if any(kw in lower for kw in conversational_keywords):
-        return True
-
-    conversational_patterns = (
-        r"^(hi|hello|hey|help)\b",
-    )
-    return any(re.search(pat, stripped, re.IGNORECASE) is not None for pat in conversational_patterns)
-
-
-def _capability_response() -> str:
-    return (
-        "I am **OASIS** (Open Automated Security Intelligence Scanner), an automated "
-        "vulnerability intelligence scanning agent orchestrated via a LangGraph state machine.\n\n"
-        "### What I Can Help With\n"
-        "- **Automated Security Analysis**: Scanning application source code and repositories "
-        "for high-risk vulnerabilities and security defects before deployment.\n"
-        "- **Deep Exploitability Reasoning**: Tracing taint flows, variable scopes, and execution "
-        "contexts using deep LLM-backed analysis to verify genuine flaws and eliminate false positives.\n"
-        "- **Comprehensive Vulnerability Coverage**: Detecting SQL Injection (SQLi), Remote Code Execution (RCE), "
-        "Command Injection, Cross-Site Scripting (XSS), CSRF, Authentication bypasses, IDOR, SSRF, "
-        "Path Traversal, and Insecure Deserialization.\n"
-        "- **Structured Security Reports**: Delivering executive summaries, detailed line-by-line evidence, "
-        "impact assessments, and remediation guidance across Markdown, JSON, and SARIF formats.\n"
-    )
 
 
 class OasisAgentGraph:
@@ -372,10 +94,6 @@ class OasisAgentGraph:
             text_input = input_data.strip()
         else:
             text_input = str(input_data)
-
-        # Check conversational queries
-        if _is_conversational_query(text_input):
-            return {"answer": _capability_response()}
 
         # Materialize input code or resolve file path
         workspace_dir: tempfile.TemporaryDirectory | None = None
@@ -531,18 +249,6 @@ class OasisAgentGraph:
         report_text = self._collect_report_text(scanner)
         if not report_text.strip() and captured_results:
             report_text = self._format_results_fallback(captured_results)
-
-        # Do not claim successful scan if 0 vulnerability types were analyzed or report indicates zero analysis
-        if isinstance(valid_files, (list, tuple)) and len(valid_files) > 0:
-            if "Analyzed 0 vulnerability types across the codebase" in report_text:
-                raise RuntimeError(
-                    "OASIS scan failed: analyzed 0 vulnerability types across the codebase. "
-                    "Vulnerability embeddings or analysis pipeline failed."
-                )
-            if not captured_results:
-                raise RuntimeError(
-                    "OASIS scan completed without analyzing any vulnerability types or producing findings."
-                )
 
         # Do not claim successful scan if no report or evidence was produced
         if not report_text.strip():

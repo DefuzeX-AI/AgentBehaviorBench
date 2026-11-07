@@ -31,10 +31,10 @@ Because DeepSeek and many specialized OpenAI-compatible LLM endpoints do not ser
 - Chat requests (`POST /v1/chat/completions`) go to `OPENAI_BASE_URL`.
 - Embedding requests (`POST /v1/embeddings`) go to `OASIS_EMBED_OPENAI_BASE_URL`.
 
-### Vulnerability-Type Embedding Resilience & Failure Surfacing
-OASIS embeds both target source files and vulnerability-type descriptions (for semantic similarity ranking):
-- If an embedding provider rejects structured multi-line descriptions (e.g. HTTP 405 / 400), OASIS automatically retries with concise single-item prompts (`Vulnerability: <name>`).
-- If vulnerability-type embedding fails permanently or yields 0 analyzed types, the scan halts and surfaces a `RuntimeError` rather than silently reporting a hollow analysis of zero vulnerability types.
+### Native Execution Semantics
+The integration preserves native OASIS LangGraph workflow and failure semantics:
+- All inputs are dispatched to the native OASIS analysis pipeline without artificial greeting intercepts.
+- The scanner runs directly without monkey-patching upstream methods; exit codes and failure states propagate natively.
 
 ## KUMA / Benchmark Configuration
 

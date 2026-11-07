@@ -104,25 +104,21 @@ def test_dockerfile_configures_safe_non_root_runtime():
     assert "COPY agent.toml ./agent.toml" in dockerfile_content
 
 
-def test_bridge_creates_graph_and_routes_conversational_queries():
+def test_bridge_creates_graph_and_preserves_native_workflow():
     import sys
     sys.path.insert(0, str(UNIT / "bindings"))
     import bridge
 
+    # Verify no conversational intercepts or monkey-patching in bridge
+    assert not hasattr(bridge, "_capability_response")
+    assert not hasattr(bridge, "_is_conversational_query")
+    assert not hasattr(bridge, "_install_concurrency_and_inventory_guards")
+    assert not hasattr(bridge, "_compute_deterministic_embedding")
+    assert not hasattr(bridge, "_install_runtime_patches")
+
     graph = bridge.create_graph()
     assert hasattr(graph, "invoke")
     assert hasattr(graph, "ainvoke")
-
-    # Conversational greeting
-    res1 = graph.invoke("Hello, who are you and what do you do?")
-    assert "answer" in res1
-    assert "OASIS" in res1["answer"]
-    assert "Security Analysis" in res1["answer"]
-
-    # Conversational capability query
-    res2 = graph.invoke("What vulnerabilities can you scan?")
-    assert "answer" in res2
-    assert "SQL Injection" in res2["answer"]
 
 
 def _can_import_oasis() -> bool:
