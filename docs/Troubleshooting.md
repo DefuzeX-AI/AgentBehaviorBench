@@ -13,6 +13,7 @@
 | Wrong Suite / URL | Use the complete printed `View:` URL including Suite ID and port. Python selects a free port if 8765 is occupied. |
 | Newly printed Suite URL returns 404 on Windows | Update ABB and open the saved `events.json` with `agentbench view`. Older viewers could share an occupied port and send requests to a previous Suite. Restarting the viewer loads the fix; the benchmark can continue running. |
 | Docker unavailable / permission denied | Run `docker info` as the same user. Start Desktop/Engine and inspect Docker context/permissions. Do not run ABB as root to hide ownership problems. |
+| Interceptor startup reports `bind source path does not exist` on macOS / Colima | Update ABB to use the home-directory default. For custom VM shares, set `ABB_DOCKER_TMPDIR` to a writable absolute path shared with Docker. See [Docker-mounted temporary files](#docker-mounted-temporary-files). |
 | Python 3.10 Case generation reports missing `tomllib` / `tomli` | Update ABB and rebuild the evaluation image. Worker staging installs `tomli` for Python below 3.11 into the image's selected Python environment; installing it only on the host does not repair an existing image. See [#85](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/85). |
 | Every Docker Case fails in Case generation with `ModuleNotFoundError: No module named 'filelock'` | Update ABB and rebuild the evaluation image. Worker staging installs `filelock` into the image's selected Python environment because the injected Suite lock imports it; installing it only on the host does not repair an existing image. See [#391](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/391). |
 | Missing/invalid KUMA key | Nonempty `KUMA_API_KEY` takes precedence over `DEFUZEX_API_KEY`. Check exported variables overriding `.env` and service account access without displaying keys. |
@@ -29,6 +30,36 @@ and `OPENROUTER_APP_TITLE` identify requests. They do not change KUMA's endpoint
 The onboarding catalog reads `KUMA_BASE_URL`, but evaluation does not forward it
 end to end and allows the default DefuzeX backend. Do not treat it as a working
 evaluation override: see [#52](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/52).
+
+## Docker-mounted temporary files
+
+On macOS, ABB creates each model interceptor's configuration, credentials and CA
+export in a private temporary directory under `~/.cache/agentbench/docker/`.
+[Colima shares the home directory by default](https://colima.run/docs/faq/#docker-bind-mount-showing-empty),
+while the macOS system temporary
+path under `/private/var/...` is not shared by default. This addresses
+[#116](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/116) without requiring
+a global `TMPDIR` workaround. Other platforms retain Python's default temporary
+location unless an override is configured.
+
+For custom Docker VM shares, set an absolute host directory that the Docker daemon
+can access at the same path, for example:
+
+```bash
+export ABB_DOCKER_TMPDIR="$HOME/abb-docker-tmp"
+```
+
+ABB creates this parent if needed. The override takes precedence on every platform;
+macOS otherwise uses the home-directory default even if `TMPDIR` is set. Ensure the
+chosen location (including any resolved symlink target) is included in your VM's
+file-sharing configuration. A remote daemon also needs access to the actual host
+files; setting this variable alone does not copy them to another machine.
+
+Each interceptor receives a unique directory with owner-only permissions. Its files
+are removed on normal shutdown and startup failure; the reusable parent remains.
+These files can contain credentials, so use a local private location outside
+published result artifacts. A forcibly killed host process may leave a directory
+behind; remove such leftovers only after confirming its interceptor has stopped.
 
 ## Structured-output generation failures
 

@@ -52,6 +52,7 @@ from .interceptor_image import LocalInterceptorImageProvider, default_intercepto
 from .interceptor_policy import InterceptorPolicy
 from .policy import DockerPolicy, EgressSettings
 from .session import DockerSession
+from .temporary import interceptor_temp_directory
 from .resources import ResourceRegistry
 from .worker_build import worker_build_context
 
@@ -441,7 +442,7 @@ class DockerRuntime:
         # inside run would escape the single build preparation policy.
         self._run("image", "inspect", image, deadline=deadline)
         container_name = f"defuzex-{suffix}-interceptor"
-        secret_dir = Path(tempfile.mkdtemp(prefix="defuzex-model-interceptor-"))
+        secret_dir = interceptor_temp_directory(self._environ)
         config_file = secret_dir / "interceptor_config.json"
         ca_dir = secret_dir / "ca"
         ca_certificate = ca_dir / "mitmproxy-ca-cert.pem"
