@@ -3,7 +3,7 @@ import re
 
 
 def stage_runtime_dependencies(context, dockerfile):
-    source = dockerfile.read_text()
+    source = dockerfile.read_text(encoding='utf-8')
     users = re.findall(r'(?im)^USER\s+(.+)$', source)
     if not users or users[-1].strip() in ('root', '0', '0:0'):
         raise ValueError('Runtime overlay requires an explicit non-root image USER')
@@ -16,4 +16,4 @@ def stage_runtime_dependencies(context, dockerfile):
         f'COPY {requirements} /opt/abb-runtime-deps/requirements.txt\n'
         'RUN python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip\n'
         'RUN python -m pip --isolated install --no-cache-dir --index-url https://pypi.org/simple '
-        '-r /opt/abb-runtime-deps/requirements.txt\nUSER ' + users[-1] + '\n')
+        '-r /opt/abb-runtime-deps/requirements.txt\nUSER ' + users[-1] + '\n', encoding='utf-8')

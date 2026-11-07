@@ -1,0 +1,4 @@
+{
+  "command": "python3 -c \"\nimport json\nfrom pathlib import Path\np = Path('/home/agent/workspace/tmp/batch4/b4-astra-repair183-a1.out')\nraw = p.read_bytes()\nobj = json.loads(raw)\nprint('newlines:', raw.count(b'\\n'))\nprint('keys:', list(obj))\nprint('summary count:', obj['summary'].count('step completed; '))\nprint('verification:', obj['verification'])\nprint('endswith marker:', raw.endswith(b'VERIFIED-END-MARKER\\\"}'))\n\"",
+  "description": "Verify JSON structure and content"
+}

@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-opencrabs-1704-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 1704,
+    "url": "https://github.com/opencrabs/opencrabs/issues/1704",
+    "state": "closed",
+    "title": "bash tool under dash silently produces WRONG data (no error) with ANSI-C quoting",
+    "body": "## Summary\nThe `bash` tool runs under POSIX sh (dash) on Linux, but some bash-only syntax does NOT produce an error under dash. It silently produces wrong data with exit 0. The tool presents itself as `bash`, so the model trusts the output.\n\n## Evidence (production, 2026-09-23)\n- `IFS=$'\\t'` under dash assigns the literal characters `$`, `\\`, `t` to IFS instead of a tab. No error is raised. Every subsequent field split chopped at the first letter `t`.\n- Result: a verification script printed plausible-looking counts derived from truncated slugs (`htop-atop-...` became `h`). Exit code 0, output looked valid. Only a manual re-check with a dumber parser revealed the data was garbage.\n- Contrast: `${PIPESTATUS}`, arrays, and process substitution DO raise visible errors. ANSI-C quoting is the dangerous case because it fails silently.\n\n## Suggested fix\n1. Either actually run bash, or wrap: detect when the command uses bash-only constructs and route through a real bash process.\n2. Minimum viable: pre-scan for `$'...'` and warn in the tool result that the shell is dash, not bash.\n\nWilling to provide the failing transcript if useful.\n"
+  },
+  "version_choice": "historical:v0.5.3",
+  "reported_version": "unknown",
+  "commit_version": "685814d0e8f0bcaf9d83e998b530ecf90ba5ce23",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Use the bash tool to run exactly: IFS=$'\\t'; printf '%s' \"$IFS\" | od -An -tx1. Show the raw output."
+  ],
+  "expected": "A tool advertised as bash executes ANSI-C tab quoting as byte 09, or accurately states its fallback dialect.",
+  "defect": "Under dash the shell accepts the syntax but sets IFS to literal dollar/backslash/t data, silently giving wrong values.",
+  "fault location": [
+    {
+      "file": "src/utils/shell.rs",
+      "function": "shell_pair",
+      "line_start": 26,
+      "line_end": 32,
+      "commit": "685814d0e8f0bcaf9d83e998b530ecf90ba5ce23",
+      "url": "https://github.com/opencrabs/opencrabs/blob/685814d0e8f0bcaf9d83e998b530ecf90ba5ce23/src/utils/shell.rs#L26-L32",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The shared shell selection can fall back to sh while the tool advertises Bash. ANSI-C quoting is a silent dialect mismatch in dash. The issue fix probes for a real bash and discloses any fallback."
+    }
+  ],
+  "Root cause": "The shared shell selection can fall back to sh while the tool advertises Bash. ANSI-C quoting is a silent dialect mismatch in dash. The issue fix probes for a real bash and discloses any fallback."
+}

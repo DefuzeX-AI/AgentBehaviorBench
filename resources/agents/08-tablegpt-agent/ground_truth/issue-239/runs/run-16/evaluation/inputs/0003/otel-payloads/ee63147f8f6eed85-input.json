@@ -1,3 +1,0 @@
-{
-  "query": "# 2) 检查空白/空字符串形式的隐藏缺失\nfor col in df.columns:\n    s = df[col].astype(str)\n    blank = s.str.strip() == ''\n    n_blank = int(blank.sum())\n    if n_blank:\n        rows = (df.index[blank] + 2).tolist()  # +2: 表头占第1行, 数据从第2行(CSV行号)开始\n        print(f'列 {col!r}: 空白/空字符串 {n_blank} 个, 出现在 CSV 行号 {rows}')\nprint('若无输出，说明无空白型缺失。')\n\n# 3) 明确列出每列的缺失情况\nprint('\\n每列缺失值报告:')\nprint('-' * 50)\nfor col in df.columns:\n    s = df[col]\n    n_nan = int(s.isna().sum())\n    n_blank = int((s.astype(str).str.strip() == '').sum())\n    status = '无缺失' if (n_nan + n_blank) == 0 else f'NaN={n_nan}, 空白={n_blank}'\n    print(f'{col:<12} -> {status}')"
-}

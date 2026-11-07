@@ -1,3 +1,0 @@
-{
-  "command": "cd /workspace/project && python3 - <<'EOF'\np='app.ini'\nb=open(p,'rb').read()\n# current state is pure LF (tool normalised everything); convert back to CRLF\nassert b'\\r' not in b, b\nb=b.replace(b'\\n', b'\\r\\n')\nopen(p,'wb').write(b)\nEOF\nod -c app.ini && wc -c app.ini"
-}

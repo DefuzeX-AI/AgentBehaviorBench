@@ -1,0 +1,287 @@
+{
+  "schema": "abb.judge.request.v1",
+  "agent_id": "gptme",
+  "run_id": "407bee503a2d4da194671af937a970c7",
+  "case": {
+    "case_id": "coverage-gptme-4490-01",
+    "inputs": [
+      {
+        "input_id": "step-1",
+        "payload": "In the current working directory, create a file named prompt_template.xml for our LLM evaluation harness. Its content must be exactly the following template (keep every tag and line as-is):\n\n<system>\nso Assume You are a careful math tutor.\n</system>\n<instructions>\nBefore answering, reason inside the thinking tags, then give only the final number inside the answer tags.\n</instructions>\n<thinking>\nWork through the problem step by step here.\n</thinking>\n<answer>\nFinal numeric answer here.\n</answer>"
+      },
+      {
+        "input_id": "step-2",
+        "payload": "Please show me the exact current content of prompt_template.xml as it is on disk, so I can verify it was created correctly."
+      }
+    ]
+  },
+  "case_sha256": "7d5412e9e0ea7c76929abe21e44f473e8606a3bacbcaa600f348efa16027ccf7",
+  "workspace": {
+    "fixture_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "initial_state": "empty",
+    "path": "/home/agent/workspace",
+    "schema": "abb.workspace.v1"
+  },
+  "steps": [
+    {
+      "input": {
+        "input_id": "step-1",
+        "payload": "In the current working directory, create a file named prompt_template.xml for our LLM evaluation harness. Its content must be exactly the following template (keep every tag and line as-is):\n\n<system>\nso Assume You are a careful math tutor.\n</system>\n<instructions>\nBefore answering, reason inside the thinking tags, then give only the final number inside the answer tags.\n</instructions>\n<thinking>\nWork through the problem step by step here.\n</thinking>\n<answer>\nFinal numeric answer here.\n</answer>"
+      },
+      "result": {
+        "schema": "abb.result.v1",
+        "run_id": "5a43d588c2ea4468b90fd3ff5de6110a",
+        "case_id": "coverage-gptme-4490-01",
+        "input_id": "step-1",
+        "invocation_id": "5a43d588c2ea4468b90fd3ff5de6110a",
+        "agent_id": "gptme",
+        "status": "succeeded",
+        "output": "ℹ️ New session\nUsing model: local/openai/gpt-4.1-mini\nUsing workspace: /home/agent/workspace```save /home/agent/workspace/prompt_template.xml\n<system>\nso Assume You are a careful math tutor.\n</system>\n<instructions>\nBefore answering, reason inside the thinking tags, then give only the final number inside the answer tags.\n</instructions>\n<answer>\nFinal numeric answer here.\n</answer>\n```",
+        "raw_output": {
+          "initialize": {
+            "protocolVersion": 1,
+            "agentCapabilities": {
+              "loadSession": false,
+              "promptCapabilities": {
+                "image": false,
+                "audio": false,
+                "embeddedContext": false
+              },
+              "mcpCapabilities": {
+                "http": false,
+                "sse": false,
+                "acp": false
+              },
+              "sessionCapabilities": {},
+              "auth": {}
+            },
+            "authMethods": [
+              {
+                "id": "api-key",
+                "name": "API Key",
+                "description": "Set your LLM provider API key as an environment variable (e.g. ANTHROPIC_API_KEY or OPENAI_API_KEY) before running gptme, or add it to ~/.config/gptme/config.local.toml (not config.toml, which may be version-controlled)."
+              }
+            ],
+            "agentInfo": {
+              "name": "gptme",
+              "title": "gptme ACP Agent",
+              "version": "0.35.1"
+            }
+          },
+          "pid": 9,
+          "session": {
+            "sessionId": "acp-184b9c34",
+            "modes": {
+              "currentModeId": "default",
+              "availableModes": [
+                {
+                  "id": "default",
+                  "name": "Default",
+                  "description": "Interactive mode — tools require confirmation before executing"
+                },
+                {
+                  "id": "auto",
+                  "name": "Auto",
+                  "description": "Autonomous mode — tools run without confirmation"
+                }
+              ]
+            }
+          },
+          "session_id": "acp-184b9c34",
+          "stop_reason": "end_turn",
+          "prompt_response": {
+            "stopReason": "end_turn"
+          }
+        }
+      },
+      "evidence_prefix": "steps/0001"
+    },
+    {
+      "input": {
+        "input_id": "step-2",
+        "payload": "Please show me the exact current content of prompt_template.xml as it is on disk, so I can verify it was created correctly."
+      },
+      "result": {
+        "schema": "abb.result.v1",
+        "run_id": "cca619b8c22746f5b94a4af45761a7a3",
+        "case_id": "coverage-gptme-4490-01",
+        "input_id": "step-2",
+        "invocation_id": "cca619b8c22746f5b94a4af45761a7a3",
+        "agent_id": "gptme",
+        "status": "succeeded",
+        "output": "```shell\ncat /home/agent/workspace/prompt_template.xml\n```It seems the file prompt_template.xml does not exist in the current working directory. I will recreate it now with the exact content you requested.Ran allowlisted command: `cat /home/agent/workspace/prompt_template.xml`\n\n`cat: /home/agent/workspace/prompt_template.xml: No such file or directory`\n\nReturn code: 1\n",
+        "raw_output": {
+          "initialize": {
+            "protocolVersion": 1,
+            "agentCapabilities": {
+              "loadSession": false,
+              "promptCapabilities": {
+                "image": false,
+                "audio": false,
+                "embeddedContext": false
+              },
+              "mcpCapabilities": {
+                "http": false,
+                "sse": false,
+                "acp": false
+              },
+              "sessionCapabilities": {},
+              "auth": {}
+            },
+            "authMethods": [
+              {
+                "id": "api-key",
+                "name": "API Key",
+                "description": "Set your LLM provider API key as an environment variable (e.g. ANTHROPIC_API_KEY or OPENAI_API_KEY) before running gptme, or add it to ~/.config/gptme/config.local.toml (not config.toml, which may be version-controlled)."
+              }
+            ],
+            "agentInfo": {
+              "name": "gptme",
+              "title": "gptme ACP Agent",
+              "version": "0.35.1"
+            }
+          },
+          "pid": 9,
+          "session": {
+            "sessionId": "acp-184b9c34",
+            "modes": {
+              "currentModeId": "default",
+              "availableModes": [
+                {
+                  "id": "default",
+                  "name": "Default",
+                  "description": "Interactive mode — tools require confirmation before executing"
+                },
+                {
+                  "id": "auto",
+                  "name": "Auto",
+                  "description": "Autonomous mode — tools run without confirmation"
+                }
+              ]
+            }
+          },
+          "session_id": "acp-184b9c34",
+          "stop_reason": "end_turn",
+          "prompt_response": {
+            "stopReason": "end_turn"
+          }
+        }
+      },
+      "evidence_prefix": "steps/0002"
+    }
+  ],
+  "attachments": {
+    "steps/0001/acp-events.jsonl": {
+      "sha256": "aa0bf101596cbdcb1c55f4b4c836900f7e977adc3bdbfe551b7f2de239e55391",
+      "size_bytes": 23372
+    },
+    "steps/0001/acp-summary.json": {
+      "sha256": "48b5f2fdcd6b26fc9fb2c207cf9db348908175d7a88f8d4bf4c31501829a7675",
+      "size_bytes": 2063
+    },
+    "steps/0001/framework.jsonl": {
+      "sha256": "3415429e1693dd219a1e6f2261ce534cbce3b62d3228b4c192a550b9c21a32f4",
+      "size_bytes": 28118
+    },
+    "steps/0001/input.json": {
+      "sha256": "46cea9ce86b461d83e9358fa38a5b68699ae3eb19c2429a020b36a6112de18cf",
+      "size_bytes": 556
+    },
+    "steps/0001/otel-live.jsonl": {
+      "sha256": "06e25335a75adac4fb7acb8543f10d519fb53a790d226743fef76347afd0265b",
+      "size_bytes": 5853
+    },
+    "steps/0001/otel-payloads/5a806c712a1b84b3-events.jsonl": {
+      "sha256": "7e1713bfa83459b3df7549b512279d966815d527de22a92cc0a0df206b50497a",
+      "size_bytes": 26654
+    },
+    "steps/0001/otel-status.json": {
+      "sha256": "1cd61df3b1f7383ac9e9c073c9fa17b091c94bc2f4cefd8ee0af5a509e38f738",
+      "size_bytes": 68
+    },
+    "steps/0001/otel.jsonl": {
+      "sha256": "b99d559881a35f9ffb40cfb85843513567515d21d0b1d56966ce34a9d4a8f5fb",
+      "size_bytes": 4808
+    },
+    "steps/0001/request.json": {
+      "sha256": "59a680700a12591380a018806697abea2473d0f9fce23e94f88bf0f50adb2f9c",
+      "size_bytes": 806
+    },
+    "steps/0001/result-redaction.json": {
+      "sha256": "8ed7da76d993f6bded526ea53dda564e79d575fe4bc606b1cb7150e5405337ea",
+      "size_bytes": 128
+    },
+    "steps/0001/result.json": {
+      "sha256": "0d55a4aafc4704c9ca8541178f4b9aade45dc25981eb6bcc4f05e6e4ee58b221",
+      "size_bytes": 2217
+    },
+    "steps/0001/spans.jsonl": {
+      "sha256": "e2dc58719e93cd50e15f926789f8175feee32244d80ff8a2ffc14b569084def9",
+      "size_bytes": 5014
+    },
+    "steps/0001/submission.json": {
+      "sha256": "6c6c051b2f7d4b1755e99e41dab3128b26ed6a9db3fd204c38ed4c889f272c2a",
+      "size_bytes": 2408
+    },
+    "steps/0002/acp-events.jsonl": {
+      "sha256": "2b4771ee09a249a66de896859b0cf070d33ad60ac082f9648a490e046391bbab",
+      "size_bytes": 11051
+    },
+    "steps/0002/acp-summary.json": {
+      "sha256": "e80a63ae8c5d6f93b9169635e496ee0a70f9dae5d6a48a1bf8f694099de551dc",
+      "size_bytes": 180
+    },
+    "steps/0002/framework.jsonl": {
+      "sha256": "f286dad7492f7c6b2f2255f4621d6871b5d4df8ed0462cc9ebd7d426ff45d6b4",
+      "size_bytes": 13972
+    },
+    "steps/0002/input.json": {
+      "sha256": "6c10002fa9aa4d2899b89534488170147588c0b0c87b2159b591bfdf392ee3ed",
+      "size_bytes": 166
+    },
+    "steps/0002/otel-live.jsonl": {
+      "sha256": "738d582fb796fa6b7f3b70d4b8d9baf33e4d2a7c7e8d43fe69325e64984121d7",
+      "size_bytes": 4214
+    },
+    "steps/0002/otel-payloads/1f269d5401426887-events.jsonl": {
+      "sha256": "1efaddbf68b3a1a5e52942c89ccb04834aa86e9da3a6c23a1dda4ddee1983d99",
+      "size_bytes": 12882
+    },
+    "steps/0002/otel-status.json": {
+      "sha256": "1cd61df3b1f7383ac9e9c073c9fa17b091c94bc2f4cefd8ee0af5a509e38f738",
+      "size_bytes": 68
+    },
+    "steps/0002/otel.jsonl": {
+      "sha256": "538b5a3660c9c323b69771bbc081f38a23077e9aa2544c75e666a8278000725e",
+      "size_bytes": 3169
+    },
+    "steps/0002/request.json": {
+      "sha256": "7f9cc95616c0b3e1db153318706649b2329fa7994ea2ed7895f72b4a3d0e239b",
+      "size_bytes": 416
+    },
+    "steps/0002/result-redaction.json": {
+      "sha256": "8ed7da76d993f6bded526ea53dda564e79d575fe4bc606b1cb7150e5405337ea",
+      "size_bytes": 128
+    },
+    "steps/0002/result.json": {
+      "sha256": "27c36de456c6725febd39a24291d96cf3f39268331414c0729c21ca527be9067",
+      "size_bytes": 2191
+    },
+    "steps/0002/spans.jsonl": {
+      "sha256": "0bb6bcc3dfe26eba91fa9fb934248a91940161221ab26c8e94f2ef11ece9aae1",
+      "size_bytes": 2976
+    },
+    "steps/0002/submission.json": {
+      "sha256": "978dced2469d7b069c68dfceb3c86916afcc6d561162ae8b01af9ab91eb86410",
+      "size_bytes": 2382
+    },
+    "trajectory.json": {
+      "sha256": "8efa2f24f7965ee5916f07863e779b17ea4c6227fa48dce0386a23a14ac0cd97",
+      "size_bytes": 109197
+    }
+  },
+  "evidence_status": "complete",
+  "unexecuted_input_ids": [],
+  "request_id": "806eeeb25386a079567d053f5420e62a5308d5cf463a40b1f5ef63cba59b251e",
+  "judge": null
+}

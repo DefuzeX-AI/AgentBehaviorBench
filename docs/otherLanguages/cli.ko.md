@@ -160,7 +160,7 @@ agentbench certify AGENT_ID [OPTIONS]
 | `--case-retries N` | 안전하게 복구 가능한 Case 실패의 추가 자동 시도 수입니다. 0 이상 정수, 기본값 2이며 0은 자동 재시도를 끕니다. | `--case-retries 0` |
 | `--retry-delay SECONDS` | 첫 재시도 대기 시간(초)입니다. 유한한 0 이상 숫자, 기본값 5이며 후속 대기는 재시도 정책에 따라 늘어납니다. | `--retry-delay 5` |
 | `--no-view` | 결과를 저장하되 웹 뷰어를 시작하지 않습니다. 기본적으로 뷰어를 시작하거나 재사용하므로 웹 빌드가 필요합니다. | `--no-view` |
-| `AGENT_ID` | 활성 등록 Agent의 정확한 ID가 필수입니다. adapting Agent를 인증하며 ready Agent는 재실행 없이 반환합니다. | `folder-mover-agent` |
+| `AGENT_ID` | 활성 등록 Agent의 정확한 ID가 필수입니다. adapting Agent를 인증하며 ready Agent는 재실행 없이 반환합니다. | `deer-flow` |
 | `--env-file PATH` | 환경 파일을 지정합니다. 기본값은 프로젝트의 .env이며 셸 환경 변수가 우선합니다. | `--env-file .env.testing` |
 | `--results-dir DIR` | ABB 결과 루트를 지정하며 없으면 생성합니다. 저장소 루트에서 기본값은 results/입니다. 이벤트는 DIR/suites/SUITE_ID/events.json에 저장됩니다. 이전 결과 위치 옵션과 함께 사용할 수 없습니다. | `--results-dir results/my-run` |
 | `--output PATH` | 이전 ABB 결과 위치 옵션입니다. 파일 경로는 부모 디렉터리만 선택하며 해당 파일을 생성하지 않습니다. --results-dir를 권장합니다. 저장소 루트에서 기본값은 results/입니다. | `--output results/legacy.json` |

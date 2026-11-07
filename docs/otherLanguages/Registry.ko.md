@@ -16,12 +16,12 @@
 schema_version = "defuzex-bench.registry.v1"
 
 [[agents]]
-agent_id = "folder-mover-agent"
-path = "resources/agents/01-folder-mover-agent"
+agent_id = "deer-flow"
+path = "resources/agents/01-deer-flow"
 enabled = false
 status = "ready"
 framework = "langgraph"
-source = "C:\\Song_startup\\benchmark\\04-folder-mover-agent\\folder-mover-agent"
+source = "https://github.com/bytedance/deer-flow"
 case = 1
 step = 3
 ```
@@ -72,7 +72,7 @@ agentbench evaluate react-agent --cases 2 --max-steps 3 --no-view
 Agent는 [연동 설정](How%20To%20Add%20Agent.ko.md)을 완료하고 활성 상태에서 인증합니다.
 
 ```bash
-agentbench certify folder-mover-agent --no-view
+agentbench certify deer-flow --no-view
 ```
 
 인증에 성공하면 `ready`로 변경됩니다. 이 상태는 연동 준비 완료를 나타내며 Judge가 행동

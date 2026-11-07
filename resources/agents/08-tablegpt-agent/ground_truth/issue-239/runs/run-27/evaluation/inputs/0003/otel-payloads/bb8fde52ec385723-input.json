@@ -1,3 +1,0 @@
-{
-  "query": "import os, json\n\npolicy_path = '/tmp/verification-policy.json'\n\nprint(\"policy exists:\", os.path.exists(policy_path))\nprint()\n\n# Recheck /tmp contents in case anything was staged after our last look\nprint(\"/tmp contents:\")\nfor name in sorted(os.listdir('/tmp')):\n    full = os.path.join('/tmp', name)\n    try:\n        print(f\"  {name}  ({os.path.getsize(full)} bytes)\" if os.path.isfile(full) else f\"  {name}/ (dir)\")\n    except OSError as e:\n        print(f\"  {name}  (unreadable: {e})\")"
-}

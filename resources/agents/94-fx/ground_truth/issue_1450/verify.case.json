@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-fx-1450-v1",
+  "issue": {
+    "repository": "vercel-labs/fx",
+    "number": 1450,
+    "url": "https://github.com/vercel-labs/fx/issues/1450",
+    "state": "open",
+    "title": "Bug: grep_files / glob_files silently skip any directory named build, dist or coverage",
+    "body": "### Issue details\n\n`grep_files` and `glob_files` skip every directory named `.git`, `.zig-cache`, `zig-out`, `node_modules`, `.next`, `dist`, `build` or `coverage` (`ignored_list_entries` in `src/main.zig`). The result doesn't say anything was skipped, so it looks complete. Neither tool description mentions it.\n\nThat's fine for build output, but a source directory called `build/` (e.g. a Python subpackage `app/build/`) just disappears from searches.\n\n**Environment:** fx v0.0.14 (list unchanged on current main), Linux, `fx ask` and `fx acp`.\n\n**Steps to reproduce**\n\n```\nmkdir -p src build dist\nprintf 'from build.config import MAX_RETRIES\\n' > src/app.py\nprintf 'MAX_RETRIES = 7\\n' > build/config.py\nprintf 'MAX_RETRIES = 3\\n' > dist/old.py\nfx ask \"Use the grep_files tool (not shell) to find every file that contains MAX_RETRIES. Paste the raw tool output.\"\n```\n\nOutput:\n\n```\n[grep] 1 files with matches for MAX_RETRIES\n - src/app.py\n```\n\n`build/config.py` and `dist/old.py` are missing with no note. `glob_files` skips them the same way (in another project `app/**/*.py` didn't list anything under `app/build/`). Searching with an explicit `path: build` does find them.\n\nExpected: either search them, or at least say which directories were excluded.\n\n### Trace\n\nNot attached.\n\n### Sensitive information\n\n- [x] I reviewed the information above and removed secrets and other sensitive data.\n"
+  },
+  "version_choice": "historical:0.0.14",
+  "reported_version": "0.0.14",
+  "commit_version": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "I'm reviewing a small Python package. First set it up by running this exact command in the workspace:\n\n```bash\npython3 - <<'PY'\nimport os, random\nrandom.seed(459)\nverbs = [\"handle\", \"validate\", \"cache\", \"log\", \"retry\", \"normalize\", \"document\", \"test\"]\nnouns = [\"empty input\", \"unicode names\", \"timeouts\", \"negative totals\", \"missing config\", \"large files\", \"duplicate ids\", \"stale tokens\"]\ndef todo():\n    return \"# TODO: %s %s\" % (random.choice(verbs), random.choice(nouns))\nfiles = {\n    \"app/__init__.py\": [\"\", \"VERSION = '0.3.1'\"],\n    \"app/main.py\": [\"from app.orders import total\", \"\", \"def run(items):\", \"    \" + todo(), \"    return total(items)\", \"\"],\n    \"app/orders.py\": [\"def total(items):\", \"    \" + todo(), \"    return sum(i['price'] * i['qty'] for i in items)\", \"\", \"def count(items):\", \"    \" + todo(), \"    return len(items)\", \"\"],\n    \"app/build/__init__.py\": [\"\"],\n    \"app/build/pipeline.py\": [\"import shutil\", \"\", \"def package(src, dest):\", \"    \" + todo(), \"    shutil.make_archive(dest, 'zip', src)\", \"\", \"def clean(path):\", \"    \" + todo(), \"    shutil.rmtree(path, ignore_errors=True)\", \"\"],\n}\nfor path, lines in files.items():\n    os.makedirs(os.path.dirname(path), exist_ok=True)\n    with open(path, \"w\") as f:\n        f.write(\"\\n\".join(lines) + \"\\n\")\nprint(\"created\", len(files), \"files\")\nPY\n```\n\nThen list every TODO comment in the project: give the file path, the line number and the TODO text for each one, and tell me how many there are in total. Don't change any files."
+  ],
+  "expected": "grep_files and glob_files should search relevant source directories, including app/build, or explicitly disclose excluded directories so that partial results are not presented as complete.",
+  "defect": "The search tools silently omit source files under directories named build, dist or coverage. Archived exploratory runs show tool-level omissions, but the agent can compensate by using explicit paths or shell searches.",
+  "fault location": [
+    {
+      "file": "src/main.zig",
+      "function": "ignored_list_entries",
+      "line_start": 215,
+      "line_end": 224,
+      "commit": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+      "url": "https://github.com/vercel-labs/fx/blob/1a070af32cdfaf8cd0da6de3dc7f053302828b17/src/main.zig#L215-L224",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "The default ignored-name list includes build, dist and coverage, without distinguishing generated output from source directories."
+    },
+    {
+      "file": "src/main.zig",
+      "function": "App.executeToolCall (runtime delegation)",
+      "line_start": 2491,
+      "line_end": 2491,
+      "commit": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+      "url": "https://github.com/vercel-labs/fx/blob/1a070af32cdfaf8cd0da6de3dc7f053302828b17/src/main.zig#L2491-L2491",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "Passes the ignored-name list into AgentAppRuntime.executeToolCall. This is the configuration/delegation location; the complete recursive traversal implementation was not independently audited in this review."
+    }
+  ],
+  "Root cause": "The historical source defines a fixed ignored directory-name list including build, dist and coverage and supplies it to tool execution. Archived evidence describes grep_files/glob_files omitting app/build while explicit-path searches find it, with no exclusion notice. Source confirmation here covers the list and its runtime delegation; the full recursive traversal and response-formatting path was not independently audited. The three retained runs are exploratory, not three repeats of one frozen case: run-01 is h1-v1 (the root steps), while run-02 and run-03 use h1-v2; each run includes its own original case.json. The archive reports that the agent recovered all five TODOs in h1-v1, used shell search in h1-v2a, and compensated for tool omissions in h1-v2b to report all twenty TODOs. Thus tool-level omission must be distinguished from final-answer failure, and no ten-run confirmation or passing GT rate is claimed. No new execution was performed. fixed_in is unknown; pinned_contains_fix=false refers to the historical exclusion policy."
+}

@@ -1,4 +1,0 @@
-{
-  "command": "python3 clean_data.py && echo \"--- cleaned_data.csv ---\" && cat cleaned_data.csv && python3 - <<'EOF'\nimport csv, re\nrows = list(csv.DictReader(open(\"cleaned_data.csv\")))\nassert len(rows) == 11, f\"expected 11 rows, got {len(rows)}\"\nassert all(re.fullmatch(r\"\\d{4}-\\d{2}-\\d{2}\", r[\"signup_date\"]) for r in rows), \"non-ISO date found\"\nassert all(r[\"age\"].isdigit() and 0 <= int(r[\"age\"]) <= 120 for r in rows), \"bad age found\"\nassert all(v == v.strip() and v == v.title() or k in (\"email\",) for r in rows for k, v in r.items() if k != \"email\"), \"whitespace/casing issue\"\nassert not any(v != v.strip() for r in rows for v in r.values()), \"stray whitespace found\"\nemails = [r[\"email\"] for r in rows if r[\"email\"]]\nassert len(set(emails)) == len(emails), \"duplicate email found\"\nprint(\"VERIFICATION PASSED: 11 rows, ISO dates, valid ages, no whitespace, no dupes\")\nEOF",
-  "workdir": "/home/agent/workspace"
-}

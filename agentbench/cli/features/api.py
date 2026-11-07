@@ -10,6 +10,9 @@ def configure(parser):
     parser.add_argument('--env-file', type=Path)
     commands = parser.add_subparsers(dest='operation', required=True)
     commands.add_parser('agent').add_argument('agent_id')
+    prepare = commands.add_parser('prepare')
+    prepare.add_argument('agent_id')
+    prepare.add_argument('--revision', required=True)
     execute = commands.add_parser('execute')
     execute.add_argument('agent_id')
     execute.add_argument('--case-file', type=Path, required=True)
@@ -18,6 +21,7 @@ def configure(parser):
     execute.add_argument('--model')
     execute.add_argument('--timeout', type=float, default=2400)
     execute.add_argument('--max-steps', type=int)
+    execute.add_argument('--revision', help='Prepare and execute this exact historical commit')
     for name in ('result', 'evidence', 'attachment', 'submit-judge', 'gt'):
         command = commands.add_parser(name)
         command.add_argument('--suite', type=Path, required=True)
@@ -43,13 +47,16 @@ def execute(args):
             operation = args.operation
             if operation == 'agent':
                 value = service.agent(args.agent_id)
+            elif operation == 'prepare':
+                value = service.prepare(args.agent_id, args.revision).describe()
             elif operation == 'execute':
                 document = json.loads(args.case_file.read_text(encoding='utf-8-sig'))
                 if not isinstance(document, dict) or document.get('schema') != 'abb.cases.v1':
                     raise ValueError('Expected abb.cases.v1 collection')
                 value = service.execute(args.agent_id, document.get('cases'), results_dir=args.results_dir,
                     judge=args.judge, model=args.model, timeout=args.timeout,
-                    max_steps=args.max_steps, concurrency=loaded.concurrency)
+                    max_steps=args.max_steps, concurrency=loaded.concurrency,
+                    target=service.prepare(args.agent_id, args.revision) if args.revision else None)
             elif operation == 'result':
                 value = service.result(args.suite)
             elif operation == 'evidence':

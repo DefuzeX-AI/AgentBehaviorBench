@@ -16,12 +16,12 @@ The file starts with a schema version. Each `[[agents]]` block adds one Agent:
 schema_version = "defuzex-bench.registry.v1"
 
 [[agents]]
-agent_id = "folder-mover-agent"
-path = "resources/agents/01-folder-mover-agent"
+agent_id = "deer-flow"
+path = "resources/agents/01-deer-flow"
 enabled = false
 status = "ready"
 framework = "langgraph"
-source = "C:\\Song_startup\\benchmark\\04-folder-mover-agent\\folder-mover-agent"
+source = "https://github.com/bytedance/deer-flow"
 case = 1
 step = 3
 ```
@@ -45,7 +45,7 @@ import location on one machine; it is not a path that every user needs to create
 | `step` | SDK upper bound on dialogue steps per Case. Must be a positive integer when present; if omitted, the SDK supplies its default. Actual Cases may contain fewer steps. |
 
 `agent_id`, `path`, and `framework` are required, nonempty strings. In a TOML
-double-quoted string, escape Windows backslashes as `\\`, as shown above.
+double-quoted string, escape Windows backslashes as `\\`.
 
 ## Understand `case` and `step`
 
@@ -74,7 +74,7 @@ integration marked `adapting`, complete [Agent onboarding](How%20To%20Add%20Agen
 and certify it while enabled:
 
 ```bash
-agentbench certify folder-mover-agent --no-view
+agentbench certify deer-flow --no-view
 ```
 
 Certification promotes a successfully integrated Agent to `ready`. The label

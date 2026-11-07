@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from kuma import to_json
 
+from agentbench import trajectory
 from agentbench.sdk.plugin.kuma.judge_bundle import export_context, restore_context, save_context, read_context
 from agentbench.sdk.plugin.kuma.judge_tasks import prepare_task, judge_task
 from agentbench.sdk.plugin.kuma.compatibility import run_case
@@ -34,7 +35,8 @@ class OfflineBackend:
             return {'allowed_extensions': ['.json'], 'max_files': 20,
                     'max_file_bytes': 5 * 1024 * 1024, 'max_total_bytes': 8 * 1024 * 1024,
                     'manifest_schema_version': '1', 'evidence_types': ['raw_log', 'defuzex.runtime_evidence.capabilities.v1'],
-                    'runtime_evidence_capabilities': ['runtime_evidence', 'agent_output', 'file_diff', 'runtime_trace']}
+                    'runtime_evidence_capabilities': ['runtime_evidence', 'agent_output', 'file_diff',
+                                                      'runtime_trace', 'file_observation_summary']}
         if path.startswith('/sdk/v2/operations/'):
             self.polls += 1
             if self.interrupt:
@@ -94,6 +96,7 @@ def stage_task(root, *, native_failure=False, stop_early=False):
         'case_id': prepared.case_id, 'attempt_id': 'original-attempt', 'status': 'succeeded',
         'cleanup_status': 'succeeded', 'host_trace_validation': 'succeeded',
         'acceptance_fixture': 'offline isolated execution; no external model or tool traffic'})
+    trajectory.write(directory, environ={})
     ticket = prepare_task(directory, prepared, environ={})
     runner = KumaContainerRunner(environ={'KUMA_API_KEY': 'dfx_offline_fixture_only'}, control=RunControl())
     return runner, registration, prepared, ticket, summary
@@ -109,6 +112,19 @@ def test_real_sdk_defers_and_restores_all_committed_evidence(tmp_path):
     assert [item.submission.output for item in restored.history] == ['blue', 'blue']
     assert all(item.submission.extensions['trace_evidence'] for item in restored.history)
     assert all(item.submission.extensions['runtime_evidence'] for item in restored.history)
+
+
+@pytest.mark.parametrize('legacy_task', [False, True])
+def test_judge_queue_does_not_require_derived_trajectory(tmp_path, legacy_task):
+    from agentbench.sdk.plugin.kuma.judge_tasks import validate_execution
+    _, _, case, ticket, _ = stage_task(tmp_path)
+    task = json.loads((ticket.directory / 'judge-task.json').read_text(encoding='utf-8'))
+    if legacy_task:
+        task['evidence_sha256']['trajectory.json'] = 'legacy-derived-file-digest'
+    (ticket.directory / 'trajectory.json').unlink()
+    validate_execution(ticket.directory, case, task=task)
+    prepare_task(ticket.directory, case, environ={})
+    assert not (ticket.directory / 'trajectory.json').exists()
 
 
 def test_host_sdk_judges_once_and_reuses_report_after_restart(tmp_path, monkeypatch):
