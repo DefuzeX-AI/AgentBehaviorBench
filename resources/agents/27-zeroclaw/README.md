@@ -1,9 +1,16 @@
 # ZeroClaw ACP deployment
 
 This unit installs the pinned [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw)
-release `v0.8.5` (commit `cb2b20a9`) from its sha256-checked GitHub release
+release `v0.8.6` (commit `c4732213`) from its sha256-checked GitHub release
 archive (`zeroclaw-x86_64-unknown-linux-gnu.tar.gz`) and drives its built-in ACP
 server (`zeroclaw acp`) over stdio. No upstream source is vendored or modified.
+
+v0.8.6 is the first release that lets an approved shell call run again with
+identical arguments in the same turn (zeroclaw-labs/zeroclaw#11612, fixed by
+zeroclaw-labs/zeroclaw#11653). In v0.8.5 that re-run tripped the loop guard ("repeated prompt-required
+tool call 'shell' with identical arguments before approval"), which aborted the
+turn and ended the ACP session (#429). An identical retry of a *denied* call still
+aborts the turn by upstream design.
 
 License: `MIT OR Apache-2.0` (the workspace `Cargo.toml`, `LICENSE-MIT`,
 `LICENSE-APACHE`).
@@ -64,7 +71,10 @@ The runtime admits the exact `POST <selected-base>/chat/completions` route.
   loopback TCP too), so `launch.py` starts one headless Chromium per Case on
   `127.0.0.1:9222` (declared in `network/rules.toml`) and points agent-browser at it
   with `AGENT_BROWSER_CDP`. `abb-chromium` trusts the interceptor CA; `zz-abb-lean`
-  keeps Chromium within the 128-pid budget (#158).
+  keeps Chromium within the 128-pid budget (#158). Since v0.8.6, `[browser] enabled`
+  registers only `browser_open`; the launcher sets `automation_enabled = true` to keep
+  the `browser` automation tool, which upstream no longer auto-approves, so each call
+  reaches the ACP client as a permission request.
 - The other built-in tools, including `web_search`, `web_fetch` and `http_request`,
   are ZeroClaw's defaults. `web_search` uses Tavily when `TAVILY_API_KEY` is
   supplied (`api.tavily.com /search`, a tool route; the key reaches ZeroClaw only
