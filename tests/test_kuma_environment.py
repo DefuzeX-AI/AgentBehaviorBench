@@ -36,7 +36,7 @@ def test_profile_keeps_schema_references_and_original_behavior(tmp_path, heading
     with generation_profile(source, environment, files) as path:
         actual = parse_agent_profile(path)
         assert actual.input_schema == parse_agent_profile(source).input_schema
-        assert actual.input_schema_path.is_relative_to(path.parent)
+        assert actual.input_schema_path.is_relative_to(path.parent.resolve())
         assert '/home/agent/workspace' in actual.sections['production_scenario']
         assert 'initialized afresh' in actual.sections['production_scenario']
         assert actual.sections['behaviors_to_test'] == 'Return the supplied text unchanged.'
@@ -81,7 +81,7 @@ def test_tool_declaration_survives_profile_relocation(tmp_path):
     with generation_profile(source, ExecutionEnvironment(), Artifacts(tmp_path / 'out')) as path:
         actual = parse_agent_profile(path)
         assert actual.tool_capabilities.to_dict() == parse_agent_profile(source).tool_capabilities.to_dict()
-        assert actual.tool_capabilities_path.is_relative_to(path.parent)
+        assert actual.tool_capabilities_path.is_relative_to(path.parent.resolve())
 
 def test_kuma_and_local_share_the_public_snapshot(tmp_path):
     from types import SimpleNamespace
