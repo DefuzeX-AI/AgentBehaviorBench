@@ -15,7 +15,7 @@ WORKDIR /opt/agent
 # - libreoffice: required by renderer.py to convert PPTX to PNG
 # - libgl1, libglib2.0-0: required by opencv-python
 # - fonts-dejavu-core: required for font rendering
-RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g; s|security.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true \
+RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g; s|security.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources 2>/dev/null || true \
     && apt-get update && apt-get install -y --no-install-recommends \
     git \
     libreoffice \
