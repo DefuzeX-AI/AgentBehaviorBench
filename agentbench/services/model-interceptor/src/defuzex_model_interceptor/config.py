@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,6 +13,10 @@ from typing import Mapping
 
 CONFIG_ENV = "DEFUZEX_INTERCEPTOR_CONFIG"
 DEFAULT_CONFIG = "/run/secrets/interceptor_config"
+
+
+# Idle bound for one upstream model response; see issue 444.
+DEFAULT_UPSTREAM_TIMEOUT_SECONDS = 300.0
 
 
 class ServiceConfigurationError(ValueError):
@@ -84,6 +89,7 @@ class ServiceConfig:
     egress_proxy: tuple[str, int] | None = None
     targets: Mapping[str, Target] = field(default_factory=dict)
     target_rules: tuple[TargetRule, ...] = ()
+    upstream_timeout_seconds: float = DEFAULT_UPSTREAM_TIMEOUT_SECONDS
 
     @classmethod
     def load(cls, path: str | Path) -> "ServiceConfig":
@@ -131,7 +137,15 @@ class ServiceConfig:
             token_counting=_object(raw.get('token_counting', {}), 'token_counting') if mode == 'replace' else {},
             egress_proxy=_egress_proxy(raw.get('egress_proxy')),
             targets=MappingProxyType(targets), target_rules=rules,
+            upstream_timeout_seconds=_upstream_timeout(raw.get('upstream_timeout_seconds',
+                                                                DEFAULT_UPSTREAM_TIMEOUT_SECONDS)),
         )
+
+
+def _upstream_timeout(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+        raise ServiceConfigurationError("upstream_timeout_seconds must be finite and positive")
+    return float(value)
 
 
 def _credential(value: object) -> Credential:

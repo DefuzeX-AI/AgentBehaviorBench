@@ -1,5 +1,6 @@
 """Prepare per-run service data; framework behavior owns credential substitution."""
 from dataclasses import asdict
+import math
 import secrets
 from .target_routing import resolve_target_routing
 
@@ -28,6 +29,7 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
         data['token_counting'] = {}
         return data, {c.agent_env: environ[c.agent_env] for c in interception.credentials
                       if environ.get(c.agent_env)}
+    data['upstream_timeout_seconds'] = upstream_timeout_seconds(environ)
     plan = resolve_target_routing(environ, model_provider)
     prepared_targets = {}
     for name, target in plan.targets.items():
@@ -56,6 +58,23 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
             item['secret_file'] = '/run/secrets/target.secret'
         data['credentials'].append(item)
     return data, token_environment
+
+
+UPSTREAM_TIMEOUT_ENV = 'ABB_MODEL_UPSTREAM_TIMEOUT_SEC'
+DEFAULT_UPSTREAM_TIMEOUT_SECONDS = 300.0
+
+
+def upstream_timeout_seconds(environ):
+    """Idle bound for one replace-mode upstream model call (issue 444)."""
+    if UPSTREAM_TIMEOUT_ENV not in environ:
+        return DEFAULT_UPSTREAM_TIMEOUT_SECONDS
+    try:
+        value = float(environ[UPSTREAM_TIMEOUT_ENV])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{UPSTREAM_TIMEOUT_ENV} must be finite and positive") from exc
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{UPSTREAM_TIMEOUT_ENV} must be finite and positive")
+    return value
 
 
 def _route_data(route):

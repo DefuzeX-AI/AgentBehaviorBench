@@ -1,4 +1,5 @@
 """Proxy orchestration; per-call wire Strategies own protocol conversion."""
+import asyncio
 import time
 import json
 from urllib.parse import quote
@@ -95,8 +96,66 @@ class ReplaceInterceptor(CommonInterceptor):
              source_raw_body=None if flow.metadata["source_grpc"] else redact(source_body.decode("utf-8", errors="replace"), self.secrets),
              source_transport="grpc" if flow.metadata["source_grpc"] else "http",
              raw_body=redact(flow.request.content.decode("utf-8"), self.secrets), truncated=False)
+        self._watch_upstream(flow)
+
+    def _watch_upstream(self, flow):
+        """Bound how long one upstream model call may stay silent (issue 444).
+
+        Without this an upstream that accepts the request and never answers
+        holds the Agent turn until the whole Case execution budget expires, and
+        no event shows that a model call was pending.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:  # Direct hook calls outside mitmproxy's event loop.
+            return
+        flow.metadata["defuzex_activity"] = time.monotonic()
+        flow.metadata["defuzex_watchdog"] = loop.create_task(self._upstream_watchdog(flow))
+
+    async def _upstream_watchdog(self, flow):
+        timeout = self.config.upstream_timeout_seconds
+        while not flow.metadata.get("defuzex_settled"):
+            delay = flow.metadata["defuzex_activity"] + timeout - time.monotonic()
+            if delay > 0:
+                await asyncio.sleep(delay)
+                continue
+            self._upstream_timed_out(flow, timeout)
+            return
+
+    def _upstream_timed_out(self, flow, timeout):
+        flow.metadata.update(defuzex_settled=True, defuzex_timed_out=True)
+        capture = flow.metadata.pop("defuzex_capture", None)
+        if capture:
+            capture.close()
+        elapsed = time.monotonic() - flow.metadata["defuzex_started"]
+        self._emit_error(flow, f"Upstream model response idle for {timeout:g} s "
+                               f"(request pending {elapsed:.1f} s)", code=ErrorCode.TRANSPORT_ERROR)
+        events.emit("llm_upstream_timeout", **self._fields(flow), timeout_seconds=timeout,
+                    elapsed_ms=round(elapsed * 1000, 3),
+                    response_started=flow.metadata.get("upstream_status") is not None,
+                    chunks=flow.metadata.get("chunk_index", 0))
+        # Close the client connection without a response, the same retryable
+        # transport-failure shape CommonInterceptor.error uses (issue 68).
+        # mitmproxy cannot kill a flow in transit, so cancel its connection handler.
+        _close_client_connection(flow)
+
+    def _settle(self, flow):
+        flow.metadata["defuzex_settled"] = True
+        watchdog = flow.metadata.pop("defuzex_watchdog", None)
+        if watchdog is not None:
+            watchdog.cancel()
+
+    def error(self, flow):
+        timed_out = flow.metadata.get("defuzex_timed_out")
+        self._settle(flow)
+        if timed_out:
+            # The timeout already recorded this call; the cancelled connection
+            # must not report it a second time.
+            flow.metadata.pop("defuzex_call_id", None)
+        super().error(flow)
 
     def responseheaders(self, flow):
+        flow.metadata["defuzex_activity"] = time.monotonic()
         wire = flow.metadata.get("wire")
         if wire is None or flow.response is None:
             return
@@ -120,7 +179,8 @@ class ReplaceInterceptor(CommonInterceptor):
             flow.response.headers["content-type"] = wire.stream_type
 
         def stream(chunk):
-            if flow.metadata.get("defuzex_stream_failed"):
+            flow.metadata["defuzex_activity"] = time.monotonic()
+            if flow.metadata.get("defuzex_stream_failed") or flow.metadata.get("defuzex_timed_out"):
                 return [] if chunk else b""
             try:
                 if chunk:
@@ -160,6 +220,9 @@ class ReplaceInterceptor(CommonInterceptor):
         flow.response.stream = stream
 
     def response(self, flow):
+        if flow.metadata.get("defuzex_timed_out"):
+            return
+        self._settle(flow)
         if flow.metadata.get('abb_tool') and flow.response is not None:
             events.emit('tool_response', **self._tool_fields(flow), status=flow.response.status_code,
                  latency_ms=round((time.monotonic()-flow.metadata['defuzex_started'])*1000, 3),
@@ -244,6 +307,15 @@ class ReplaceInterceptor(CommonInterceptor):
                    | {t.target_plugin for t in destinations if t is not None} - self.targets.keys())
         if missing:
             raise RuntimeError("Unknown model interceptor plugins: " + ", ".join(sorted(missing)))
+
+
+def _close_client_connection(flow):
+    try:
+        from mitmproxy import ctx
+        handler = ctx.master.addons.get("proxyserver").connections[flow.client_conn.id]
+        handler.transports[handler.client].handler.cancel("upstream model timeout")
+    except (AttributeError, KeyError):  # Connection already closed.
+        pass
 
 
 def _model(payload):
