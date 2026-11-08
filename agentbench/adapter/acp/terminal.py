@@ -54,9 +54,14 @@ class Terminals:
         directory = workspace_path(self.config, cwd or self.config.cwd)
         environment = child_environment(self.config)
         environment.update({item.name: item.value for item in env or []})
+        # The Case workspace is a host directory the runtime opens to every uid and
+        # removes from the host afterwards. Commands keep what they create equally
+        # open, so a directory made by the container user (for example
+        # __pycache__) does not block that removal.
         process = await asyncio.create_subprocess_exec(command, *(args or []), cwd=directory,
             env=environment, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT, start_new_session=os.name == 'posix')
+            stderr=asyncio.subprocess.STDOUT, start_new_session=os.name == 'posix',
+            **({'umask': 0} if os.name == 'posix' else {}))
         identifier = uuid4().hex
         terminal = Terminal(process, limit)
         terminal.drain = asyncio.create_task(terminal.collect())
