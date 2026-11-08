@@ -381,17 +381,17 @@ def test_dockerfile_security_no_chmod_777():
 
 # ------------------------------------------------------------------- Issue #383 Remediation Regressions
 
-def test_conversational_input_returns_natural_language_without_synthesis(monkeypatch):
-    """Conversational/introductory requests must return natural language immediately without running synthesis."""
+def test_non_paper_input_returns_diagnostic_error_without_synthesis(monkeypatch):
+    """Non-paper conversational and introductory requests must return diagnostic error without running synthesis."""
     from unittest.mock import MagicMock
 
     module = _binding()
     monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
     instance = module.create_graph()
 
-    # Guard: _get_workflow must strictly NEVER be invoked for conversational queries
+    # Guard: _get_workflow must strictly NEVER be invoked for non-paper conversational queries
     mock_workflow = MagicMock(
-        side_effect=AssertionError("PosterGen workflow synthesis should NOT be invoked for conversational queries")
+        side_effect=AssertionError("PosterGen workflow synthesis should NOT be invoked for non-paper queries")
     )
     monkeypatch.setattr(instance, "_get_workflow", mock_workflow)
 
@@ -955,13 +955,13 @@ def test_paper_request_with_introduce_or_features_not_short_circuited(tmp_path, 
 
 # ------------------------------------------------------------------- Long Prompt & OSError Resilience (KUMA Evaluation Defense)
 
-def test_long_conversational_prompts_return_capabilities_without_oserror(monkeypatch):
-    """Long conversational prompts (>255 chars, 500, 1600, 4000 chars) must return capabilities text without OSError.
+def test_long_non_paper_prompts_return_diagnostic_error_without_oserror(monkeypatch):
+    """Long non-paper conversational prompts (>255 chars, 500, 1600, 4000 chars) must return diagnostic error without OSError.
 
     Linux POSIX limits single path components to NAME_MAX=255 bytes and total paths to PATH_MAX=4096 bytes.
     Freeform text prompts exceeding 255 characters without slashes will trigger OSError: [Errno 36] File name too long
     if passed to filesystem stat/exists calls without length guards.
-    This test verifies that long conversational prompts return completed capabilities responses immediately
+    This test verifies that long non-paper conversational prompts return diagnostic error responses immediately
     without throwing OSError and without invoking synthesis.
     """
     from unittest.mock import MagicMock
@@ -971,7 +971,7 @@ def test_long_conversational_prompts_return_capabilities_without_oserror(monkeyp
     instance = module.create_graph()
 
     mock_workflow = MagicMock(
-        side_effect=AssertionError("PosterGen workflow synthesis should NOT be invoked for conversational queries")
+        side_effect=AssertionError("PosterGen workflow synthesis should NOT be invoked for non-paper queries")
     )
     monkeypatch.setattr(instance, "_get_workflow", mock_workflow)
 
