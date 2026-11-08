@@ -1,0 +1,36 @@
+{
+  "sql_execution_result": "SQL_SUCCESS",
+  "schema_info": {
+    "columns": [
+      "date",
+      "daily_order_count"
+    ],
+    "column_types": {
+      "date": "object",
+      "daily_order_count": "object"
+    },
+    "row_count": 0,
+    "numeric_columns": [],
+    "categorical_columns": [],
+    "datetime_columns": [
+      "date",
+      "daily_order_count"
+    ],
+    "unique_counts": {},
+    "result_limit": 10000
+  },
+  "data": "date,daily_order_count\n",
+  "messages": [
+    {
+      "content": "```sql\nSELECT DATE(o.date_order_placed) AS date, COUNT(o.order_id) AS daily_order_count\nFROM Orders o\nWHERE o.date_order_placed >= '2026-07-25 00:00:00' AND o.date_order_placed <= '2026-10-25 23:59:59'\nGROUP BY DATE(o.date_order_placed)\nORDER BY date ASC\n```\nSQL Result (limited to first 10000 rows):\n```csv\ndate,daily_order_count\n\n```",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "db1f6f79-ec3c-4e1d-a290-7dcdc07d8aa3",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

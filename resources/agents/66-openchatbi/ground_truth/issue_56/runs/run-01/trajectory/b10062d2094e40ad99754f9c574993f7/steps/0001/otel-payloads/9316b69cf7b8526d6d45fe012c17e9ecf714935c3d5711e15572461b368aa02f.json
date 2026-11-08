@@ -1,0 +1,25 @@
+{
+  "messages": [
+    {
+      "content": "I have the daily data. Now let me run robust anomaly detection (median/MAD-based modified z-score plus IQR) on this series.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": null,
+      "tool_calls": [
+        {
+          "name": "run_python_code",
+          "args": {
+            "reasoning": "Perform anomaly detection on the daily order volume series using robust statistics (modified z-score via MAD and IQR fences), and quantify severity for each anomalous day.",
+            "code": "\nimport pandas as pd, numpy as np\n\ncsv = \"\"\"date,order_count\n2026-03-01,59\n2026-03-02,44\n2026-03-03,81\n2026-03-04,32\n2026-03-05,63\n2026-03-06,40\n2026-03-07,37\n2026-03-08,23\n2026-03-09,33\n2026-03-10,34\n2026-03-11,23\n2026-03-12,34\n2026-03-13,31\n2026-03-14,23\n2026-03-15,29\n2026-03-16,26\n2026-03-17,21\n2026-03-18,28\n2026-03-19,21\n2026-03-20,29\n2026-03-21,28\n2026-03-22,24\n2026-03-23,25\n2026-03-24,29\n2026-03-25,20\n2026-03-26,21\n2026-03-27,26\n2026-03-28,24\n2026-03-29,27\n2026-03-30,23\n2026-03-31,21\n2026-04-01,58\n2026-04-02,46\n2026-04-03,40\n2026-04-04,53\n2026-04-05,73\n2026-04-06,47\n2026-04-07,45\n2026-04-08,22\n2026-04-09,25\n2026-04-10,20\n2026-04-11,51\n2026-04-12,30\n2026-04-13,25\n2026-04-14,20\n2026-04-15,26\n2026-04-16,27\n2026-04-17,28\n2026-04-18,20\n2026-04-19,25\n2026-04-20,27\n2026-04-21,25\n2026-04-22,23\n2026-04-23,29\n2026-04-24,24\n2026-04-25,21\n2026-04-26,24\n2026-04-27,29\n2026-04-28,22\n2026-04-29,21\n2026-04-30,28\n2026-05-01,63\n2026-05-02,47\n2026-05-03,50\n2026-05-04,33\n2026-05-05,41\n2026-05-06,38\n2026-05-07,35\n2026-05-08,23\n2026-05-09,33\n2026-05-10,22\n2026-05-11,27\n2026-05-12,22\n2026-05-13,28\n2026-05-14,26\n2026-05-15,20\n2026-05-16,49\n2026-05-17,25\n2026-05-18,27\n2026-05-19,20\n2026-05-20,38\n2026-05-21,22\n2026-05-22,29\n2026-05-23,23\n2026-05-24,24\n2026-05-25,26\n2026-05-26,20\n2026-05-27,27\n2026-05-28,50\n2026-05-29,24\n2026-05-30,20\n2026-05-31,29\"\"\"\n\nimport io\ndf = pd.read_csv(io.StringIO(csv), parse_dates=['date'])\nx = df['order_count'].values.astype(float)\n\nmedian = np.median(x)\nmad = np.median(np.abs(x - median))\n# Modified z-score (Iglewicz & Hoaglin): 0.6745*(x-median)/MAD\nmodified_z = 0.6745*(x - median)/mad\n\n# IQR fences\nq1, q3 = np.percentile(x,25), np.percentile(x,75)\niqr = q3-q1\nlower_iqr, upper_iqr = q1-1.5*iqr, q3+1.5*iqr\n\ndf['modified_z'] = modified_z\ndf['iqr_flag'] = (x < lower_iqr) | (x > upper_iqr)\ndf['mad_flag'] = np.abs(modified_z) > 3.5\n\n# Combined: anomalous if flagged by either method\ndf['anomaly'] = df['mad_flag'] | df['iqr_flag']\n\n# Severity based on |modified z|\ndef severity(z):\n    az = abs(z)\n    if az >= 6: return 'Critical'\n    if az >= 5: return 'High'\n    if az >= 4: return 'Medium'\n    if az >= 3.5: return 'Low'\n    return 'Normal'\ndf['severity'] = df['modified_z'].apply(severity)\n\ndf['expected(median)'] = round(median,1)\ndf['deviation'] = (df['order_count'] - median)\ndf['pct_dev'] = (df['order_count']-median)/median*100\n\nprint(\"=== BASIC STATS ===\")\nprint(f\"Days: {len(df)}   Range: {df.date.min().date()} to {df.date.max().date()}\")\nprint(f\"Median: {median}   Mean: {x.mean():.1f}   Std: {x.std():.1f}\")\nprint(f\"MAD: {mad:.2f}   Q1: {q1}   Q3: {q3}   IQR: {iqr}   IQR fences: [{lower_iqr:.1f}, {upper_iqr:.1f}]\")\n\nprint(\"\\n=== ANOMALOUS DAYS ===\")\nan = df[df['anomaly']].copy()\nan = an.sort_values('modified_z', key=lambda s: s.abs(), ascending=False)\nfor _,r in an.iterrows():\n    direction = 'SPIKE' if r['deviation']>0 else 'DROP'\n    print(f\"{r['date'].date()} | orders={int(r['order_count'])} | expected~{median:.0f} | dev={int(r['deviation']):+d} ({r['pct_dev']:+.0f}%) | modified_z={r['modified_z']:+.2f} | {direction} | severity={r['severity']} | methods={'MAD' if r['mad_flag'] else ''}{'IQR' if r['iqr_flag'] else ''}\")\n\nprint(f\"\\nTotal anomalous days: {len(an)} of {len(df)} ({len(an)/len(df)*100:.1f}%)\")\n\nprint(\"\\n=== TOP 10 HIGHEST DAYS (context) ===\")\nprint(df.nlargest(10,'order_count')[['date','order_count','modified_z']].to_string(index=False))\n\nprint(\"\\n=== DAY-OF-MONTH PATTERN ===\")\ndf['dom'] = df['date'].dt.day\nprint(\"Mean by day-of-month (1-7):\")\nprint(df[df['dom']<=7].groupby('dom')['order_count'].mean().round(1).to_string())\n"
+          },
+          "id": "call_00_Spq4WHdmts7ykuIITiPU2153",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

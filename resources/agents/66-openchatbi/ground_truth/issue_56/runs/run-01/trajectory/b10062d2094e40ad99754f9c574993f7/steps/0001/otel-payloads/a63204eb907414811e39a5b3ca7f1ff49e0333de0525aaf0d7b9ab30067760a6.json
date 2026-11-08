@@ -1,0 +1,26 @@
+{
+  "messages": [
+    {
+      "content": "{\"schemas\": [{\"table\": \"Orders\", \"description\": \"Main order table containing order status, placement date, and customer relationships\", \"selection_rule\": \"Select when queries involve order status, order history, or customer order relationships\", \"sql_rule\": \"Use order_id as primary key. Join with Customers via customer_id for customer information\", \"derived_metric\": \"\", \"columns\": [{\"column_name\": \"order_id\", \"display_name\": \"Order ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for orders\", \"alias\": \"ord_id\"}, {\"column_name\": \"customer_id\", \"display_name\": \"Customer ID\", \"category\": \"identifier\", \"type\": \"INTEGER\", \"description\": \"Unique identifier for customers\", \"alias\": \"cust_id\"}, {\"column_name\": \"order_status\", \"display_name\": \"Order Status\", \"category\": \"status\", \"type\": \"VARCHAR(10)\", \"description\": \"Current status of the order (Shipped|Packing|On Road)\", \"alias\": \"ord_status\"}, {\"column_name\": \"date_order_placed\", \"display_name\": \"Order Placed Date\", \"category\": \"temporal\", \"type\": \"DATETIME\", \"description\": \"Date and time when the order was placed\", \"alias\": \"ord_date\"}, {\"column_name\": \"order_details\", \"display_name\": \"Order Details\", \"category\": \"attribute\", \"type\": \"VARCHAR(255)\", \"description\": \"Additional order information\", \"alias\": \"ord_details\"}], \"date_columns\": [\"date_order_placed\"], \"metric_columns\": [], \"dimension_columns\": []}], \"missing_tables\": [], \"warnings\": []}",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "show_schema",
+      "id": null,
+      "tool_call_id": "call_00_QwY3sNpBzmsWXvI28dkN2180",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "SQL Query:\n```sql\nSELECT MIN(date_order_placed) AS ord_date_min, MAX(date_order_placed) AS ord_date_max, COUNT(*) AS order_count\nFROM Orders\n```\n\n\nQuery Results (CSV format):\n```csv\nord_date_min,ord_date_max,order_count\n2025-11-30 07:00:25,2026-05-31 21:32:28,5893\n\n```",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "text2sql",
+      "id": null,
+      "tool_call_id": "call_01_1UMYgJBmqsinCOojkNNO1774",
+      "artifact": null,
+      "status": "success"
+    }
+  ]
+}

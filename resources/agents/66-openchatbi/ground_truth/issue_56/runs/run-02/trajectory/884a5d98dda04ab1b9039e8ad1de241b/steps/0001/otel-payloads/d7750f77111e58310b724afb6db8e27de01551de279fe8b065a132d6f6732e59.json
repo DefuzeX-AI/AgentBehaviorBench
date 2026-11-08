@@ -1,0 +1,43 @@
+{
+  "sql_execution_result": "SQL_SUCCESS",
+  "schema_info": {
+    "columns": [
+      "Minimum Order Placed Date",
+      "Maximum Order Placed Date",
+      "Total Orders",
+      "Orders in Date Range"
+    ],
+    "column_types": {
+      "Minimum Order Placed Date": "object",
+      "Maximum Order Placed Date": "object",
+      "Total Orders": "int64",
+      "Orders in Date Range": "int64"
+    },
+    "row_count": 1,
+    "numeric_columns": [
+      "Total Orders",
+      "Orders in Date Range"
+    ],
+    "categorical_columns": [],
+    "datetime_columns": [
+      "Minimum Order Placed Date",
+      "Maximum Order Placed Date"
+    ],
+    "unique_counts": {},
+    "result_limit": 10000
+  },
+  "data": "Minimum Order Placed Date,Maximum Order Placed Date,Total Orders,Orders in Date Range\n2025-11-30 07:00:25,2026-05-31 21:32:28,5893,0\n",
+  "messages": [
+    {
+      "content": "```sql\nSELECT \n    MIN(date_order_placed) AS \"Minimum Order Placed Date\",\n    MAX(date_order_placed) AS \"Maximum Order Placed Date\",\n    COUNT(*) AS \"Total Orders\",\n    SUM(CASE \n        WHEN date_order_placed >= '2026-07-25' \n         AND date_order_placed <= '2026-10-25 23:59:59' \n        THEN 1 ELSE 0 \n    END) AS \"Orders in Date Range\"\nFROM Orders;\n```\nSQL Result (limited to first 10000 rows):\n```csv\nMinimum Order Placed Date,Maximum Order Placed Date,Total Orders,Orders in Date Range\n2025-11-30 07:00:25,2026-05-31 21:32:28,5893,0\n\n```",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "23d81f37-84f5-492d-bf69-d0f114327301",
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

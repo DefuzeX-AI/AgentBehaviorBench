@@ -1,0 +1,73 @@
+{
+  "generations": [
+    [
+      {
+        "text": "**Open order items: 11,169**\n\nI listed every `Order_Items` row whose `order_item_status` is not `Finish` and not `Canceled`. Since the list is 11,169 rows, printing it inline isn't practical — here's the summary, with a full-list export available on request.\n\n**Composition of the open items**\n\n| Order Item Status | Open Items |\n|---|---|\n| Packed | 3,773 |\n| Pending | 3,725 |\n| Shipped | 3,671 |\n| **Total open** | **11,169** |\n\n**Context (all 18,727 order items in the system)**\n\n| Order Item Status | Items |\n|---|---|\n| Canceled | 3,829 |\n| Finish | 3,729 |\n| Packed | 3,773 |\n| Pending | 3,725 |\n| Shipped | 3,671 |\n\nSample of the list (ordered by `order_item_id`):\n\n| order_item_id | order_id | order_item_status |\n|---|---|---|\n| 18 | 16 | Shipped |\n| 19 | 17 | Pending |\n| 20 | 17 | Packed |\n| 21 | 17 | Shipped |\n| 23 | 18 | Shipped |\n| 28 | 19 | Pending |\n\nNotes worth flagging for the reconciliation:\n- The live data uses **`Canceled`** (with \"ed\") as the closed value, not `Cancel` as the glossary states — I excluded both spellings, so no closed items were missed.\n- \"Open\" here spans three statuses (`Packed`/`Pending`/`Shipped`). Confirm with the warehouse team whether `Shipped` items should still count as open, since 3,671 rows (33%) fall there; that changes the reconciliation number to 7,498 if shipped items are treated as closed.\n\nWant me to export the complete 11,169-row list as a CSV for the warehouse team?",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "**Open order items: 11,169**\n\nI listed every `Order_Items` row whose `order_item_status` is not `Finish` and not `Canceled`. Since the list is 11,169 rows, printing it inline isn't practical — here's the summary, with a full-list export available on request.\n\n**Composition of the open items**\n\n| Order Item Status | Open Items |\n|---|---|\n| Packed | 3,773 |\n| Pending | 3,725 |\n| Shipped | 3,671 |\n| **Total open** | **11,169** |\n\n**Context (all 18,727 order items in the system)**\n\n| Order Item Status | Items |\n|---|---|\n| Canceled | 3,829 |\n| Finish | 3,729 |\n| Packed | 3,773 |\n| Pending | 3,725 |\n| Shipped | 3,671 |\n\nSample of the list (ordered by `order_item_id`):\n\n| order_item_id | order_id | order_item_status |\n|---|---|---|\n| 18 | 16 | Shipped |\n| 19 | 17 | Pending |\n| 20 | 17 | Packed |\n| 21 | 17 | Shipped |\n| 23 | 18 | Shipped |\n| 28 | 19 | Pending |\n\nNotes worth flagging for the reconciliation:\n- The live data uses **`Canceled`** (with \"ed\") as the closed value, not `Cancel` as the glossary states — I excluded both spellings, so no closed items were missed.\n- \"Open\" here spans three statuses (`Packed`/`Pending`/`Shipped`). Confirm with the warehouse team whether `Shipped` items should still count as open, since 3,671 rows (33%) fall there; that changes the reconciliation number to 7,498 if shipped items are treated as closed.\n\nWant me to export the complete 11,169-row list as a CSV for the warehouse team?",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 632,
+              "prompt_tokens": 118534,
+              "total_tokens": 119166,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 211,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cached_tokens": 2176
+              },
+              "prompt_cache_hit_tokens": 2176,
+              "prompt_cache_miss_tokens": 116358
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-flash",
+            "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+            "id": "a10892dd-bbd9-4545-b386-c6b15bc6c787",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a16d93-1dbe-7d40-bd4b-323ddf8ed18c-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 632,
+      "prompt_tokens": 118534,
+      "total_tokens": 119166,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 211,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": 2176
+      },
+      "prompt_cache_hit_tokens": 2176,
+      "prompt_cache_miss_tokens": 116358
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-flash",
+    "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+    "id": "a10892dd-bbd9-4545-b386-c6b15bc6c787"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

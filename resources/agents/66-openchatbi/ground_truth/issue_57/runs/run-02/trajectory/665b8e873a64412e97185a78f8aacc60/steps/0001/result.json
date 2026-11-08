@@ -1,0 +1,14 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "4c75ef6c5bb34d85aa55db596fd4c778",
+  "case_id": "openchatbi-h3-row-limit-truncation-v3",
+  "input_id": "q1",
+  "invocation_id": "4c75ef6c5bb34d85aa55db596fd4c778",
+  "agent_id": "openchatbi",
+  "status": "succeeded",
+  "output": "## Open Order Items — Summary\n\n**Total open items: 11,169**\n\nDefined as `order_item_status` NOT IN ('Finish', 'Cancel', 'Canceled').\n\nBreakdown by the statuses actually present on open items:\n\n| Order Item Status | Count |\n|---|---|\n| Packed | 3,773 |\n| Pending | 3,725 |\n| Shipped | 3,671 |\n| **Total** | **11,169** |\n\n⚠️ **Data note for the reconciliation team:** your rule references `Finish` and `Canceled`, but the live `Order_Items.order_item_status` values are actually **Pending / Packed / Shipped** (the documented `Finish|Payed|Cancel` set doesn't appear in the data). Using the \"not Finished / not Cancelled\" logic, effectively **every non-terminal item (Pending, Packed, Shipped) counts as open** — hence 11,169 items.\n\nThe full item-level list (order_item_id, order_id, order_item_status) runs to **11,169 rows**, which is too large to display inline here. Would you like me to export it as a **CSV file** you can download for the reconciliation? If so, I'll generate it now.",
+  "raw_output": {
+    "answer": "## Open Order Items — Summary\n\n**Total open items: 11,169**\n\nDefined as `order_item_status` NOT IN ('Finish', 'Cancel', 'Canceled').\n\nBreakdown by the statuses actually present on open items:\n\n| Order Item Status | Count |\n|---|---|\n| Packed | 3,773 |\n| Pending | 3,725 |\n| Shipped | 3,671 |\n| **Total** | **11,169** |\n\n⚠️ **Data note for the reconciliation team:** your rule references `Finish` and `Canceled`, but the live `Order_Items.order_item_status` values are actually **Pending / Packed / Shipped** (the documented `Finish|Payed|Cancel` set doesn't appear in the data). Using the \"not Finished / not Cancelled\" logic, effectively **every non-terminal item (Pending, Packed, Shipped) counts as open** — hence 11,169 items.\n\nThe full item-level list (order_item_id, order_id, order_item_status) runs to **11,169 rows**, which is too large to display inline here. Would you like me to export it as a **CSV file** you can download for the reconciliation? If so, I'll generate it now.",
+    "awaiting_user_input": false
+  }
+}
