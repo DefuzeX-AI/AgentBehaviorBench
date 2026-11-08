@@ -15,7 +15,8 @@ WORKDIR /opt/agent
 # Install dependencies
 COPY agent/requirements.txt ./agent-requirements.txt
 RUN pip install --no-cache-dir --index-url "$ABB_PIP_INDEX_URL" --timeout 120 --retries 5 -r agent-requirements.txt \
-    && pip install --no-cache-dir --index-url "$ABB_PIP_INDEX_URL" --timeout 120 --retries 5 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2'
+    && pip install --no-cache-dir --index-url "$ABB_PIP_INDEX_URL" --timeout 120 --retries 5 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2' 'PyYAML>=6,<7' 'filelock>=3.32.7,<4' \
+    && echo "import os; os.umask(0)" > /usr/local/lib/python3.11/site-packages/umask.pth
 
 # Setup non-root execution user and workspace
 RUN useradd --create-home --uid 10001 agent \

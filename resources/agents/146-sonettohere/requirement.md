@@ -37,4 +37,5 @@ same Case preserve state and file modifications across turns.
 - Network access is strictly restricted to the configured model inference endpoint (`api.deepseek.com`). External web browsing, remote package downloads, and git remote operations are unavailable.
 - Interactive WebSockets and UI controls are disabled in headless execution; tool confirmations are governed by automated session approval.
 - No third-party MCP servers, desktop GUI environments, or external database credentials are provisioned.
+- Command execution, terminal shells, and test runners (such as bash, pytest, or unittest execution) are unavailable; the agent operates solely via workspace file tools (read, write, edit, delete, list, search). Tasks must evaluate creating, inspecting, reading, or modifying files and code, not running shell commands.
 - The agent must not claim tool execution or file modifications that did not actually occur on disk.
