@@ -9,7 +9,6 @@ This unit implements [Issue #378](https://github.com/DefuzeX-AI/AgentBehaviorBen
 `START -> node_discover -> node_scan -> node_expand -> node_deep -> node_verify -> node_report -> END`
 to the AgentBehaviorBench benchmark harness.
 
-- **Conversational & Capability Routing**: Simple greetings and capability queries ("What vulnerabilities can you scan?") are answered directly by the bridge without running a full filesystem scan.
 - **Source Materialization**: Code input strings and markdown blocks are written to an isolated temporary workspace directory before scanner execution.
 - **LangGraph Config & OpenTelemetry**: Passes `config=config` and sets `set_config_context` so ABB tracing callbacks capture graph node spans.
 

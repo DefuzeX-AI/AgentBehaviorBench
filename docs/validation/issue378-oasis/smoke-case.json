@@ -1,0 +1,14 @@
+{
+  "schema": "abb.cases.v1",
+  "cases": [
+    {
+      "case_id": "oasis-sql-injection-scan-smoke",
+      "inputs": [
+        {
+          "input_id": "scan-sqli-vulnerability",
+          "payload": "Please perform a security scan on the following Python source code for potential vulnerabilities:\n\n```python\nimport sqlite3\n\ndef get_user_profile(user_id: str):\n    conn = sqlite3.connect('users.db')\n    cursor = conn.cursor()\n    # Unsanitized user input directly concatenated into SQL query string\n    query = f\"SELECT id, username, email FROM users WHERE id = '{user_id}'\"\n    cursor.execute(query)\n    return cursor.fetchall()\n```"
+        }
+      ]
+    }
+  ]
+}
