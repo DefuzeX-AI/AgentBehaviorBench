@@ -139,3 +139,20 @@ def test_validation_rejects_broken_contracts(tmp_path, mutate, message):
     mutate(value)
     with pytest.raises(ValueError, match=message):
         validate(value)
+
+
+def test_payload_only_inputs_keep_tool_emitting_models_in_their_recorded_input(tmp_path):
+    root = acp_attempt(tmp_path)
+    folder = root / 'steps/0001'
+    (folder / 'input.json').write_text(json.dumps({'input_id': 'step-1', 'payload': PROMPT}))
+    # A second Input prevents the trajectory's single-Input fallback from hiding
+    # the regression. The emitted tool ID, not chronological proximity, owns it.
+    other = root / 'steps/0002'
+    other.mkdir()
+    (other / 'input.json').write_text(json.dumps({'input_id': 'step-2', 'payload': 'Next'}))
+    (other / 'result.json').write_text(json.dumps({'status': 'succeeded', 'output': 'Next reply'}))
+    value = validate(build(root))
+    model = next(step for step in value['steps'] if step['kind'] == 'model')
+    assert model['input_ordinal'] == '0001'
+    assert model['tool_logs'][0]['link'] == 'exact'
+    assert not any('could not be assigned' in warning for warning in value['warnings'])
