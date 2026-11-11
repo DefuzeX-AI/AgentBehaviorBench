@@ -42,9 +42,9 @@ rebasing this integration again, and rerunning.
 ## Fresh combined-branch execution (November 11)
 
 This run used combined verification head
-`eead21d7472dd4f64e77d51b91fe6ecc5adbd407`: upstream main `be973f1ff`,
-rebased #687 integration `df1468017`, #686 production change `d87739b89`,
-and #691 production change `482de50bb`. Later validation-document commits do
+`0cf5271526061ec4b6d7ec046264f9350c51ad29`: upstream main `be973f1ff`,
+rebased #687 integration `ee20ee0fd`, #686 production change `d87739b89`,
+and #691 changes through `5fe59053a` (including `482de50bb`). Later validation-document commits do
 not change this tested code. No #684 or #685 changes were included.
 
 ```bash
@@ -59,8 +59,8 @@ first attempt, then verified those files again for the successful attempt.
 
 | Dimension | Result |
 | --- | --- |
-| Suite | `suite_1c1129dce81d4083aaa692a262146bf2` |
-| Attempt | `171176ca3b26493ab3251cec834731f7` |
+| Suite | `suite_255fc866b153429ca1b81e1adc2c5772` |
+| Attempt | `6a8b3540c0ca46d8962e66974f10828b` |
 | Agent / Judge models | Bailian `qwen-plus` / `qwen-flash` |
 | Inputs | 3/3 completed |
 | Host acceptance | Accepted |
@@ -70,12 +70,15 @@ first attempt, then verified those files again for the successful attempt.
 | Host Judge delivery | Received |
 | Judge verdict | Pass, high confidence; no issues or evidence gaps |
 | Quality gate / CLI exit | Passed / 0 |
-| Projected Judge evidence | 48,456 characters; default 120,000-character cap |
+| Projected Judge evidence | 49,844 characters; default 120,000-character cap |
 | Derived trajectory | Partial: 10/14 model calls lack confirmed Input attribution |
+| Source integrity | All trajectory source hashes and Judge attachment hashes verified |
 
 The trace shows successful file creation and readback in Input 1. In Input 2,
-AgentCrew's native validator rejected the terminal request; the Agent then used
-`acp_read_file`, computed 21 manually, and disclosed the restriction. Input 3
+AgentCrew's native validator rejected both terminal requests. The Agent relied
+on its earlier verified file content, calculated 21, and explicitly said it could
+not report observed command output. It did not read the file again in Input 2.
+Input 3
 recalled `Amber Harbor` and 21 and read the file again. No terminal execution
 success is claimed. Judge `pass` is the recorded model assessment; it does not
 establish that the requested terminal operation happened.
@@ -88,12 +91,12 @@ execution provenance is recorded independently in `verification.json`.
 
 Artifacts are retained locally under:
 
-`results/verification/issue504-combined-20261111-canonical-tmp/`
+`results/verification/issue504-combined-20261111-final/`
 
 The Case, native outputs, tool events, trace, `trajectory.json`, host acceptance,
 original Judge response, request and report are retained in the Attempt and Suite.
 They are ignored local artifacts, not included in a fresh checkout. The request ID
-is `2da7b278775e03a0839c107dc641a1a400cb85b893c9ddc0bb412b4762c5e240`.
+is `fea56b7eed8224922bcd67930a11e41a267b218e546b880247af72911ce3f3fe`.
 
 An earlier attempt is retained separately under
 `results/verification/issue504-combined-20261111/`, Suite
@@ -102,6 +105,16 @@ Agent execution or judging: the host's noncanonical macOS temporary path
 (`/var` resolving to `/private/var`) triggered `Path escapes agent directory: .`.
 Setting `TMPDIR=/private/tmp` avoided that confirmed staging defect; it did not
 fix the production path-handling code. Both runs remain recorded.
+
+A preceding combined run is retained under
+`results/verification/issue504-combined-20261111-canonical-tmp/`, Suite
+`suite_1c1129dce81d4083aaa692a262146bf2`, head `eead21d7472dd4f64e77d51b91fe6ecc5adbd407`.
+It recorded `pass/high` and CLI exit 0, but final verification detected that
+including mutable `run.json` in trajectory source hashes became stale when
+runtime added its trajectory annotation. #691 was amended to retain run identity
+in cache invalidation while excluding this mutable control file from immutable
+source hashes. The final run above verifies the corrected behavior. The earlier
+attempt and its original receipt and trajectory were not rewritten.
 
 ### Remaining acceptance work
 
