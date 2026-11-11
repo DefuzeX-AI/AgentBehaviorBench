@@ -78,7 +78,9 @@ Relationships come from recorded identifiers only; timestamps order steps.
 - An Input's explicit `case_id` is preserved. When absent, the shared interaction
   index uses the same Input's recorded invocation context, then the containing
   attempt's `run.json` Case identity. Including `run.json` in the index revision
-  invalidates cached identity when that file changes. This restores Case scoping
+  invalidates cached identity when that file changes. The mutable `run.json` is
+  excluded from immutable trajectory source hashes because runtime adds the
+  trajectory result to it after derivation. This restores Case scoping
   for payload-only `steps/NNNN/input.json`; it does not assign model calls by time.
 - Interceptor records group by `call_id`; framework records group by span id.
 - A wire model call joins its framework model span through the

@@ -156,3 +156,16 @@ def test_payload_only_inputs_keep_tool_emitting_models_in_their_recorded_input(t
     assert model['input_ordinal'] == '0001'
     assert model['tool_logs'][0]['link'] == 'exact'
     assert not any('could not be assigned' in warning for warning in value['warnings'])
+
+
+def test_runtime_trajectory_annotation_does_not_invalidate_source_hashes(tmp_path):
+    import hashlib
+    root = acp_attempt(tmp_path)
+    write(root)
+    value = read(root)
+    run = json.loads((root / 'run.json').read_bytes())
+    run['trajectory'] = {'status': value['status'], 'path': 'trajectory.json'}
+    (root / 'run.json').write_text(json.dumps(run))
+    assert 'run.json' not in {source['path'] for source in value['sources']}
+    assert all(hashlib.sha256((root / source['path']).read_bytes()).hexdigest() == source['sha256']
+               for source in value['sources'])
