@@ -134,7 +134,13 @@ Credentials stay on the host. KUMA is never a fallback.
 The provider assesses ordered inputs, outputs and a bounded projection of verified
 trace contents. It includes tool calls and outcomes, permission decisions, file
 reads/writes and available file evidence, with each event pointing to its original
-attachment and line. Streaming chunks omitted from the model request are counted;
+attachment and line. The projection uses the shared interaction index restricted
+to the request's hash-verified attachments. Framework and supplemental OTel tool
+records reference the same indexed execution only when their recorded tool call
+ID identifies one execution in that Input. Duplicate or absent IDs remain
+ambiguous or unobserved. Multiple records can describe one execution; they are
+not separate successful actions. Timestamps determine display order only and
+never establish a relationship. Streaming chunks omitted from the model request are counted;
 the original attachments remain intact. The model-facing projection is retained in
 `judge/local-evidence.json` for review. An oversized decision event or a projection
 larger than `ABB_LOCAL_JUDGE_MAX_CHARS` (default 120000 characters) is explicitly

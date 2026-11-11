@@ -8,6 +8,9 @@ import hashlib
 import json
 from pathlib import Path
 
+from agentbench.observe.interactions import InteractionIndex
+from agentbench.observe.artifact_paths import canonical_relative, artifact_file
+
 
 MAX_EVENT_CHARS = 12000
 TOOL_UPDATES = frozenset({'tool_call', 'tool_call_update'})
@@ -59,12 +62,37 @@ def _excluded_kind(record: dict) -> str:
     return name
 
 
-def _lines(directory: Path, relative: str, attachments: dict):
+def _verified_index(request, directory):
+    """Use the shared reader, restricted to this request's verified attachments."""
+    files = []
+    for name, metadata in request['attachments'].items():
+        if name.endswith(('/framework.jsonl', '/spans.jsonl', '/input.json', '/result.json', '/request.json')):
+            files.append((name, metadata.get('size_bytes', 0), 0))
+    return InteractionIndex(directory, files)
+
+
+def _records(index, relative, attachments):
     if relative not in attachments:
         return
-    with (directory / relative).open(encoding='utf-8') as source:
-        for number, raw in enumerate(source, 1):
-            yield number, raw, json.loads(raw)
+    # The shared index already decoded these records. Read original bytes only
+    # for line hashes; do not independently parse or group the trace again.
+    lines = artifact_file(index.root, relative).read_text(encoding='utf-8').splitlines(keepends=True)
+    records = [record for group in index.groups.values() for record in group
+               if record['file'] == relative and record['line'] is not None]
+    for record in sorted(records, key=lambda r: r['line']):
+        yield record['line'], lines[record['line'] - 1], record['raw']
+
+
+def _tool_reference(index, prefix, call_id):
+    """Join supplemental records only to a unique indexed execution in this Input."""
+    if not call_id:
+        return None
+    candidates = [row for row in index.rows if row['kind'] == 'tool'
+                  and row.get('tool_call_id') == call_id
+                  and canonical_relative(row.get('_context') or '') == canonical_relative(prefix)]
+    return {'tool_call_id': call_id,
+            'status': 'exact' if len(candidates) == 1 else 'ambiguous' if candidates else 'unobserved',
+            'interaction_ids': [row['id'] for row in candidates]}
 
 
 def _time(value: object) -> datetime:
@@ -85,16 +113,18 @@ def project(request: dict, directory: Path) -> tuple[dict, list[str]]:
     Unselected streaming chunks are counted, while final Agent output is included
     from result.json. Any oversized selected event blocks a model verdict.
     """
+    directory = Path(directory).resolve()
     attachments = request['attachments']
+    index = _verified_index(request, directory)
     steps = []
-    gaps = []
+    gaps = list(index.warnings)
     for step in request['steps']:
         prefix = step['evidence_prefix']
         input_path, result_path = prefix + '/input.json', prefix + '/result.json'
         events = []
         skipped = Counter()
         framework = prefix + '/framework.jsonl'
-        for number, raw, record in _lines(directory, framework, attachments):
+        for number, raw, record in _records(index, framework, attachments):
             selection = _selected(record)
             if selection is None:
                 skipped[_excluded_kind(record)] += 1
@@ -107,11 +137,15 @@ def project(request: dict, directory: Path) -> tuple[dict, list[str]]:
                 item['detail_omitted'] = True
             else:
                 item['detail'] = data
+            call_id = data.get('tool_call_id') or data.get('toolCallId')
+            relation = _tool_reference(index, prefix, call_id)
+            if relation:
+                item['tool_execution'] = relation
             events.append(item)
 
         # Span records can carry tool outcomes absent from framework events.
         spans = prefix + '/spans.jsonl'
-        for number, raw, record in _lines(directory, spans, attachments):
+        for number, raw, record in _records(index, spans, attachments):
             attributes = record.get('attributes', {})
             if not isinstance(attributes, dict) or not any(key.startswith('gen_ai.tool.') for key in attributes):
                 continue
@@ -125,14 +159,18 @@ def project(request: dict, directory: Path) -> tuple[dict, list[str]]:
                 item['detail_omitted'] = True
             else:
                 item['detail'] = detail
+            relation = _tool_reference(index, prefix, attributes.get('gen_ai.tool.call.id'))
+            if relation:
+                item['tool_execution'] = relation
             events.append(item)
 
         # Framework events and final spans can arrive in different files; their
-        # recorded timestamps provide the cross-file order within a step.
+        # recorded timestamps provide display order only, never identity or pairing.
+        # Records sharing a tool_execution reference describe the same execution.
         events.sort(key=lambda event: _time(event['time']))
         file_evidence = prefix + '/file-evidence.json'
         if file_evidence in attachments:
-            content = (directory / file_evidence).read_text(encoding='utf-8')
+            content = artifact_file(directory, file_evidence).read_text(encoding='utf-8')
             item = {'source': _reference(file_evidence, attachments=attachments)}
             if len(content) > MAX_EVENT_CHARS:
                 gaps.append(f'Oversized file evidence at {file_evidence}; inspect the full attachment.')

@@ -104,3 +104,62 @@ def test_oversized_decision_event_creates_gap(tmp_path, monkeypatch):
     monkeypatch.setattr(provider, 'judge_model', no_model)
     report = provider.judge.judge(request, directory=tmp_path, environ={})
     assert report['status'] == 'inconclusive' and report['evidence_gaps']
+
+
+def test_projection_uses_verified_index_and_identifiers_not_timestamps(tmp_path):
+    prefix = 'steps/0001'
+    folder = tmp_path / prefix
+    folder.mkdir(parents=True)
+    records = [
+        {'event': 'span_start', 'timestamp': '2026-01-01T00:00:01Z',
+         'data': {'kind': 'tool', 'span_id': 'span-a', 'tool_call_id': 'call-a',
+                  'name': 'read', 'input': {'path': 'missing.txt'}}},
+        {'event': 'span_end', 'timestamp': '2026-01-01T00:00:02Z',
+         'data': {'span_id': 'span-a', 'tool_call_id': 'call-a',
+                  'output': 'Error: File not found'}},
+    ]
+    spans = [{'name': 'read', 'end_time': '2026-01-01T00:00:02Z',
+              'attributes': {'gen_ai.tool.call.id': call_id, 'gen_ai.tool.call.result': output}}
+             for call_id, output in [('call-a', 'Error: File not found'), ('call-b', 'unrelated')]]
+    values = {'input.json': json.dumps({'input_id': 'read', 'payload': 'Read the file'}),
+              'result.json': json.dumps({'status': 'succeeded', 'output': 'I read the file.'}),
+              'framework.jsonl': ''.join(json.dumps(r) + '\n' for r in records),
+              'spans.jsonl': ''.join(json.dumps(r) + '\n' for r in spans)}
+    for name, content in values.items():
+        (folder / name).write_text(content)
+    # This unverified second Input must never participate in projection or pairing.
+    extra = tmp_path / 'steps/0002'
+    extra.mkdir()
+    (extra / 'input.json').write_text('{"input_id":"unverified"}')
+    (extra / 'framework.jsonl').write_text(json.dumps(records[0]))
+    attachments = {prefix + '/' + name: {'sha256': hashlib.sha256(content.encode()).hexdigest(),
+                                        'size_bytes': len(content.encode())}
+                   for name, content in values.items()}
+    request = {'attachments': attachments, 'case': {}, 'steps': [{
+        'evidence_prefix': prefix, 'input': {'input_id': 'read', 'payload': 'Read the file'},
+        'result': {'status': 'succeeded', 'output': 'I read the file.'}}]}
+    payload, gaps = project(request, tmp_path)
+    assert gaps == []
+    events = payload['steps'][0]['events']
+    framework, matched, unrelated = events[0], events[2], events[3]
+    assert framework['tool_execution'] == matched['tool_execution']
+    assert matched['tool_execution']['status'] == 'exact'
+    assert unrelated['tool_execution']['status'] == 'unobserved'
+    assert unrelated['tool_execution']['interaction_ids'] == []
+    assert 'Error: File not found' in json.dumps(payload)
+    assert payload['steps'][0]['output'] == 'I read the file.'
+    assert all('0002' not in event['source']['path'] for event in events)
+
+
+def test_invalid_trace_line_blocks_a_complete_projection(tmp_path):
+    folder = tmp_path / 'steps/0001'
+    folder.mkdir(parents=True)
+    (folder / 'framework.jsonl').write_text('{invalid\n')
+    (folder / 'input.json').write_text('{"input_id":"a"}')
+    (folder / 'result.json').write_text('{}')
+    attachments = {f'steps/0001/{name}': {'sha256': hashlib.sha256((folder / name).read_bytes()).hexdigest()}
+                   for name in ('framework.jsonl', 'input.json', 'result.json')}
+    _, gaps = project({'attachments': attachments, 'case': {}, 'steps': [{
+        'evidence_prefix': 'steps/0001', 'input': {'input_id': 'a', 'payload': 'x'},
+        'result': {'status': 'succeeded'}}]}, tmp_path)
+    assert any('invalid JSON' in gap for gap in gaps)
