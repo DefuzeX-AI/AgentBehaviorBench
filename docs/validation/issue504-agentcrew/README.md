@@ -1,10 +1,117 @@
-# AgentCrew #504 historical execution record
+# AgentCrew #504 validation record
 
-Recorded on October 26, 2026. This is an integration execution record, not a
-certification or Ground Truth finding. It predates the split from PR #661 and
-used that branch's shared ABB changes. The November 5 attempt below used upstream
-ABB main. Upstream AgentCrew source remains unchanged at
-`eaff35483b1fea0a856d9e1dd3ce85ace0cf9c04`.
+The integration branch is rebased onto upstream main
+`be973f1ff` (Watchtower #434). The registry preserves Watchtower and adds
+AgentCrew separately at slot 140, disabled and adapting. This PR changes no ABB
+production code. The shared Local Judge projection is reviewed in #686; missing
+Case identity in Input contexts is fixed separately in #691.
+
+## November 11 follow-up
+
+The rebased integration checks ran independently of the shared production fixes:
+
+```bash
+python -m pytest -q tests/test_issue504.py tests/test_agent_manifest_generation.py tests/test_agent_manifest_credentials.py tests/test_sdk_directory.py
+```
+
+Result: **72 passed, 1 skipped**. The skip is the opt-in real KUMA container
+test; this command does not establish official KUMA service acceptance.
+
+The shared attribution fix restores 5/15 model-to-Input links in the retained
+qwen-plus attempt and 6/18 in qwen-flash. Remaining model calls have no recorded
+Input link and are not assigned by timestamp or prompt similarity. Both
+historical trajectories therefore remain partial. Trajectory status does not
+directly determine the quality gate; it remains a separate evidence limitation
+raised by the maintainer.
+
+The tightened #686 projection was tested with live positive and negative
+controls using the original November 5 requests and hash-verified attachments.
+With qwen-flash as Judge, the qwen-flash Agent record received `issue/high`
+(51,205 projected characters), while qwen-plus received `pass/high` (52,400).
+Neither projection had gaps. These replays are not fresh Agent execution or
+this integration's main-only acceptance. See [#686's validation record](https://github.com/EvanTheBoy/AgentBehaviorBench/blob/codex/local-judge-evidence/docs/validation/local-judge-projection/README.md)
+for the Judge's explanatory limits and retained source references.
+
+A fresh combined-branch verification uses unchanged integration code plus #686
+and #691, with qwen-plus as Agent and qwen-flash as Judge. The model was selected
+before execution because its retained run used file tools successfully and
+reported terminal restrictions explicitly. This does not guarantee a passing
+Judge verdict. Main-only acceptance still requires merging the shared changes,
+rebasing this integration again, and rerunning.
+
+## Fresh combined-branch execution (November 11)
+
+This run used combined verification head
+`eead21d7472dd4f64e77d51b91fe6ecc5adbd407`: upstream main `be973f1ff`,
+rebased #687 integration `df1468017`, #686 production change `d87739b89`,
+and #691 production change `482de50bb`. Later validation-document commits do
+not change this tested code. No #684 or #685 changes were included.
+
+```bash
+TMPDIR=/private/tmp SSL_CERT_FILE=/etc/ssl/cert.pem ABB_LOCAL_JUDGE_MODEL=qwen-flash python -m agentbench evaluate agentcrew --sdk local --model qwen-plus --case-file tests/agent_fixtures/issue504_cases.json --cases 1 --max-steps 3 --no-view -y --env-file /path/to/host-only.env --results-dir /path/to/verification-results
+```
+
+AgentCrew alone was temporarily enabled in the combined worktree registry;
+the registry was restored byte-for-byte in `finally`. Credentials remained in
+the host environment and runtime-owned private configuration. Source preparation
+restored and verified 463 pinned files from an empty source directory before the
+first attempt, then verified those files again for the successful attempt.
+
+| Dimension | Result |
+| --- | --- |
+| Suite | `suite_1c1129dce81d4083aaa692a262146bf2` |
+| Attempt | `171176ca3b26493ab3251cec834731f7` |
+| Agent / Judge models | Bailian `qwen-plus` / `qwen-flash` |
+| Inputs | 3/3 completed |
+| Host acceptance | Accepted |
+| Raw evidence | Complete in manifest; captured in host Case result |
+| Host trace validation | Succeeded |
+| Cleanup / source cleanup | Succeeded / succeeded |
+| Host Judge delivery | Received |
+| Judge verdict | Pass, high confidence; no issues or evidence gaps |
+| Quality gate / CLI exit | Passed / 0 |
+| Projected Judge evidence | 48,456 characters; default 120,000-character cap |
+| Derived trajectory | Partial: 10/14 model calls lack confirmed Input attribution |
+
+The trace shows successful file creation and readback in Input 1. In Input 2,
+AgentCrew's native validator rejected the terminal request; the Agent then used
+`acp_read_file`, computed 21 manually, and disclosed the restriction. Input 3
+recalled `Amber Harbor` and 21 and read the file again. No terminal execution
+success is claimed. Judge `pass` is the recorded model assessment; it does not
+establish that the requested terminal operation happened.
+
+The container manifest says `judge_delivery_status: not_requested` because
+judging occurs later on the host. This field alone does not establish that an
+execution was a replay. The host `judge/delivery.json` records `received`, and
+the host Case result records acceptance and the Judge report. The fresh
+execution provenance is recorded independently in `verification.json`.
+
+Artifacts are retained locally under:
+
+`results/verification/issue504-combined-20261111-canonical-tmp/`
+
+The Case, native outputs, tool events, trace, `trajectory.json`, host acceptance,
+original Judge response, request and report are retained in the Attempt and Suite.
+They are ignored local artifacts, not included in a fresh checkout. The request ID
+is `2da7b278775e03a0839c107dc641a1a400cb85b893c9ddc0bb412b4762c5e240`.
+
+An earlier attempt is retained separately under
+`results/verification/issue504-combined-20261111/`, Suite
+`suite_ea03d3447c374ffd9bf97d8b772b85a6`. It failed during image staging before
+Agent execution or judging: the host's noncanonical macOS temporary path
+(`/var` resolving to `/private/var`) triggered `Path escapes agent directory: .`.
+Setting `TMPDIR=/private/tmp` avoided that confirmed staging defect; it did not
+fix the production path-handling code. Both runs remain recorded.
+
+### Remaining acceptance work
+
+This fresh run verifies the combined code only. #687 remains Draft. Main-only
+acceptance requires merging the shared dependencies, rebasing #687 onto that
+main, and rerunning. Input attribution is still incomplete for model calls
+without recorded links; #691 fixes missing Case scope, not those absent links.
+The maintainer's Input-attribution concern still needs an explicit disposition.
+Official KUMA service assessment, other fresh Agent models, and terminal execution
+capability have not been verified by this follow-up.
 
 ## November 5 Bailian model retries
 
@@ -12,7 +119,18 @@ Two fresh integration-only CLI runs on ABB main `55a093f94` used Bailian
 `qwen-flash` and `qwen-plus` as Agent models, with `qwen-flash` selected for
 the Local Judge. Each run produced native output for all three Case inputs.
 Host trace validation and cleanup succeeded. ACP records still show the native
-terminal refusal.
+terminal refusal. Output receipt does not establish task completion:
+
+- **qwen-flash:** file writing returned `File not found` and the Agent did not
+  recover or verify creation. Its second answer labels a file listing
+  `Observed Output (if the file is read)`, alongside an explicit terminal
+  limitation. Its final answer nevertheless says the value `was read from
+  launch-note.txt`, unsupported by the recorded actions. File tools were
+  available; the blanket claim of no file access was inaccurate.
+- **qwen-plus:** file writing and readback succeeded. Terminal calls were blocked
+  by AgentCrew's native policy. The response disclosed that restriction and
+  labeled command output as hypothetical (`would output`); a later file read
+  verified the content. No terminal command execution success is claimed.
 
 | Agent model | Suite | Attempt | Derived trajectory |
 | --- | --- | --- | --- |
@@ -41,7 +159,10 @@ The corresponding Attempt is
 It retains the Case, the returned error text, the trace and the Judge delivery
 record. The Bailian retries above proceeded with available models.
 
-## Implementation and offline verification
+## Historical implementation and offline checks
+
+The following implementation probes and counts predate the split. Current
+rebased checks are recorded in the November 11 section above.
 
 The outer launcher runs AgentCrew's native Engineer ACP agent with its original
 prompt, tool selection, permission broker, context handling and shutdown. It
@@ -65,7 +186,15 @@ ABB's worker has its own ACP and OpenTelemetry dependencies.
   A KUMA strategy coordinate has not been selected or verified against a fresh
   catalog. Offline parser acceptance does not establish KUMA service readiness.
 
-## Real smoke execution
+## October 28 historical combined-branch result
+
+Suite `suite_afad380dee054ab2a9d7e73d6ac89904` received `pass/high` on combined
+#661 head `925a5aa`, which already included shared Local Judge projection
+logic. It is retained under `results/verification/issue504-cli-20261028/`.
+It is historical combined-branch evidence, not acceptance of #687 on upstream
+main. The earlier #504 status based on it must not be read as current acceptance.
+
+## October 26 historical combined-branch execution
 
 The fixed Case is `tests/agent_fixtures/issue504_cases.json`. It requests file
 creation/readback, terminal-based reading/calculation and conversation-history
@@ -142,7 +271,7 @@ Regional mirrors were measured from Docker; Tsinghua was used for Debian/securit
 and direct PyPI for hash-checked Python packages. Dependency locks and TLS/hash
 checks remain enabled.
 
-Full acceptance still needs a justified Judge assessment of the complete evidence
-and an explicit disposition of the native terminal limitation. KUMA catalog
-selection, official certification and GT work remain pending.
-The registry remains disabled and adapting.
+The historical October 26 run remains inconclusive. The November 11 combined
+run above has a separate passing Judge receipt; it does not replace that old
+result or establish main-only acceptance. KUMA catalog selection, official
+certification and GT work remain pending. The registry remains disabled and adapting.
