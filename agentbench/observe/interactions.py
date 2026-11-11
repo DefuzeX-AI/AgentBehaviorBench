@@ -49,7 +49,7 @@ def _data(record):
 
 
 def _files(root):
-    names = {'network.jsonl', 'evaluation/sdk.jsonl', 'evaluation/case.json',
+    names = {'run.json', 'network.jsonl', 'evaluation/sdk.jsonl', 'evaluation/case.json',
              'evaluation/judge/report.json', 'evaluation/manifest.json',
              'evaluation/workspace-artifacts.json', 'evaluation/workspace.json'}
     for pattern in ('steps/[0-9][0-9][0-9][0-9]', 'evaluation/inputs/[0-9][0-9][0-9][0-9]', 'invocation-*/output'):
@@ -135,13 +135,25 @@ class InteractionIndex:
                 except ValueError:
                     self.warnings.append(f'{name}: contains incomplete or invalid JSON')
 
+        run = self.artifacts.get('run.json', {}).get('value')
+        run = run if isinstance(run, dict) else {}
         for name, item in self.artifacts.items():
             if name.endswith('/input.json'):
                 folder = name.rsplit('/', 1)[0]
                 inp = item['value']
+                invocation = self.artifacts.get(folder + '/request.json', {}).get('value')
+                observation = invocation.get('observation_context') if isinstance(invocation, dict) else None
+                observation = observation if isinstance(observation, dict) else {}
+                # The invocation records the Input explicitly; run.json scopes
+                # current attempt layouts whose input.json stores only payload/id.
+                case_id = inp.get('case_id') if isinstance(inp, dict) else None
+                if not case_id and isinstance(inp, dict) and inp.get('input_id'):
+                    if observation.get('input_id') == inp['input_id']:
+                        case_id = observation.get('case_id')
+                    case_id = case_id or run.get('case_id')
                 self.contexts[folder] = {'folder': folder,
                     'input_id': inp.get('input_id') if isinstance(inp, dict) else None,
-                    'case_id': inp.get('case_id') if isinstance(inp, dict) else None,
+                    'case_id': case_id,
                     **{key: self.artifacts.get(folder + '/' + filename, {}).get('value') for key, filename in {
                         'input': 'input.json', 'mapped': 'mapped-input.json', 'invocation': 'request.json',
                         'result': 'result.json', 'submission': 'submission.json'}.items()}}

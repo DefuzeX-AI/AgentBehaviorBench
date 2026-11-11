@@ -40,6 +40,10 @@ def _sources(index, api):
     from agentbench.observe.artifact_paths import canonical_relative
     sources = []
     for name, _, _ in index_files(index):
+        # Runtime adds the trajectory result to this mutable control file after
+        # derivation. Hashing it would create a self-referential source digest.
+        if name == 'run.json':
+            continue
         try:
             sources.append({'path': canonical_relative(name),
                             'sha256': hashlib.sha256(api.file(name).read_bytes()).hexdigest()})

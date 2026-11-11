@@ -63,3 +63,50 @@ def test_stream_protocols_and_arguments():
         {'choices': [{'delta': {'tool_calls': [{'id': 'chat'}]}}]},
         {'type': 'response.output_item.added', 'item': {'type': 'function_call', 'call_id': 'responses'}},
     ], 'input': {'type': 'tool_use', 'id': 'forged'}}) == {'anthropic', 'chat', 'responses'}
+
+
+def test_current_step_layout_recovers_case_from_run_without_time_inference(tmp_path):
+    fixture(tmp_path)
+    legacy = tmp_path / 'evaluation/inputs/0001'
+    folder = tmp_path / 'steps/0001'
+    folder.parent.mkdir()
+    legacy.rename(folder)
+    (folder / 'input.json').write_text(json.dumps({'input_id': 'step-1', 'payload': 'hello'}))
+    (tmp_path / 'run.json').write_text(json.dumps({'case_id': 'case-a'}))
+    result = interactions(tmp_path, {'kinds': 'chat'})
+    row, = result['items']
+    assert row['case_id'] == 'case-a'
+    assert row['input_id'] == 'step-1'
+    assert row['link_evidence'] == 'emitted_tool_id'
+    assert row['tool_relations'][0]['status'] == 'exact'
+    # Cached indexes must include run identity in their revision.
+    (tmp_path / 'run.json').write_text(json.dumps({'case_id': 'case-other'}))
+    row, = interactions(tmp_path, {'kinds': 'chat'})['items']
+    assert row['input_id'] is None
+    assert row['tool_relations'][0]['status'] == 'unobserved'
+
+
+def test_invocation_case_fallback_and_explicit_case_precedence(tmp_path):
+    fixture(tmp_path)
+    folder = tmp_path / 'evaluation/inputs/0001'
+    (folder / 'input.json').write_text(json.dumps({'input_id': 'step-1'}))
+    (folder / 'request.json').write_text(json.dumps({
+        'observation_context': {'input_id': 'step-1', 'case_id': 'case-a'}}))
+    (tmp_path / 'run.json').write_text(json.dumps({'case_id': 'case-other'}))
+    row, = interactions(tmp_path, {'kinds': 'chat'})['items']
+    assert row['input_id'] == 'step-1'
+    (folder / 'input.json').write_text(json.dumps({'input_id': 'step-1', 'case_id': 'case-explicit'}))
+    row, = interactions(tmp_path, {'kinds': 'chat'})['items']
+    assert row['input_id'] is None
+    assert row['tool_relations'][0]['status'] == 'unobserved'
+
+
+def test_invocation_for_another_input_cannot_supply_case(tmp_path):
+    fixture(tmp_path)
+    folder = tmp_path / 'evaluation/inputs/0001'
+    (folder / 'input.json').write_text(json.dumps({'input_id': 'step-1'}))
+    (folder / 'request.json').write_text(json.dumps({
+        'observation_context': {'input_id': 'step-other', 'case_id': 'case-a'}}))
+    row, = interactions(tmp_path, {'kinds': 'chat'})['items']
+    assert row['input_id'] is None
+    assert row['tool_relations'][0]['status'] == 'unobserved'

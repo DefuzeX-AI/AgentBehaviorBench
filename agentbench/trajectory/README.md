@@ -75,6 +75,13 @@ replaced by `{"truncated": true, "size", "sha256", "head"}`.
 
 Relationships come from recorded identifiers only; timestamps order steps.
 
+- An Input's explicit `case_id` is preserved. When absent, the shared interaction
+  index uses the same Input's recorded invocation context, then the containing
+  attempt's `run.json` Case identity. Including `run.json` in the index revision
+  invalidates cached identity when that file changes. The mutable `run.json` is
+  excluded from immutable trajectory source hashes because runtime adds the
+  trajectory result to it after derivation. This restores Case scoping
+  for payload-only `steps/NNNN/input.json`; it does not assign model calls by time.
 - Interceptor records group by `call_id`; framework records group by span id.
 - A wire model call joins its framework model span through the
   `framework_span_id` header. Both sides of that pair form one step.
@@ -85,6 +92,9 @@ Relationships come from recorded identifiers only; timestamps order steps.
   `tool_only` step.
 - LangGraph: the acting component comes from `langgraph_checkpoint_ns` of the
   model span (`agent/subgraph` for nested graphs). ACP: the Agent identity.
+- Model calls without an explicit Input ID, matching framework/native record or
+  uniquely emitted tool ID remain unassigned. Restoring Case identity alone does
+  not make such a multi-Input trajectory complete.
 - ACP agents expose no internal model spans; their model calls are the wire
   records, their tool logs the ACP `tool_call` updates, with terminal
   `exitStatus` when the client observed the terminal.
