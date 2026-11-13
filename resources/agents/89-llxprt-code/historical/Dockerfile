@@ -13,6 +13,11 @@ ENV PATH=/opt/agent/agent/node_modules/.bin:/opt/venv/bin:$PATH PYTHONPATH=/opt/
     PYTHONUNBUFFERED=1 HOME=/home/agent
 WORKDIR /opt/agent
 COPY agent/ ./agent/
+# Only the 0.11+ layout (bin/llxprt.mjs shim plus a prepack Bun bundle, which
+# bootstrap/launch.py starts) is supported; older commits ship a different entry.
+RUN test -f agent/packages/cli/bin/llxprt.mjs \
+    && node -e "process.exit(require('./agent/packages/cli/package.json').scripts?.prepack ? 0 : 1)" \
+    || { echo 'llxprt-code historical recipe supports the 0.11+ bundle layout (packages/cli/bin/llxprt.mjs and a prepack bundle); this commit predates it' >&2; exit 1; }
 # Install scripts stay enabled: the Bun runtime, node-pty, the tree-sitter / ast-grep
 # grammars and the patch-package postinstall set up their parts at install time.
 RUN cd agent && npm ci --no-audit --no-fund \
