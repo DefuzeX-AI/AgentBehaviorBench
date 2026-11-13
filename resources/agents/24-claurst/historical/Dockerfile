@@ -17,10 +17,14 @@ RUN curl -fsSL --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal --
 WORKDIR /src
 COPY agent/ ./
 # Same command as the upstream release workflow (default features, incl. voice).
+# Exp3 builds the baseline and then the repaired source with the same cached
+# target/; copied sources keep their old mtimes, so touch them first or Cargo
+# would reuse the baseline's workspace crates. Dependencies stay cached.
 RUN --mount=type=cache,id=abb-claurst-cargo-registry,target=/opt/cargo/registry \
     --mount=type=cache,id=abb-claurst-cargo-git,target=/opt/cargo/git \
     --mount=type=cache,id=abb-claurst-target,target=/src/src-rust/target \
-    cd src-rust \
+    find /src -path /src/src-rust/target -prune -o -type f -exec touch {} + \
+    && cd src-rust \
     && channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml ../rust-toolchain.toml 2>/dev/null | head -1 || true) \
     && if [ -z "$channel" ] || [ "$channel" = stable ]; then export RUSTUP_TOOLCHAIN="$RUST_STABLE"; fi \
     && cargo build --release --locked --package claurst \

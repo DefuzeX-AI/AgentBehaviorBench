@@ -20,10 +20,14 @@ COPY agent/ ./
 # headless (upstream's documented --no-default-features path) with the ACP and
 # terminal frontends and document conversion; gpui and the MCP server mode are
 # left out.
+# Exp3 builds the baseline and then the repaired source with the same cached
+# target/; copied sources keep their old mtimes, so touch them first or Cargo
+# would reuse the baseline's workspace crates. Dependencies stay cached.
 RUN --mount=type=cache,id=abb-code-assistant-cargo-registry,target=/opt/cargo/registry \
     --mount=type=cache,id=abb-code-assistant-cargo-git,target=/opt/cargo/git \
     --mount=type=cache,id=abb-code-assistant-target,target=/src/target \
-    channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml 2>/dev/null || true) \
+    find /src -path /src/target -prune -o -type f -exec touch {} + \
+    && channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml 2>/dev/null || true) \
     && if [ -z "$channel" ] || [ "$channel" = stable ]; then export RUSTUP_TOOLCHAIN="$RUST_STABLE"; fi \
     && cargo build --release --locked --package code-assistant --no-default-features \
         --features acp-frontend,terminal-frontend,document-conversion \
