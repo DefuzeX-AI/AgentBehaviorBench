@@ -6,6 +6,10 @@ import tempfile
 import time
 
 
+class SubmoduleSource(ValueError):
+    """The commit tree has gitlinks, so a plain commit archive is incomplete."""
+
+
 def run_git(directory, args, check):
     env = dict(os.environ, GIT_TERMINAL_PROMPT='0', GIT_LFS_SKIP_SMUDGE='1')
     with tempfile.TemporaryFile() as output:
@@ -48,5 +52,5 @@ def export_source(spec, archive, check):
             raise ValueError('Downloaded source commit does not match source.revision')
         tree = run_git(directory, ['ls-tree', '-r', actual], check)
         if any(line.startswith('160000 ') for line in tree.splitlines()):
-            raise ValueError('Git source contains submodules; use bundled source until submodules are supported')
+            raise SubmoduleSource('Git source contains submodules; use the recursive source export')
         run_git(directory, ['archive', '--format=zip', '--output=' + str(archive), actual], check)

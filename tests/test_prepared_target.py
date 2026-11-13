@@ -77,7 +77,7 @@ def test_failed_fetch_is_not_published(unit, tmp_path, monkeypatch):
     root, first, _ = unit
     def fail(*args, **kwargs):
         raise RuntimeError('offline')
-    monkeypatch.setattr('agentbench.evaluation.targets.source_archive', fail)
+    monkeypatch.setattr('agentbench.evaluation.targets.export_archive', fail)
     with pytest.raises(RuntimeError, match='offline'):
         prepare_target(registration(root), first, cache_dir=tmp_path / 'prepared')
     assert not [p for p in (tmp_path / 'prepared').iterdir() if p.is_dir()]

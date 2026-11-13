@@ -11,8 +11,9 @@ import time
 from agentbench.harness.registry import AgentRegistration, tomllib
 from agentbench.harness.session.plan import source_digest
 from agentbench.runtime.docker.worker_build import agent_build_ignore
-from agentbench.runtime.source.cache import cache_lock, source_archive
+from agentbench.runtime.source.cache import cache_lock
 from agentbench.runtime.source.config import source_spec
+from agentbench.runtime.source.export import export_archive
 from agentbench.runtime.source.inventory import extract_source
 from agentbench.runtime.source.preparation import prepare_agent_source
 
@@ -110,7 +111,8 @@ def prepare_target(registration, revision, *, cache_dir, check=lambda: None,
         target = parent / fingerprint[:24]
         with cache_lock(parent / (fingerprint + '.lock'), bounded):
             if not target.exists():
-                archive = source_archive(spec, source_cache, bounded, output_fn)
+                # Gitlink commits are fixed by the revision already in the fingerprint.
+                archive, submodules = export_archive(spec, source_cache, bounded, output_fn)
                 extract_source(archive, staged / 'agent', bounded)
                 # Reuse installation overlays and runtime configuration checks.
                 prepare_agent_source(staged, cache_dir=source_cache, check=bounded,
@@ -120,6 +122,8 @@ def prepare_target(registration, revision, *, cache_dir, check=lambda: None,
                               'repository': spec.repository, 'original_method': method,
                               'strategy': 'source', 'fingerprint': fingerprint,
                               'archive_sha256': hashlib.sha256(archive.read_bytes()).hexdigest()}
+                if submodules:
+                    provenance['submodules'] = submodules
                 (staged / 'provenance.json').write_text(json.dumps(provenance, indent=2), encoding='utf-8')
                 digest = source_digest(staged)
                 # The marker stays outside the unit and is published under the same lock.

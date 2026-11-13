@@ -1,4 +1,4 @@
-"""Complete source-only archives, including commit-pinned submodule trees."""
+"""Complete commit archives, including commit-pinned submodule trees."""
 import hashlib
 import json
 import os
@@ -22,6 +22,10 @@ def _relative(name):
     return name
 
 
+def _label(where, name):
+    return where + '/' + name if where else name
+
+
 def _repository(parent, value):
     match = re.fullmatch(r'git@([A-Za-z0-9.-]+):(.+)', value)
     if match:
@@ -31,35 +35,43 @@ def _repository(parent, value):
     return value
 
 
-def _archive(spec, output, check, output_fn, ancestors=()):
+def _archive(spec, output, check, output_fn, ancestors=(), where=''):
     identity = (spec.repository, spec.revision)
     if identity in ancestors or len(ancestors) >= 20:
-        raise ValueError('Cyclic or excessively deep submodule tree')
+        raise ValueError('Cyclic or excessively deep submodule tree at ' + (where or '.'))
     with tempfile.TemporaryDirectory(prefix='abb-export-git-') as temporary:
         directory = Path(temporary)
         acquisition.run_git(directory, ['init', '--bare', '--quiet'], check)
         output_fn('Export source: ' + spec.repository + ' @ ' + spec.revision)
-        acquisition.run_git(directory, ['fetch', '--quiet', '--depth=1', '--no-tags', '--',
-                            spec.repository, spec.revision], check)
+        try:
+            acquisition.run_git(directory, ['fetch', '--quiet', '--depth=1', '--no-tags', '--',
+                                spec.repository, spec.revision], check)
+        except RuntimeError as error:
+            if not where:
+                raise
+            raise RuntimeError(f'Fetching submodule {where} from {spec.repository} failed') from error
         actual = acquisition.run_git(directory, ['rev-parse', 'FETCH_HEAD^{commit}'], check).strip()
         if actual != spec.revision:
             raise ValueError('Downloaded source commit does not match requested revision')
         tree = acquisition.run_git(directory, ['ls-tree', '-rz', actual], check)
-        links = {}
+        links, names = {}, set()
         for item in tree.split('\0'):
             if not item:
                 continue
             metadata, name = item.split('\t', 1)
             mode, kind, sha = metadata.split()
+            names.add(name)
             if mode == '160000':
                 links[_relative(name)] = sha
         modules = {}
+        if links and '.gitmodules' not in names:
+            raise ValueError('Missing .gitmodules entry for gitlink ' + _label(where, min(links)))
         if links:
             config = acquisition.run_git(directory, ['config', '--null', '--blob', actual + ':.gitmodules',
-                             '--get-regexp', r'^submodule\..*\.(path|url)$'], check)
+                             '--list'], check)
             sections = {}
             for item in config.split('\0'):
-                if not item:
+                if not re.fullmatch(r'submodule\..*\.(path|url)\n.*', item, re.S):
                     continue
                 key, value = item.split('\n', 1)
                 section, field = key.rsplit('.', 1)
@@ -71,6 +83,16 @@ def _archive(spec, output, check, output_fn, ancestors=()):
                 if name in modules:
                     raise ValueError('Duplicate submodule path: ' + name)
                 modules[name] = entry.get('url', '')
+        # Validate every gitlink before fetching any submodule.
+        children = {}
+        for name, revision in sorted(links.items()):
+            if name not in modules:
+                raise ValueError('Missing .gitmodules entry for gitlink ' + _label(where, name))
+            try:
+                children[name] = git_source_spec(_repository(spec.repository, modules[name]), revision)
+            except ValueError as error:
+                raise ValueError('Submodule ' + _label(where, name)
+                                 + ' needs an HTTPS URL without credentials') from error
         own = directory / 'own.zip'
         acquisition.run_git(directory, ['archive', '--format=zip', '--output=' + str(own), actual], check)
         records = []
@@ -82,12 +104,10 @@ def _archive(spec, output, check, output_fn, ancestors=()):
                         continue
                     with source.open(entry) as incoming, merged.open(entry, 'w') as outgoing:
                         shutil.copyfileobj(incoming, outgoing)
-            for index, (name, revision) in enumerate(sorted(links.items())):
-                if name not in modules:
-                    raise ValueError('Missing submodule URL for ' + name)
-                child = git_source_spec(_repository(spec.repository, modules[name]), revision)
+            for index, (name, child) in enumerate(children.items()):
                 archive = directory / f'child-{index}.zip'
-                nested = _archive(child, archive, check, output_fn, (*ancestors, identity))
+                nested = _archive(child, archive, check, output_fn, (*ancestors, identity),
+                                  _label(where, name))
                 records.append({'path': name, 'repository': child.repository, 'revision': child.revision})
                 records.extend({**record, 'path': name + '/' + record['path']} for record in nested)
                 with zipfile.ZipFile(archive) as source:
@@ -101,13 +121,31 @@ def _archive(spec, output, check, output_fn, ancestors=()):
         return records
 
 
+def _expanded(path):
+    try:
+        return bool(json.loads(path.read_text(encoding='utf-8'))['submodules'])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
 def export_archive(spec, directory, check, output_fn=print):
-    """Reuse regular verified archives, or cache a recursively expanded archive."""
+    """Return a verified commit archive and its pinned submodule records.
+
+    Trees without gitlinks keep the regular commit archive and cache entry, so
+    those archives stay byte-identical. Only trees with gitlinks are expanded
+    recursively, into a separate cache.
+    """
     directory = Path(directory).resolve()
     key = hashlib.sha256((spec.repository + '\n' + spec.revision).encode()).hexdigest()
     # The legacy producer only publishes archives without any submodules.
     if (directory / (key + '.zip')).is_file():
         return source_archive(spec, directory, check, output_fn), []
+    # Older recursive entries without submodules yield to the regular archive.
+    if not _expanded(directory / 'recursive-v1' / (key + '.json')):
+        try:
+            return source_archive(spec, directory, check, output_fn), []
+        except acquisition.SubmoduleSource:
+            output_fn('Source contains submodules: exporting pinned submodule commits')
     directory = directory / 'recursive-v1'
     directory.mkdir(parents=True, exist_ok=True)
     target, metadata = directory / (key + '.zip'), directory / (key + '.json')

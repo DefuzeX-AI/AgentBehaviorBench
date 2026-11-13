@@ -18,7 +18,8 @@ The gitlink is pinned to `2ca6a3acda193a246c3774a9369a255c5bf9d56f`, which no
 longer exists in `TauricResearch/TradingAgents` (the project's history was
 rewritten; `upload-pack: not our ref`). Because of that:
 
-- `source.method = "git"` is rejected by ABB ("Git source contains submodules").
+- `source.method = "git"` fails: ABB restores submodules at their pinned
+  commits, and fetching this commit fails.
 - A recursive clone cannot restore the pinned submodule, and every revision of
   `lc2panda/alphastream` in the available history pins this same commit.
 

@@ -201,7 +201,7 @@ def test_invalid_archive_does_not_publish_source(unit, tmp_path, monkeypatch, na
     archive = tmp_path/'bad.zip'
     with zipfile.ZipFile(archive,'w') as file:
         file.writestr(name, content)
-    monkeypatch.setattr(preparation,'source_archive',lambda *args: archive)
+    monkeypatch.setattr(preparation,'export_archive',lambda *args: (archive, []))
     with pytest.raises(ValueError):
         prepare(root,tmp_path)
     assert not (root/'agent').exists()
@@ -214,7 +214,7 @@ def test_sdk_staging_only_copies_prepared_files(unit, tmp_path, monkeypatch):
     prepare(root, tmp_path)
     def forbidden(*args):
         pytest.fail('SDK staging must not download Agent source')
-    monkeypatch.setattr(preparation, 'source_archive', forbidden)
+    monkeypatch.setattr(preparation, 'export_archive', forbidden)
     with evaluation_agent(SimpleNamespace(path=root, agent_id='test', framework='langgraph'), backend=None) as staged:
         assert (staged.path/'agent/app.py').read_text() == 'version = 1\n'
     assert len(fetched) == 1
@@ -370,7 +370,7 @@ def test_registered_abb_descriptor_loads_after_clean_source_preparation(unit_nam
     with zipfile.ZipFile(archive, 'w') as file:
         # Upstream has no ABB descriptor; preparation must add the tracked input.
         file.writestr('README.md', 'upstream snapshot')
-    monkeypatch.setattr(preparation, 'source_archive', lambda *args: archive)
+    monkeypatch.setattr(preparation, 'export_archive', lambda *args: (archive, []))
     prepare(root, tmp_path)
     config = LangGraphAdapterConfig.from_agent_dir(root)
     expected_graph = 'article_explainer' if unit_name == '34-article-explainer' else 'agent'

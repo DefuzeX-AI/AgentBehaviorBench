@@ -118,8 +118,10 @@ Install mode requires `install/`; Git and bundled units may omit it. Bundled uni
 still require manually supplied source.
 
 New supported GitHub imports automatically use `method="git"` with their recorded
-full commit SHA. Existing explicit methods are preserved. Local imports and
-unsupported submodule/symlink/LFS layouts use `bundled` and need manual source.
+full commit SHA. Existing explicit methods are preserved. Local imports, and
+imports with submodules, symlinks or LFS, use `bundled` and need manual source.
+Git preparation can restore commit-pinned submodules; to use it, set
+`method="git"` and verify a clean preparation.
 Before submitting a new integration, verify preparation in a separate clean copy
 of the outer unit with no `agent/` (supply manual source for bundled), then load
 its adapter configuration. Include all outer inputs in the change. This catches

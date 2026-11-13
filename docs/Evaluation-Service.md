@@ -84,8 +84,9 @@ The historical recipe builds upstream source with its own dependency lock;
 current package-install inputs are excluded. Nanocoder supplies this recipe and
 launches the compiled native ACP CLI. There is no implicit npm/pip version mapping,
 fallback to latest, or automatic repair of incompatible historical interfaces.
-Other install units fail explicitly until a recipe is supplied. Existing Git
-acquisition restrictions (submodules, symlinks and LFS) still apply.
+Other install units fail explicitly until a recipe is supplied. Commit-pinned
+Git submodules are restored recursively at the gitlink commits, as in Experiment
+3 source-only exports; symlink and LFS restrictions still apply.
 
 ```bash
 agentbench api prepare nanocoder --revision 59874391f939bdfe93c273a10d23a7a94009edd1

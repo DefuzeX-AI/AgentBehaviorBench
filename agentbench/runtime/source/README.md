@@ -89,9 +89,15 @@ are not reusable; no fallback to the latest branch is allowed. Cache ZIP CRCs
 and commit metadata are checked on reuse; a corrupt archive reports its path
 for removal and retry.
 
-Version one rejects Git submodules and source symlinks instead of constructing
-an incomplete or escaping tree. Git LFS materialization is not supported.
-Use manually supplied, ignored local source for these repositories. Package installation stays in each
+Git submodules are restored recursively at the commits recorded by each tree's
+gitlinks (`export.py`). Paths, `.gitmodules` entries, cycles and depth are checked
+before any submodule is fetched. Trees with submodules use a separate
+`recursive-v1` cache; other archives are unchanged. Submodule URLs must be HTTPS
+without credentials, but any HTTPS host is accepted, including loopback and
+private addresses. Review a source's `.gitmodules` before pinning it.
+Runtime preparation still rejects source symlinks instead of constructing an
+escaping tree, and Git LFS materialization is not supported. Use manually
+supplied, ignored local source for those repositories. Package installation stays in each
 Agent's Dockerfile. No Agent container or paid model call is needed for the
 local regression tests:
 

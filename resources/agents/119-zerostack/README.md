@@ -11,8 +11,8 @@ resolved configuration through `ABB_AGENT_MODEL_API_KEY`, `ABB_AGENT_MODEL_BASE_
 
 ## Source and image
 
-The upstream repository has a Git submodule (`tap`, a Homebrew tap), and ABB's Git source mode
-rejects submodules. The unit therefore uses `source.method = "install"`: `install/` (the
+The upstream repository has a Git submodule (`tap`, a Homebrew tap) that is not a build input.
+The unit uses `source.method = "install"`: `install/` (the
 launcher) is copied into `agent/`, and the Dockerfile's builder stage fetches exactly the pinned
 commit (`git fetch --depth 1 origin <sha>`, checked with `git rev-parse`) without submodules,
 which are not build inputs. It then runs `cargo build --locked --release --features acp`

@@ -223,5 +223,6 @@ or a source-backed outer binding without config/graph_id. Bindings remain outer
 
 Manifest provenance sets method=git for supported full-SHA GitHub imports, bundled
 for local/manual prerequisites (including submodules, symlinks and LFS declarations),
-and preserves existing explicit methods. The source and generated files are never
+and preserves existing explicit methods. Submodules are a conservative choice:
+Git preparation can restore commit-pinned submodules, but not symlinks or LFS. The source and generated files are never
 silently rewritten to change an existing unit's acquisition policy.

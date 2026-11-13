@@ -92,7 +92,8 @@ evidence and rechecks them before registration. ABB-owned graph descriptors use
 Native upstream descriptors keep their native paths; bindings stay outside source.
 The generator uses pinned Git acquisition for supported GitHub imports, preserves
 explicit acquisition policy, and uses manual bundled source for local imports or
-unsupported submodule, symlink and LFS layouts. See the add-agent guide for review
+imports with submodules, symlinks or LFS. Git preparation itself restores
+commit-pinned submodules, but still rejects symlinks and LFS. See the add-agent guide for review
 and clean-source verification; static checks do not prove successful execution.
 
 ## Refreshing the Agent inventory

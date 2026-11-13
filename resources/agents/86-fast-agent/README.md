@@ -8,7 +8,7 @@ The native source is pinned to
 ## Source preparation
 
 This upstream tree contains the optional `skills-repo` Git submodule. ABB's
-source importer does not support submodule layouts, so this unit uses
+source importer assigns submodule layouts to bundled source, so this unit uses
 `source.method="bundled"` with an ignored, manually supplied `agent/` tree.
 From this unit's directory:
 

@@ -9,7 +9,6 @@ from uuid import uuid4
 from agentbench.harness.ground_truth.issues import read_issue
 from agentbench.harness.registry import tomllib
 from agentbench.harness.session.plan import source_digest
-from agentbench.runtime.source.cache import source_archive
 from agentbench.runtime.source.config import git_source_spec, source_spec
 from agentbench.runtime.source.export import export_archive, export_digest
 from agentbench.runtime.source.inventory import extract_source
@@ -64,11 +63,7 @@ def export_project(engine, root, agent_id, issue, output, *, records_dir=None, o
         spec = source_spec(tomllib.loads((target.registration.path / 'agent.toml').read_text(encoding='utf-8')))
         base_target = target.describe()
     # Export the original commit, without ABB installation overlays or history.
-    submodules = []
-    if no_run:
-        archive, submodules = export_archive(spec, root / 'cache/sources', lambda: None, output_fn)
-    else:
-        archive = source_archive(spec, root / 'cache/sources', lambda: None, output_fn)
+    archive, submodules = export_archive(spec, root / 'cache/sources', lambda: None, output_fn)
     output.mkdir(parents=True, exist_ok=False)
     source_path = output / 'source'
     if os.name == 'nt' and not str(source_path).startswith('\\\\?\\'):
@@ -85,6 +80,8 @@ def export_project(engine, root, agent_id, issue, output, *, records_dir=None, o
               'source_sha256': export_digest(source_path) if no_run else source_digest(source_path)}
     if no_run:
         record.update(source_digest_schema='abb.export-tree.v1', submodules=submodules)
+    elif submodules:
+        record['submodules'] = submodules
     path = parent / ('project_' + uuid4().hex[:16])
     Artifacts(path, environ={}).save('project.json', record)
     return {**record, 'record_path': str(path / 'project.json')}

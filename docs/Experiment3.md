@@ -30,9 +30,13 @@ runs an Agent, builds an image, or calls a model.
 
 Source-only provenance records each submodule's path, repository and full commit.
 Its `abb.export-tree.v1` digest hashes all exported file bytes, directory paths
-and symbolic-link targets without dereferencing links. Source-only archives use
-a separate cache for recursive trees; runtime preparation keeps its existing
-source restrictions.
+and symbolic-link targets without dereferencing links. Sources without
+submodules reuse the regular commit archive. Trees with submodules use a
+separate `recursive-v1` cache, shared with runtime preparation. Runtime
+preparation restores the same commit-pinned submodule trees, but it still
+rejects symbolic links and Git LFS pointers. Submodule URLs must use HTTPS
+without credentials, but the host is not restricted: loopback and private
+addresses are fetched too, so review `.gitmodules` before pinning a source.
 
 ```powershell
 $env:PYTHONUTF8 = '1'
@@ -52,7 +56,11 @@ contains only metadata and a title, the export does not invent a full report.
 Generation reuses historical target preparation and verified source archives.
 It makes no model calls and does not build Docker images. A generated project is
 not proof of successful execution. Git units and install units with a declared
-historical source recipe are supported. Unsupported preparation fails explicitly.
+historical source recipe are supported. Commit-pinned submodules are restored
+recursively, and the prepared target's provenance and the project record list
+them. The revision fixes every gitlink commit, so a prepared target is reused
+without its source cache.
+Unsupported preparation fails explicitly.
 
 Host provenance is saved separately under `<ABB-parent>/outputs/exp3/projects/`,
 or `--records-dir`. It records the requested Issue, baseline target, export path

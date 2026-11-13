@@ -9,7 +9,8 @@ import time
 
 from agentbench.runtime.agentcontainer.config import tomllib, docker_structure
 from .config import source_spec, InstallSource
-from .cache import cache_lock, source_archive
+from .cache import cache_lock
+from .export import export_archive
 from .inventory import extract_source, missing_files
 
 
@@ -91,7 +92,7 @@ def _prepare_git_source(root, spec, target, record_path, cache_dir, check, outpu
         output_fn('Agent source: reused local files (unmanaged) .... OK')
         return
     output_fn('Restoring Agent source: ' + spec.repository + ' @ ' + spec.revision)
-    archive = source_archive(spec, cache_dir, check, output_fn)
+    archive, _ = export_archive(spec, cache_dir, check, output_fn)
     with tempfile.TemporaryDirectory(prefix='.abb-source-', dir=root) as temporary:
         staged = Path(temporary)/'agent'
         inventory = extract_source(archive, staged, check)
