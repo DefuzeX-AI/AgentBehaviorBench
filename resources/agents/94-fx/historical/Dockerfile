@@ -1,22 +1,27 @@
 # Build the selected upstream commit from source the way its release workflow
-# builds the Linux binary: pinned Zig 0.17.0 (build.zig.zon minimum_zig_version),
+# builds the Linux binary: the Zig release named by the commit's build.zig.zon
+# `minimum_zig_version` (the version its release workflow pins), then
 # `zig build -Doptimize=ReleaseSafe -Dtarget=<arch>-linux`. `zig build` fetches
 # whatever build.zig.zon declares at build time.
 FROM debian:bookworm-slim AS build
 ARG TARGETARCH
-ARG ZIG_VERSION=0.17.0
-ARG ZIG_SHA256_X86_64=1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026
-ARG ZIG_SHA256_AARCH64=9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
     && rm -rf /var/lib/apt/lists/*
 ENV ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global ZIG_LOCAL_CACHE_DIR=/tmp/zig-local
-RUN arch="${TARGETARCH:-$(uname -m)}" \
-    && case "$arch" in \
-         amd64|x86_64) zarch=x86_64; sha="$ZIG_SHA256_X86_64" ;; \
-         arm64|aarch64) zarch=aarch64; sha="$ZIG_SHA256_AARCH64" ;; \
+COPY agent/build.zig.zon /tmp/build.zig.zon
+# Official tarball sha256 values from https://ziglang.org/download/index.json.
+RUN version=$(sed -n 's/^[[:space:]]*\.minimum_zig_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' /tmp/build.zig.zon) \
+    && arch="${TARGETARCH:-$(uname -m)}" \
+    && case "$arch" in amd64|x86_64) zarch=x86_64 ;; arm64|aarch64) zarch=aarch64 ;; \
          *) echo "unsupported architecture: $arch" >&2; exit 1 ;; esac \
+    && case "$version/$zarch" in \
+         0.16.0/x86_64)  sha=70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00 ;; \
+         0.16.0/aarch64) sha=ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17 ;; \
+         0.17.0/x86_64)  sha=1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026 ;; \
+         0.17.0/aarch64) sha=9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8 ;; \
+         *) echo "no pinned Zig toolchain for minimum_zig_version '${version}' on ${zarch}; add its sha256 to this table" >&2; exit 1 ;; esac \
     && curl -fsSL --retry 3 -o /tmp/zig.tar.xz \
-         "https://ziglang.org/download/${ZIG_VERSION}/zig-${zarch}-linux-${ZIG_VERSION}.tar.xz" \
+         "https://ziglang.org/download/${version}/zig-${zarch}-linux-${version}.tar.xz" \
     && echo "$sha  /tmp/zig.tar.xz" | sha256sum -c - \
     && mkdir -p /opt/zig && tar -xJf /tmp/zig.tar.xz -C /opt/zig --strip-components=1 \
     && rm /tmp/zig.tar.xz && /opt/zig/zig version \
