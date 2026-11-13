@@ -78,6 +78,7 @@ def upstream(tmp_path, intercept):
     class MockTrustPolicy:
         def run_arguments(self):
             return (*InterceptorPolicy().run_arguments(),
+                    "--add-host", "host.docker.internal:host-gateway",
                     "--mount", f"type=bind,source={certificate},target=/run/acceptance-ca/mock.pem,readonly",
                     "--mount", f"type=bind,source={configuration},target=/run/defuzex/ca/config.yaml,readonly")
 
@@ -112,6 +113,7 @@ def test_one_agent_runs_two_cases_in_parallel_and_cleans_resources(cancel, inter
     agent_id = "single-agent-case-acceptance"
     root = output / "agent"
     root.mkdir()
+    (root / "agent").mkdir()
     (root / "Dockerfile").write_text(
         f"FROM {base}\nUSER root\nWORKDIR /opt/agent\nCOPY main.py /opt/agent/main.py\nUSER agent\n")
     model_call = (
@@ -135,7 +137,7 @@ def test_one_agent_runs_two_cases_in_parallel_and_cleans_resources(cancel, inter
         "    time.sleep(0.05)\n"
         "print(json.dumps({'case_id': marker, 'output': 'hello ' + marker}), flush=True)\n")
     (root / "agent.toml").write_text(
-        f'schema_version = "defuzex-bench.agent.v2"\nagent_id = "{agent_id}"\nframework = "fixture"\n'
+        f'schema_version = "defuzex-bench.agent.v2"\nagent_id = "{agent_id}"\nframework = "langgraph"\n'
         '[runtime]\ntype = "docker"\ntimeout_sec = 90\nenv_keys = ["ABB_ACCEPTANCE_CASE_MARKER"]\n'
         '[build]\ncontext = "."\ndockerfile = "Dockerfile"\n'
         '[launch]\nargv = ["python", "/opt/agent/main.py"]\n')
@@ -147,8 +149,12 @@ def test_one_agent_runs_two_cases_in_parallel_and_cleans_resources(cancel, inter
                 '[[llm_interception.routes]]\nid = "openai-chat"\nhost_patterns = ["api.openai.com"]\n'
                 'ports = [443]\nmethods = ["POST"]\npath_patterns = ["/v1/chat/completions"]\n'
                 'protocol_plugin = "openai-chat"\ncredential = "openai"\n')
-    registration = AgentRegistration(agent_id, root, True, "ready", "fixture", "offline-acceptance",
+    registration = AgentRegistration(agent_id, root, True, "ready", "langgraph", "offline-acceptance",
                                      case_count=requested_cases)
+    (root / "requirement.md").write_text(
+        "# Offline Docker acceptance\n\n"
+        "This fixture runs a deterministic local command and may call a local mock model endpoint.\n"
+    )
 
     class GatePolicy:
         def run_arguments(self):
@@ -279,16 +285,17 @@ def test_one_agent_runs_two_cases_in_parallel_and_cleans_resources(cancel, inter
         try:
             assert factory.both_started.wait(75), "Two Cases of the single Agent did not start"
             deadline = time.monotonic() + 10
+            expected_containers = 6 if intercept else 2
             while time.monotonic() < deadline:
                 listed = commands.run(["ps", "--filter", f"label=abb.suite_id={suite_id}",
                                        "--format", "{{.Names}}"], timeout=5)
                 assert listed.returncode == 0, listed.stderr
                 names = listed.stdout.splitlines()
-                if len(names) == (4 if intercept else 2):
+                if len(names) == expected_containers:
                     observed.extend(names)
                     break
                 time.sleep(0.1)
-            assert len(observed) == (4 if intercept else 2), "Expected two simultaneously running Cases"
+            assert len(observed) == expected_containers, "Expected two simultaneously running Cases"
             inspected = commands.run(["inspect", *observed], timeout=10)
             assert inspected.returncode == 0, inspected.stderr
             for container in json.loads(inspected.stdout):
@@ -351,19 +358,23 @@ def test_one_agent_runs_two_cases_in_parallel_and_cleans_resources(cancel, inter
     (output / "acceptance.json").write_text(json.dumps(evidence, indent=2))
     assert not controller_errors, controller_errors
     assert result.selected_count == result.attempted_count == 1
-    assert len(observed) == (4 if intercept else 2) and set(factory.started) == set(case_ids[:2])
+    assert len(observed) == (6 if intercept else 2) and set(factory.started) == set(case_ids[:2])
     assert factory.prepare_count == 1
     assert len(factory.runner_uses) == 3
     assert len({id(runner) for runner, _ in factory.runner_uses}) == 3
     assert {identity["agent_id"] for identity in factory.identities.values()} == {agent_id}
     assert len({identity["agent_job_id"] for identity in factory.identities.values()}) == 1
     assert len({identity["job_id"] for identity in factory.identities.values()}) == 2
-    assert len(snapshot) == (6 if intercept else 4) and all(resource["status"] == "removed" for resource in snapshot)
+    assert len(snapshot) == (8 if intercept else 4) and all(resource["status"] == "removed" for resource in snapshot)
     assert containers.returncode == networks.returncode == 0
     assert not containers.stdout.strip() and not networks.stdout.strip()
     execution_containers = [container for container in network_modes.values()
                             if container["labels"]["abb.role"] == "agent"]
     assert len(execution_containers) == 2
+    expected_roles = ["agent"] * 2
+    if intercept:
+        expected_roles.extend(["interceptor"] * 2 + ["egress-observer"] * 2)
+    assert sorted(container["labels"]["abb.role"] for container in network_modes.values()) == sorted(expected_roles)
     assert len({container["image_id"] for container in execution_containers}) == 1
     if intercept:
         assert {request["marker"] for request in upstream.requests} == set(case_ids[:2])

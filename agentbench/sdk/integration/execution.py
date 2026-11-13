@@ -53,6 +53,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                    require_workspace_identity=False,
                    safe_case_replay=False, validate_failed_execution=None,
                    collect_artifacts=None, excluded_agent_environment=(),
+                   excluded_controller_environment=(),
                    repository_target='/opt/abb-sdk-repo'):
     """Run an SDK worker using the host facilities supplied to its runner.
 
@@ -124,6 +125,13 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
             from agentbench.trajectory.metadata import capture_target
             files.save('request/target.json', capture_target(agent.path))
             with stage_agent(agent, control=control, deadline=preparation) as descriptor:
+                descriptor_manifest = tomllib.loads(
+                    (descriptor.path / 'agent.toml').read_text(encoding='utf-8'))
+                runtime_manifest = descriptor_manifest.get('runtime', {})
+                adapter_manifest = descriptor_manifest.get('adapter', {})
+                mcp_environment = tuple(dict.fromkeys(
+                    key for server in adapter_manifest.get('mcp_servers', ())
+                    for key in server.get('env_keys', ())))
                 # Keep the tracked source/workspace separate from private SDK storage.
                 # Only the trusted controller mounts the ledger.
                 repository = directory / 'sdk-source'
@@ -229,8 +237,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     agent_process = agent_runtime.start(
                         descriptor, invocation=(public_inputs, agent_outputs),
                         argv=('python', '-m', 'agentbench.runtime.agentcontainer.channel'),
-                        exclude_environment=tuple(tomllib.loads((descriptor.path / 'agent.toml').read_text(encoding='utf-8'))
-                                                  .get('runtime', {}).get('worker_env_keys', ())) +
+                        exclude_environment=tuple(runtime_manifest.get('worker_env_keys', ())) +
                                             tuple(excluded_agent_environment),
                         preparation_deadline=preparation)
                     agent_checkpoint = agent_process.trace_checkpoint()
@@ -238,6 +245,8 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                 # Start the container process, then wait for its generation/execution mode.
                 session = runtime.start(descriptor,
                                         invocation=(inputs, destination),
+                                        exclude_environment=tuple(dict.fromkeys((
+                                            *excluded_controller_environment, *mcp_environment))),
                                         preparation_deadline=preparation)
                 checkpoint = session.trace_checkpoint()
                 with span('Container execution', kind='container') as container_timing:

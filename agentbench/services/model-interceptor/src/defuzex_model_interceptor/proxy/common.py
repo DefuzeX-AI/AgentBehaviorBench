@@ -18,6 +18,7 @@ class CommonInterceptor:
         self.secrets += tuple(t.secret for t in config.targets.values() if t.secret)
         if config.target is not None and config.target.secret:
             self.secrets += (config.target.secret,)
+        self.secrets += tuple(getattr(config, 'redaction_secrets', ()))
 
     def running(self):
         events.emit("interceptor_ready", agent_id=self.config.agent_id, mode=self.config.mode)

@@ -123,30 +123,36 @@ class DirectoryAgentSession:
         if done.get('sequence') != sequence:
             raise ValueError('Agent response identity mismatch')
         self.state = done['session']
-        # The Agent never needs an old request to maintain its own conversation.
-        request.unlink()
-        return folder
+        # Request removal is the Agent's acknowledgement that its response has
+        # been copied and may be reclaimed from the shared transport.
+        return folder, request
 
     async def invoke(self, envelope, output, evidence):
         if self.closed:
             raise RuntimeError('Isolated Agent session is closed')
-        folder = await self._exchange(dict(envelope), self.timeout)
-        collect_response(folder, output, limits=self.response_limits)
-        result = json.loads((output / 'result.json').read_text(encoding='utf-8'))
-        if result.get('run_id') != envelope['run_id']:
-            raise ValueError('Agent result belongs to a different invocation')
-        spans = output / 'spans.jsonl'
-        if not spans.is_file():
-            raise ValueError('Agent response is missing original telemetry')
-        with spans.open(encoding='utf-8') as stream:
-            for line in stream:
-                evidence.accept_span(decode_span(json.loads(line)))
-        return result
+        folder, request = await self._exchange(dict(envelope), self.timeout)
+        try:
+            collect_response(folder, output, limits=self.response_limits)
+            result = json.loads((output / 'result.json').read_text(encoding='utf-8'))
+            if result.get('run_id') != envelope['run_id']:
+                raise ValueError('Agent result belongs to a different invocation')
+            spans = output / 'spans.jsonl'
+            if not spans.is_file():
+                raise ValueError('Agent response is missing original telemetry')
+            with spans.open(encoding='utf-8') as stream:
+                for line in stream:
+                    evidence.accept_span(decode_span(json.loads(line)))
+            return result
+        finally:
+            # The controller is done with this response, including when it rejects
+            # a malformed or uncopyable response; the Agent can reclaim its folder.
+            request.unlink(missing_ok=True)
 
     async def aclose(self):
         if not self.closed:
             self.closed = True
-            await self._exchange({'operation': 'close'}, min(10, self.timeout))
+            _, request = await self._exchange({'operation': 'close'}, min(10, self.timeout))
+            request.unlink(missing_ok=True)
 
     def snapshot(self):
         return dict(self.state)

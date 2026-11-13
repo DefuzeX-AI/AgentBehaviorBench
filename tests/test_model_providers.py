@@ -139,7 +139,8 @@ def test_sdk_cli_model_override_applies_to_selected_provider(sdk_name):
         evaluation_plan(selection=resolve_sdk(sdk_name)), model='cli-model',
         trace_sink=None, trace_max_bytes=4096,
         environ={'DEEPSEEK_API_KEY': 'test-secret', 'DEEPSEEK_MODEL': 'env-model'})
-    target = resolve_model_provider(environ=runner.environ).resolve(runner.environ)
+    environment = runner.context.environ if sdk_name == 'local' else runner.environ
+    target = resolve_model_provider(environ=environment).resolve(environment)
     assert (target.provider_id, target.model) == ('deepseek', 'cli-model')
 
 

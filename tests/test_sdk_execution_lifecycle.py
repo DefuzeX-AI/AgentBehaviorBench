@@ -26,6 +26,28 @@ def test_shared_execution_honors_explicit_model_without_mutating_environment(tmp
     assert original == {'ABB_MODEL': 'environment-default'}
 
 
+def test_controller_environment_exclusions_apply_only_to_controller(tmp_path):
+    services, calls = fake_services()
+    agent = source_agent(tmp_path)
+    with (agent.path / 'agent.toml').open('a') as stream:
+        stream.write(
+            '[runtime]\nsecret_env_keys = ["MCP_TEST_TOKEN"]\n'
+            '[adapter]\n'
+            '[[adapter.mcp_servers]]\n'
+            'name = "fixture"\ncommand = "/usr/bin/python3"\n'
+            'args = []\nenv_keys = ["MCP_TEST_TOKEN"]\n'
+        )
+    run_evaluation(agent, context=context(services), output=tmp_path / 'runs',
+                   stage_agent=unchanged_stage,
+                   excluded_controller_environment=('ABB_AGENT_MODEL_API_KEY',))
+    controller = next(call for call in calls if call['role'] == 'controller')
+    agent = next(call for call in calls if call['role'] == 'agent')
+    assert controller['start_options']['exclude_environment'] == (
+        'ABB_AGENT_MODEL_API_KEY', 'MCP_TEST_TOKEN')
+    assert 'ABB_AGENT_MODEL_API_KEY' not in agent['start_options']['exclude_environment']
+    assert 'MCP_TEST_TOKEN' not in agent['start_options']['exclude_environment']
+
+
 def test_generation_without_prespecified_slots_uses_preparation_storage(tmp_path):
     services, calls = fake_services()
     store = FileArtifactStore(tmp_path / 'suite')

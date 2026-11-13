@@ -1,5 +1,6 @@
 """Sync and async callers share one owned event loop for persistent ACP resources."""
 import asyncio
+import os
 import threading
 from pathlib import Path
 from agentbench.adapter.base import AdapterInvocation
@@ -23,6 +24,15 @@ class ACPAdapter:
     @property
     def is_loaded(self):
         return self._session is not None and not self._session.closed
+
+    def observation_secrets(self):
+        """Return configured MCP values so evidence sinks can redact Agent echoes."""
+        return tuple(
+            value
+            for server in self.config.mcp_servers
+            for key in server.env_keys
+            if (value := os.environ.get(key))
+        )
 
     def load(self):
         """Prepare the owned loop; launch/handshake occurs at the first input."""

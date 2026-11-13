@@ -31,6 +31,7 @@ class DockerCommandRunner:
         self, args: Sequence[str], *, control: RunControl | None = None,
         timeout: float = 60, deadline: Deadline | None = None,
         cleanup: bool = False, log_directory: Path | None = None,
+        extra_environ: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         own_deadline = Deadline.after(timeout)
         if deadline is not None:
@@ -43,6 +44,7 @@ class DockerCommandRunner:
         # only a bounded tail for diagnostics and retain full files when requested.
         if log_directory is not None:
             log_directory.mkdir(parents=True, exist_ok=True)
+        environ = self.environ if extra_environ is None else {**self.environ, **extra_environ}
         with tempfile.TemporaryFile() if log_directory is None else tempfile.NamedTemporaryFile(
             dir=log_directory, prefix="docker-", suffix=".stdout.log", delete=False
         ) as stdout, tempfile.TemporaryFile() if log_directory is None else tempfile.NamedTemporaryFile(
@@ -50,7 +52,7 @@ class DockerCommandRunner:
         ) as stderr:
             process = self.start(
                 args, control=None if cleanup else control,
-                stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
+                stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, env=environ,
             )
             try:
                 while True:
@@ -96,8 +98,7 @@ class DockerCommandRunner:
             try:
                 process.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                # Popen.args can contain docker create --env credentials. Hide
-                # both the raw exception and its implicit traceback context.
+                # Hide raw Docker client failures and their implicit traceback context.
                 raise DockerCommandTimeout('Docker client did not stop after termination') from None
 
 

@@ -11,6 +11,23 @@ def mode(path):
     return stat.S_IMODE(path.stat().st_mode)
 
 
+def test_atomic_json_sets_mode_before_publishing(tmp_path, monkeypatch):
+    from pathlib import Path
+    from agentbench.observe.store import atomic_json
+
+    replace = Path.replace
+
+    def checked_replace(temporary, destination):
+        assert mode(temporary) == 0o644
+        return replace(temporary, destination)
+
+    monkeypatch.setattr(Path, 'replace', checked_replace)
+    output = tmp_path / 'done.json'
+    atomic_json(output, {'sequence': 0}, mode=0o644)
+
+    assert mode(output) == 0o644
+
+
 def test_host_prepares_judge_directory_for_atomic_report_handoff(tmp_path, monkeypatch):
     import os
     from agentbench.sdk.common.artifacts import Artifacts
@@ -109,4 +126,4 @@ def test_worker_publishes_atomic_outputs_even_on_failure(tmp_path, monkeypatch, 
     else:
         assert asyncio.run(worker.execute(tmp_path, output)) == 0
     assert mode(output / 'manifest.json') == 0o644
-    assert mode(output / 'timing.jsonl') & 0o044 == 0o044
+    assert mode(output / 'logs/controller-timing.jsonl') & 0o044 == 0o044

@@ -49,6 +49,13 @@ class OtelSession:
             return
         span.set_attribute(f'gen_ai.{direction}.messages', payload)
 
+    def add_secrets(self, secrets):
+        values = tuple(value for value in secrets if isinstance(value, str) and value)
+        if not values:
+            return
+        with self.lock:
+            self.exporter.secrets = tuple(dict.fromkeys((*self.exporter.secrets, *values)))
+
     def record(self, event, **data):
         with self.lock:
             identity = {f'abb.{key}': data[key] for key in ('input_id', 'case_id', 'agent_id') if isinstance(data.get(key), str)}
@@ -165,6 +172,10 @@ class ObservedStore:
             self.otel.record(event, **data)
         except Exception as exc:
             self.otel.error = type(exc).__name__
+
+    def add_secrets(self, secrets):
+        self.store.add_secrets(secrets)
+        self.otel.add_secrets(secrets)
 
     def close(self):
         self.otel.close()
