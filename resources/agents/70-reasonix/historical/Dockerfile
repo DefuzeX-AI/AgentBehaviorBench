@@ -26,18 +26,21 @@ WORKDIR /opt/agent
 COPY agent/ ./agent/
 COPY --from=build /out/reasonix /opt/reasonix/libexec/reasonix
 COPY historical/acp-compat.sh /tmp/acp-compat.sh
-# bootstrap/launch.py execs /opt/reasonix/bin/reasonix. Install the built binary there
-# directly; only when this revision's `acp` lacks one of the launcher's flags, put the
-# flag-dropping shim in front of it.
+# bootstrap/launch.py execs /opt/reasonix/bin/reasonix acp --profile balanced
+# --permission-mode auto --sandbox-bash auto --workspace-only. Support is probed by
+# behaviour (an undefined flag fails with "flag provided but not defined"; help output
+# omits hidden flags and its exit status varies by revision). The 1.x revisions reject
+# only --permission-mode, so only then is the shim that drops it put in front of the
+# binary. The launcher's full argv is then checked through the installed path.
 RUN mkdir -p /opt/reasonix/bin && probe=$(mktemp -d) \
-    && help=$(HOME=$probe REASONIX_HOME=$probe /opt/reasonix/libexec/reasonix acp -h 2>&1) \
-    && rm -rf "$probe" && unsupported= \
-    && for flag in profile permission-mode sandbox-bash workspace-only; do \
-         printf '%s\n' "$help" | grep -Eq -- "^ +--?$flag( |\$)" || unsupported="$unsupported $flag"; done \
-    && if [ -z "$unsupported" ]; then mv /opt/reasonix/libexec/reasonix /opt/reasonix/bin/reasonix; \
-       else sed "s/@UNSUPPORTED@/${unsupported# }/" /tmp/acp-compat.sh > /opt/reasonix/bin/reasonix \
-            && chmod 0755 /opt/reasonix/bin/reasonix && echo "acp compat shim for:$unsupported"; fi \
-    && rm /tmp/acp-compat.sh && /opt/reasonix/bin/reasonix --version \
+    && if HOME=$probe REASONIX_HOME=$probe /opt/reasonix/libexec/reasonix acp --permission-mode auto --help 2>&1 \
+            | grep -q 'flag provided but not defined'; then \
+         install -m 0755 /tmp/acp-compat.sh /opt/reasonix/bin/reasonix && echo 'acp: --permission-mode undefined, shim installed'; \
+       else mv /opt/reasonix/libexec/reasonix /opt/reasonix/bin/reasonix; fi \
+    && if HOME=$probe REASONIX_HOME=$probe /opt/reasonix/bin/reasonix acp --profile balanced --permission-mode auto \
+            --sandbox-bash auto --workspace-only --help 2>&1 | grep 'flag provided but not defined'; then \
+         echo 'acp rejects a bootstrap/launch.py flag' >&2; exit 1; fi \
+    && rm -rf "$probe" /tmp/acp-compat.sh && /opt/reasonix/bin/reasonix --version \
     && python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2' \
     && useradd --create-home --uid 10001 agent \
     && mkdir -p /home/agent/workspace \

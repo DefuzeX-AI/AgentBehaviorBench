@@ -1,26 +1,21 @@
 #!/bin/sh
-# Installed only by historical/Dockerfile, and only when the built revision's
-# `reasonix acp` lacks a flag that bootstrap/launch.py passes (1.x releases
-# have no --permission-mode; some have no --profile). Those flags are dropped;
-# every other argument and every other subcommand reach the binary unchanged.
+# Installed by historical/Dockerfile only when the built revision's `reasonix acp`
+# rejects --permission-mode ("flag provided but not defined"), as the 1.x releases
+# do. bootstrap/launch.py always passes `--permission-mode auto`; this drops that
+# flag and its value, so such a session starts in the revision's default ask mode
+# and ABB answers its permission requests with the unit's permission_policy.
+# Every other argument and every other subcommand reach the binary unchanged.
 set -eu
 real=/opt/reasonix/libexec/reasonix
-unsupported='@UNSUPPORTED@'
 [ "${1:-}" = acp ] || exec "$real" "$@"
-echo "reasonix (historical build): ignoring acp flags not defined by this revision: $unsupported" >&2
+echo "reasonix (historical build): dropping --permission-mode; this revision's acp does not define it" >&2
 skip=0
 for arg do
   shift
   if [ "$skip" = 1 ]; then skip=0; continue; fi
   case $arg in
-    --*)
-      name=${arg#--}; name=${name%%=*}
-      case " $unsupported " in
-        *" $name "*)
-          # --workspace-only is the launcher's only boolean flag; the others take a value.
-          case $arg in *=*) ;; *) [ "$name" = workspace-only ] || skip=1 ;; esac
-          continue ;;
-      esac ;;
+    --permission-mode) skip=1; continue ;;
+    --permission-mode=*) continue ;;
   esac
   set -- "$@" "$arg"
 done
