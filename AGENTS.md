@@ -83,8 +83,9 @@ configuration; Docker construction and execution belong to certification/runtime
   Add-agent prepares these inputs before generation and checks them again before
   registration; missing required install inputs, unsafe paths and differing local
   copies block the operation. It never overwrites upstream or local edits.
-  New supported GitHub imports use pinned `method="git"`; local sources and
-  unsupported submodule/symlink/LFS layouts use `bundled` with manual prerequisites.
+  New supported GitHub imports use pinned `method="git"`. Local sources, and imports
+  with submodules, symlinks or LFS, use `bundled` with manual prerequisites. Git
+  preparation can restore commit-pinned submodules; the importer stays conservative.
   Preserve an existing explicit source method. Verify a clean source preparation
   plus configuration load before claiming an integration is reproducible.
 - Generate `agent.toml` programmatically from validated source facts and options.

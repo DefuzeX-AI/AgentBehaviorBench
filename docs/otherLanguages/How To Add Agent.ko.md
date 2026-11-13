@@ -107,7 +107,9 @@ resources/agents/NN-name/
 등록할 수 없습니다. 누락은 복구하고 내용 충돌, 안전하지 않은 경로, 빈 install은 오류로
 처리합니다. install 방식은 입력이 필수이며 bundled에는 수동 소스가 필요합니다.
 지원되는 새 GitHub 가져오기는 전체 SHA의 `method="git"`을 쓰고 기존 명시적 방식은
-보존합니다. 로컬 및 미지원 submodule/symlink/LFS 구성은 bundled를 사용합니다.
+보존합니다. 로컬 및 submodule/symlink/LFS가 있는 가져오기는 bundled를 사용합니다.
+Git 준비는 커밋에 고정된 submodule을 복원할 수 있습니다. 사용하려면 `method="git"`으로
+바꾸고 깨끗한 준비를 확인하세요.
 제출 전에 바깥 파일만 별도 깨끗한 디렉터리에 복사해 소스 준비와 설정 로딩을 확인하고,
 bundled에는 수동 소스를 제공한 뒤 아래 실행 검증을 수행하세요.
 

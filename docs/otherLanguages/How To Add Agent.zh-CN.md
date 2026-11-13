@@ -118,7 +118,8 @@ resources/agents/NN-name/
 副本时禁止注册。缺失副本会补齐，内容冲突、不安全路径或空 install 目录会报错，不会覆盖。
 install 模式必须提供非空 `install/`；Git 和 bundled 可省略。bundled 仍需手动提供源码。
 新建且受支持的 GitHub 导入自动使用完整 SHA 的 `method="git"`；已有显式方式保留。
-本地来源及暂不支持的 submodule、symlink、LFS 布局使用 bundled 并记录手动准备要求。
+本地来源及含 submodule、symlink、LFS 的导入使用 bundled 并记录手动准备要求。
+Git 准备可以按提交恢复固定的 submodule；如需使用，改为 `method="git"` 并验证干净准备。
 提交前在单独干净目录仅复制外层文件，验证源码准备和适配器配置加载（bundled 另提供源码），
 再执行下方 smoke/certification。静态检查不代表 Agent 已执行成功。
 

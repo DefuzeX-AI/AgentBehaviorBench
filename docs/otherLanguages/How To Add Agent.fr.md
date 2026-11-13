@@ -112,8 +112,9 @@ est refusé. Les copies manquantes sont réparées ; conflits, chemins dangereux
 répertoires install vides bloquent l’opération. Le mode install exige ces entrées ;
 bundled exige toujours les sources manuelles. Les nouveaux imports GitHub pris en
 charge utilisent `method="git"` avec le SHA complet ; les méthodes explicites sont
-conservées. Les sources locales et les configurations submodule/symlink/LFS non
-prises en charge utilisent bundled. Avant soumission, vérifiez la préparation et
+conservées. Les sources locales et les imports avec submodules, symlinks ou LFS
+utilisent bundled. La préparation Git sait restaurer les submodules épinglés par
+commit ; pour l'utiliser, passez à `method="git"` et vérifiez une préparation propre. Avant soumission, vérifiez la préparation et
 le chargement de configuration dans une copie propre des fichiers externes, avec
 sources manuelles pour bundled, puis exécutez les tests ci-dessous.
 

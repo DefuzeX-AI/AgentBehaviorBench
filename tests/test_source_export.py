@@ -62,9 +62,10 @@ def test_recursive_export_uses_gitlink_commits_and_cache(tmp_path, monkeypatch):
     assert (target / 'deps/child/vendor/leaf/value.txt').read_text() == 'pinned version'
     assert [(r['path'], r['revision']) for r in modules] == [
         ('deps/child', child_sha), ('deps/child/vendor/leaf', pinned)]
-    assert len(fetched) == 3
+    # One plain probe of the parent detects gitlinks before the recursive export.
+    assert len(fetched) == 4
     assert export_archive(spec, tmp_path / 'cache', lambda: None) == (archive, modules)
-    assert len(fetched) == 3
+    assert len(fetched) == 4
 
 
 def link_archive(path, links, files=None):

@@ -107,7 +107,9 @@ resources/agents/NN-name/
 登録できません。欠落は補完し、内容の競合・危険なパス・空の install はエラーにします。
 install 方式には入力が必須で、bundled は別途手動ソースが必要です。
 対応する新規 GitHub 導入は完全 SHA の `method="git"` を設定し、既存の明示的方式は
-保持します。ローカルや未対応の submodule/symlink/LFS 構成は bundled を使います。
+保持します。ローカルや submodule/symlink/LFS を含む導入は bundled を使います。
+Git 準備はコミット固定の submodule を復元できます。使う場合は `method="git"` に変更し、
+クリーンな準備を確認してください。
 提出前に外側のファイルだけを別のクリーンな場所へコピーして準備と設定読み込みを確認し、
 bundled には手動ソースを提供してください。その後、以下の実行検証を行います。
 
