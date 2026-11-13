@@ -16,11 +16,12 @@ COPY agent/ ./agent/
 # turbo starts. pnpm's pre-run dependency check is off because only the filtered
 # subset is installed. turbo concurrency and the Node heap are capped to fit a shared
 # 8 GB Docker VM.
-RUN npm install -g --no-audit --no-fund "pnpm@$(node -p "require('./agent/package.json').packageManager.split('@')[1].split('+')[0]")" \
-    && export CI=true TURBO_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 \
+# corepack provides the pnpm version (and checks its hash) pinned in packageManager.
+RUN corepack enable \
+    && export CI=true TURBO_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
        pnpm_config_enable_global_virtual_store=false npm_config_enable_global_virtual_store=false \
        pnpm_config_verify_deps_before_run=false npm_config_verify_deps_before_run=false \
-    && cd agent \
+    && cd agent && pnpm --version \
     && pnpm install --frozen-lockfile --config.enable-global-virtual-store=false \
        --store-dir /tmp/pnpm-store --filter "mastracode..." --filter mastra-turbo \
     && rm -rf /tmp/pnpm-store \
