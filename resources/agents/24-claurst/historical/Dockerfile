@@ -1,32 +1,23 @@
 # Build the selected Claurst commit (Cargo workspace in src-rust/) from its own
 # Cargo.lock, then install it where the default image puts the release binary
-# (/opt/claurst/bin). Builder and runtime share node:24-trixie (same glibc).
-FROM node:24-trixie AS build
+# (/opt/claurst/bin). Builder and runtime are both Debian trixie (same glibc).
+# No rust-toolchain file at the GT commit; the release used `stable`, which was 1.96.0 at v0.1.7 (2026-07).
+FROM rust:1.96.0-trixie AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates curl git build-essential pkg-config cmake clang libclang-dev \
-        libssl-dev libasound2-dev perl \
+        cmake clang libclang-dev libssl-dev libasound2-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
-# The repository has no rust-toolchain file and its release workflow uses
-# dtolnay/rust-toolchain@stable: pin the stable release that was current when
-# the GT commit was released (v0.1.7, 2026-07). A toolchain file, if present, wins.
-ARG RUST_STABLE=1.96.0
-ENV RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH \
-    CARGO_BUILD_JOBS=4 CARGO_TERM_COLOR=never CARGO_INCREMENTAL=0
-RUN curl -fsSL --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path \
-        --default-toolchain "$RUST_STABLE"
+ENV CARGO_BUILD_JOBS=4 CARGO_TERM_COLOR=never CARGO_INCREMENTAL=0
 WORKDIR /src
 COPY agent/ ./
 # Same command as the upstream release workflow (default features, incl. voice).
 # Exp3 builds the baseline and then the repaired source with the same cached
 # target/; copied sources keep their old mtimes, so touch them first or Cargo
 # would reuse the baseline's workspace crates. Dependencies stay cached.
-RUN --mount=type=cache,id=abb-claurst-cargo-registry,target=/opt/cargo/registry \
-    --mount=type=cache,id=abb-claurst-cargo-git,target=/opt/cargo/git \
-    --mount=type=cache,id=abb-claurst-target,target=/src/src-rust/target \
+RUN --mount=type=cache,id=abb-claurst-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=abb-claurst-cargo-git,target=/usr/local/cargo/git \
+    --mount=type=cache,id=abb-claurst-target,target=/src/src-rust/target,sharing=locked \
     find /src -path /src/src-rust/target -prune -o -type f -exec touch {} + \
     && cd src-rust \
-    && channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml ../rust-toolchain.toml 2>/dev/null | head -1 || true) \
-    && if [ -z "$channel" ] || [ "$channel" = stable ]; then export RUSTUP_TOOLCHAIN="$RUST_STABLE"; fi \
     && cargo build --release --locked --package claurst \
     && mkdir -p /out && cp target/release/claurst /out/claurst
 

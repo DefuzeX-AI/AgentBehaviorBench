@@ -6,8 +6,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl git build-essential pkg-config cmake clang libclang-dev \
         libssl-dev libasound2-dev perl \
     && rm -rf /var/lib/apt/lists/*
-# rust-toolchain.toml says channel = "stable"; resolve it to the stable release
-# that was current when the GT commits were released (v0.5.12/v0.5.13, 2026-10).
+# The commit's rust-toolchain.toml decides the toolchain; channel = "stable"
+# resolves to the stable release that was current at v0.5.12/v0.5.13 (2026-10).
+# This recipe covers all 4 opencrabs GT commits: 0dfe3b7 (v0.5.13) and 2cf3e6e
+# (v0.5.12) were built and run; 685814d (v0.5.3, Issue 1704) and 212e134
+# (v0.5.4, Issue 1932) were checked statically (same toolchain file, bin, release
+# profile, features and RTK version) but not built. rustup (not a rust:<ver>
+# image) keeps the builder on the runtime's Ubuntu 26.04 glibc and honors the file.
 ARG RUST_STABLE=1.99.0
 ENV RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH \
     CARGO_TERM_COLOR=never CARGO_INCREMENTAL=0
@@ -34,13 +39,11 @@ COPY agent/ ./
 # would reuse the baseline's workspace crates. Dependencies stay cached.
 RUN --mount=type=cache,id=abb-opencrabs-cargo-registry,target=/opt/cargo/registry \
     --mount=type=cache,id=abb-opencrabs-cargo-git,target=/opt/cargo/git \
-    --mount=type=cache,id=abb-opencrabs-target,target=/src/target \
+    --mount=type=cache,id=abb-opencrabs-target,target=/src/target,sharing=locked \
     find /src -path /src/target -prune -o -type f -exec touch {} + \
     && channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml 2>/dev/null || true) \
     && if [ -z "$channel" ] || [ "$channel" = stable ]; then export RUSTUP_TOOLCHAIN="$RUST_STABLE"; fi \
-    && CARGO_PROFILE_RELEASE_LTO=$CARGO_PROFILE_RELEASE_LTO \
-       CARGO_PROFILE_RELEASE_CODEGEN_UNITS=$CARGO_PROFILE_RELEASE_CODEGEN_UNITS \
-       CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS cargo build --release --locked --all-features --bin opencrabs \
+    && cargo build --release --locked --all-features --bin opencrabs \
         --config "profile.release.package.opencrabs.opt-level=$OPENCRABS_OPT_LEVEL" \
         --config "profile.release.package.opencrabs.codegen-units=$OPENCRABS_CODEGEN_UNITS" \
     && mkdir -p /out && cp target/release/opencrabs /out/opencrabs

@@ -1,18 +1,12 @@
 # Build the selected code-assistant commit from its own Cargo.lock, then install
 # it where the default image puts the release binary (/opt/code-assistant/bin).
 # Builder and runtime are both Debian trixie (same glibc).
-FROM buildpack-deps:trixie AS build
+# No rust-toolchain file at the GT commit; the release used `stable`, which was 1.98.0 at v0.2.16 (2026-09).
+FROM rust:1.98.0-trixie AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
         cmake clang libclang-dev libssl-dev libzstd-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
-# The repository has no rust-toolchain file and its release workflow installs
-# `stable`: pin the stable release that was current when the GT commit was
-# released (v0.2.16, 2026-09). A toolchain file, if present, wins.
-ARG RUST_STABLE=1.98.0
-ENV RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH \
-    CARGO_BUILD_JOBS=4 CARGO_TERM_COLOR=never CARGO_INCREMENTAL=0
-RUN curl -fsSL --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path \
-        --default-toolchain "$RUST_STABLE"
+ENV CARGO_BUILD_JOBS=4 CARGO_TERM_COLOR=never CARGO_INCREMENTAL=0
 WORKDIR /src
 COPY agent/ ./
 # The release binary is a workspace build with every default feature, including
@@ -23,12 +17,10 @@ COPY agent/ ./
 # Exp3 builds the baseline and then the repaired source with the same cached
 # target/; copied sources keep their old mtimes, so touch them first or Cargo
 # would reuse the baseline's workspace crates. Dependencies stay cached.
-RUN --mount=type=cache,id=abb-code-assistant-cargo-registry,target=/opt/cargo/registry \
-    --mount=type=cache,id=abb-code-assistant-cargo-git,target=/opt/cargo/git \
-    --mount=type=cache,id=abb-code-assistant-target,target=/src/target \
+RUN --mount=type=cache,id=abb-code-assistant-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=abb-code-assistant-cargo-git,target=/usr/local/cargo/git \
+    --mount=type=cache,id=abb-code-assistant-target,target=/src/target,sharing=locked \
     find /src -path /src/target -prune -o -type f -exec touch {} + \
-    && channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml 2>/dev/null || true) \
-    && if [ -z "$channel" ] || [ "$channel" = stable ]; then export RUSTUP_TOOLCHAIN="$RUST_STABLE"; fi \
     && cargo build --release --locked --package code-assistant --no-default-features \
         --features acp-frontend,terminal-frontend,document-conversion \
     && mkdir -p /out && cp target/release/code-assistant /out/code-assistant
