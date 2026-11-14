@@ -134,8 +134,13 @@ Credentials stay on the host. KUMA is never a fallback.
 The provider assesses ordered inputs, outputs and transported trace contents.
 It records its model, endpoint, prompt and raw reply beside the protocol result.
 Execution/evidence failures are inconclusive rather than automatically labeled
-Agent defects. Evidence larger than `ABB_LOCAL_JUDGE_MAX_CHARS` (default 120000 characters) is explicitly inconclusive,
-not silently truncated. Findings are model assessments, not validated GT.
+Agent defects. Evidence has no default character cap. An optional positive
+`ABB_LOCAL_JUDGE_MAX_CHARS` gives an inconclusive result when exceeded; it never
+silently truncates evidence. Provider context limits still apply. Set
+`ABB_LOCAL_JUDGE_MAX_TOKENS` and, optionally, `ABB_LOCAL_JUDGE_REASONING_EFFORT`
+for a compatible Judge model; a length-truncated reply is retained but rejected.
+These options do not change Case generation. Findings are model assessments, not
+validated GT.
 
 Historical local KUMA-worker modules are retained for legacy compatibility;
 they are not used by new `--sdk local` runs. Old result files remain readable.

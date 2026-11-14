@@ -128,6 +128,13 @@ async def execute_case(factory, root, repository, settings, files, summary, *, s
     run = factory(case=case, repo_path=repository, agent_root=root,
                   storage_path=Path(settings['private_storage']), case_index=settings['case_index'],
                   evidence=evidence, **settings['sdk_options'])
+    from agentbench.sdk.common.workspace import workspace_policy
+    from agentbench.runtime.agentcontainer.config import tomllib
+    policy = workspace_policy(tomllib.loads((Path(root) / 'agent.toml').read_text()))
+    observer = None
+    if policy.track_files:
+        from agentbench.sdk.common.file_evidence import FileEvidence
+        observer = FileEvidence(repository, secrets=files.secrets)
     primary = None
     try:
         if snapshot(run.case) != document['case']:
@@ -155,7 +162,11 @@ async def execute_case(factory, root, repository, settings, files, summary, *, s
                 files.save(f'{relative}/input.json', {'input_id': item.input_id, 'payload': item.payload})
                 evidence.steps.append(folder)
                 files.save('manifest.json', summary)
+                before_files = observer.capture() if observer is not None else None
                 result = await invoke(item, folder)
+                if observer is not None:
+                    observer.publish(before_files, observer.capture(), files, relative,
+                                     export=policy.export_changed_files, diff=policy.upload_diff)
                 if result.get('status') not in ('succeeded', 'failed', 'timeout', 'cancelled', 'aborted'):
                     raise ValueError('Unknown Agent execution status')
                 telemetry = json.loads(Path(folder / 'otel-status.json').read_bytes())
