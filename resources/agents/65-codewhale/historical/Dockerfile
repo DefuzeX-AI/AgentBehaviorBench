@@ -6,7 +6,9 @@
 #   `cargo build --release --locked --target <target> -p codewhale-cli -p codewhale-tui`,
 #   where `codewhale serve` runs the codewhale-tui binary next to it. Those
 #   releases shipped aarch64 Linux as gnu (x86_64 as musl from 0.8.6x on); this
-#   recipe builds that layout for gnu.
+#   recipe builds that layout for gnu. The gnu build links libdbus (keyring), so
+#   the build stage has libdbus-1-dev and pkg-config, as release.yml installs,
+#   and the runtime stage has libdbus-1-3.
 # rust-toolchain.toml says "stable" (or is absent before 0.8.6x); STABLE_TOOLCHAIN
 # pins it so the build does not drift with time.
 #
@@ -14,7 +16,7 @@
 # its front end alone, whatever the LTO, codegen-unit or job settings, so this
 # build needs a Docker VM with well over 8 GB of memory (GitHub runners: 16 GB).
 FROM rust:1.98.1-bookworm AS build
-RUN apt-get update && apt-get install -y --no-install-recommends musl-tools \
+RUN apt-get update && apt-get install -y --no-install-recommends musl-tools libdbus-1-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 ARG STABLE_TOOLCHAIN=1.98.1
 ENV CARGO_BUILD_JOBS=4 CARGO_TERM_COLOR=never
@@ -48,14 +50,15 @@ RUN --mount=type=cache,id=abb-hist-cargo-registry,target=/usr/local/cargo/regist
 # binary at agent/node_modules/codewhale/bin/downloads/codewhale directly (where
 # the npm package's installer puts it), so the built binaries go there.
 FROM node:24-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends python3-venv python3-pip ripgrep \
+RUN apt-get update && apt-get install -y --no-install-recommends python3-venv python3-pip ripgrep libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/* && python3 -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/opt/abb-runtime \
     PYTHONUNBUFFERED=1 HOME=/home/agent
 WORKDIR /opt/agent
 COPY agent/ ./agent/
 COPY --from=build /out/ /opt/agent/agent/node_modules/codewhale/bin/downloads/
-RUN agent/node_modules/codewhale/bin/downloads/codewhale --version \
+RUN ! ldd agent/node_modules/codewhale/bin/downloads/* | grep 'not found' \
+    && agent/node_modules/codewhale/bin/downloads/codewhale --version \
     && python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2' \
     && useradd --create-home --uid 10001 agent \
     && mkdir -p /home/agent/workspace \
