@@ -80,9 +80,10 @@ Relationships come from recorded identifiers only; timestamps order steps.
   `framework_span_id` header. Both sides of that pair form one step.
 - Tool executions join the model call whose output emitted their
   `tool_call_id` (`observe/tool_links.py`). One candidate in the same Input
-  is `exact`; several are `ambiguous`; none means the execution was
-  `not_observed`. A tool execution no model call emitted becomes a
-  `tool_only` step.
+  is `exact`; several candidates or repeated emitters are `ambiguous`; none
+  means the execution was `not_observed`. IDs are read from the recorded
+  start/update/end fields of the same span; conflicting IDs are not linked.
+  Ambiguous executions remain separate `tool_only` steps.
 - LangGraph: the acting component comes from `langgraph_checkpoint_ns` of the
   model span (`agent/subgraph` for nested graphs). ACP: the Agent identity.
 - ACP agents expose no internal model spans; their model calls are the wire
