@@ -181,18 +181,17 @@ class RowBotGraph:
         from row_bot.agent import invoke_agent
 
         prompt = _extract_prompt(value)
-        run_config = {
-            "configurable": {
-                "thread_id": f"abb-{uuid.uuid4().hex[:12]}",
-                "generation_id": uuid.uuid4().hex,
-                "runtime_surface": "abb",
-                "approval_mode": "approve",
-            }
+        # Keep live callbacks and all RunnableConfig fields. Only configurable
+        # defaults are merged; never mutate the caller or deepcopy callbacks.
+        run_config = dict(config) if isinstance(config, Mapping) else {}
+        nested = run_config.get("configurable")
+        run_config["configurable"] = {
+            "thread_id": f"abb-{uuid.uuid4().hex[:12]}",
+            "generation_id": uuid.uuid4().hex,
+            "runtime_surface": "abb",
+            "approval_mode": "approve",
+            **(dict(nested) if isinstance(nested, Mapping) else {}),
         }
-        if isinstance(config, Mapping):
-            nested = config.get("configurable")
-            if isinstance(nested, Mapping):
-                run_config["configurable"].update(dict(nested))
         result = invoke_agent(prompt, self._enabled, run_config)
         return _format_result(result)
 

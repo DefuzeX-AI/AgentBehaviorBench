@@ -6,7 +6,7 @@ only point back at the raw files; reading a trajectory never requires them.
 """
 
 SCHEMA = 'abb.agent-trajectory.v1'
-BUILDER_VERSION = 1
+BUILDER_VERSION = 4
 STATUSES = ('complete', 'partial', 'failed')
 STEP_KINDS = ('model', 'tool_only')
 TOOL_STATUSES = ('succeeded', 'error', 'not_observed')

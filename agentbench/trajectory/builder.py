@@ -5,10 +5,11 @@ execution no model call emitted. Framework chain and middleware spans are not
 steps; their payloads remain in the raw evidence.
 """
 import hashlib
-from collections import defaultdict
 from pathlib import Path
 
 from agentbench.observe.interactions import load_index
+from agentbench.observe.input_artifacts import input_ordinal, read_input_artifacts
+from agentbench.observe.tool_links import compatible, resolve_tools
 from agentbench.observe.view_api import RunViewAPI
 
 from .actors import actor_for, langgraph_actor
@@ -16,13 +17,13 @@ from .content import bounded, digest, framework_input, framework_output, max_val
 from .files import file_changes, replay_events
 from .metadata import build_metadata
 from .schema import BUILDER_VERSION, SCHEMA
-from .sources import _data, framework_calls, llm_record, node_tool_calls, order_key, tool_log, tool_rows, wire_calls
+from .sources import _data, framework_calls, llm_record, node_tool_calls, order_key, tool_log, tool_rows, wire_calls, wire_stream
 
 
 def _identity(api, run):
     request = None
     for folder in api.outputs():
-        request = api.read(f'{folder}/request.json') or api.read(f'{folder}/invocation.json')
+        _, request = read_input_artifacts(folder, api.read)
         if request:
             break
     request = request or {}
@@ -33,7 +34,7 @@ def _identity(api, run):
 
 
 def _ordinal(folder):
-    return folder.rsplit('/', 1)[-1] if folder else None
+    return input_ordinal(folder)
 
 
 def _sources(index, api):
@@ -74,10 +75,13 @@ def _model_step(index, entry, agent_id, limit):
         payload_in = request.get('payload')
         model_in = model_input(payload_in)
         output_source = 'wire'
+        stream = None
+        error_record = None
         if wire.get('_response') is not None and 'payload' in response:
             output = model_output(response.get('payload'))
         else:
-            error = next((_data(r) for r in reversed(entry['records']) if 'error' in (r['raw'].get('event') or '')), {})
+            error_record = next((r for r in reversed(entry['records']) if 'error' in (r['raw'].get('event') or '')), None)
+            error = _data(error_record)
             wire_error = {k: error.get(k) for k in ('error_code', 'error', 'message', 'upstream_status', 'local_status')
                           if error.get(k) is not None}
             end = _data(llm_record(wire, 'span_end')) if framework is not None else {}
@@ -85,6 +89,10 @@ def _model_step(index, entry, agent_id, limit):
                 # The wire record failed, but the framework still received a result.
                 output, output_source = framework_output(end['output']), 'framework'
                 output = _recover_tool_calls(index, output, _data(llm_record(wire, 'span_start')))
+            elif (stream := wire_stream(entry['records'])) is not None:
+                # Cancellation need not produce llm_response or span_end. Only
+                # normalize frames already persisted by this call's interceptor.
+                output, output_source = model_output(stream), 'wire_delta'
             else:
                 output = {'text': None, 'reasoning': None, 'tool_calls': [], 'finish_reason': None, 'usage': None,
                           'model': request.get('model')}
@@ -92,13 +100,18 @@ def _model_step(index, entry, agent_id, limit):
         step = {'kind': 'model', 'source': 'wire+framework' if framework is not None else 'wire',
                 'output_source': output_source,
                 'agent_name': actor_for(agent_id, llm_record(wire, 'span_start')) if framework is not None else agent_id,
-                'started_at': wire.get('timestamp'), 'ended_at': wire.get('ended'),
+                'started_at': wire.get('timestamp'),
+                'ended_at': wire.get('ended') or (error_record or {}).get('raw', {}).get('timestamp'),
                 'model': output.get('model') or request.get('model') or payload_in.get('model') if isinstance(payload_in, dict) else request.get('model'),
                 'purpose': wire.get('purpose'), 'status': wire.get('status'),
                 'input': bounded(model_in, limit), 'output': bounded(output, limit),
                 'evidence': {'interaction_id': wire['id'], 'call_id': wire.get('call_id'),
                              'framework_span_id': wire.get('framework_span_id'),
                              'request_sha256': digest(payload_in), 'response_sha256': digest(response.get('payload'))}}
+        if stream is not None:
+            step['evidence'].update(stream_event_count=len(stream['events']), stream_sha256=digest(stream))
+            if step['status'] == 'pending':
+                step['status'] = 'incomplete'
         return step, [c.get('id') for c in output.get('tool_calls') or [] if c.get('id')]
     start, end = _data(framework.get('_request')), _data(framework.get('_response'))
     output = _recover_tool_calls(index, framework_output(end.get('output')), start)
@@ -126,15 +139,14 @@ def build(directory, *, environ=None, project_root=None):
     only_folder = folders[0] if len(folders) == 1 else None
 
     tools = tool_rows(index)
-    tools_by_call = defaultdict(list)
-    for row in tools:
-        if row.get('tool_call_id'):
-            tools_by_call[row['tool_call_id']].append(row)
+    tools_by_id = {row['id']: row for row in tools}
     framework_by_span = {row.get('framework_span_id'): row for row in framework_calls(index) if row.get('framework_span_id')}
 
     entries, consumed = [], set()
     for row in wire_calls(index):
         framework = framework_by_span.get(row.get('framework_span_id'))
+        if framework is not None and not compatible(row, framework):
+            framework = None
         if framework is not None:
             consumed.add(framework['id'])
         entries.append({'wire': row, 'framework': framework, 'records': index.groups.get(row['id'], []),
@@ -144,26 +156,39 @@ def build(directory, *, environ=None, project_root=None):
             entries.append({'wire': None, 'framework': row, 'records': index.groups.get(row['id'], []),
                             'folder': row.get('_context'), 'order': order_key(row)})
 
-    used, ambiguous, steps = set(), 0, []
+    models = []
     for entry in entries:
         step, emitted = _model_step(index, entry, agent_id, limit)
+        if step.get('output_source') == 'wire_delta':
+            warnings.append(f"model call {step['evidence']['call_id']}: only recorded stream fragments are available; no complete response")
+        entry['step'] = step
+        row = entry['wire'] or entry['framework']
+        models.append({**row, 'emitted_tool_ids': emitted})
+    relations = resolve_tools(models, tools)
+    used, ambiguous, steps = set(), 0, []
+    for entry in entries:
+        step = entry['step']
         folder = entry['folder'] or only_folder
         logs = []
-        for call_id in emitted:
-            candidates = [t for t in tools_by_call.get(call_id, [])
-                          if not folder or not t.get('_context') or t['_context'] == folder]
-            if len(candidates) == 1:
-                log = tool_log(index, candidates[0]); log['link'] = 'exact'; used.add(candidates[0]['id'])
-            elif candidates:
-                log = tool_log(index, candidates[0]); log['link'] = 'ambiguous'; ambiguous += 1
-                log['evidence']['candidates'] = [t['id'] for t in candidates]
-                used.update(t['id'] for t in candidates)
+        for relation in relations[step['evidence']['interaction_id']]:
+            call_id = relation['tool_call_id']
+            if relation['status'] == 'exact':
+                row = tools_by_id[relation['interaction_ids'][0]]
+                log = tool_log(index, row)
+                log['link'] = 'exact'
+                used.add(row['id'])
             else:
-                log = {'tool_call_id': call_id, 'tool_name': next((c.get('name') for c in step['output'].get('tool_calls') or []
-                       if c.get('id') == call_id), None) or 'unknown', 'input_arguments': next((c.get('arguments') for c in
-                       step['output'].get('tool_calls') or [] if c.get('id') == call_id), None), 'outputs': None,
-                       'execution_status': 'not_observed', 'exit_status': None, 'link': 'none', 'evidence': {}}
-                warnings.append(f"tool call {call_id} was emitted but its execution was not observed")
+                call = next((c for c in step['output'].get('tool_calls') or [] if c.get('id') == call_id), {})
+                link = 'ambiguous' if relation['status'] == 'ambiguous' else 'none'
+                ambiguous += link == 'ambiguous'
+                log = {'tool_call_id': call_id, 'tool_name': call.get('name') or 'unknown',
+                       'input_arguments': call.get('arguments'), 'outputs': None,
+                       'execution_status': 'not_observed', 'exit_status': None, 'link': link,
+                       'evidence': {'candidates': relation['interaction_ids']}}
+                # Ambiguous executions remain independent steps with every original
+                # output intact. A candidate is not an attributed execution.
+                reason = 'execution not observed' if relation['status'] == 'unobserved' else 'ambiguous execution association'
+                warnings.append(f"tool call {call_id}: {reason}")
             logs.append(bounded(log, limit))
         if entry['folder'] is None and only_folder is None and folders:
             warnings.append(f"model call {step['evidence']['interaction_id']} could not be assigned to an Input")
@@ -195,7 +220,8 @@ def build(directory, *, environ=None, project_root=None):
         ordinal = _ordinal(folder)
         ids = [s['step_id'] for s in steps if s['input_ordinal'] == ordinal]
         result = api.read(f'{folder}/result.json') or {}
-        record = api.read(f'{folder}/input.json') or {}
+        record, _ = read_input_artifacts(folder, api.read)
+        record = record or {}
         changes, coverage = file_changes(api, folder, replays)
         file_coverage.add(coverage)
         inputs.append({'ordinal': ordinal, 'input_id': record.get('input_id'),

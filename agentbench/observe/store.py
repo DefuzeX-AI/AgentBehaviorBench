@@ -27,7 +27,12 @@ def json_value(value):
     if isinstance(value, (list, tuple)):
         return [json_value(v) for v in value]
     if hasattr(value, "model_dump"):
-        return json_value(value.model_dump())
+        # Nested fields can be annotated BaseMessage while holding AIMessage.
+        # Serialize the actual values, then apply the normal redaction pipeline.
+        import inspect
+        dump = value.model_dump
+        options = {"serialize_as_any": True} if "serialize_as_any" in inspect.signature(dump).parameters else {}
+        return json_value(dump(**options))
     return {"type": type(value).__name__, "value": str(value)}
 
 

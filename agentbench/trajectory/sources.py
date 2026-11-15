@@ -38,6 +38,22 @@ def llm_record(row, event):
     return next((r for r in reversed(records) if _event(r) == event), None)
 
 
+def wire_stream(records):
+    """Native SSE payloads for one indexed call, in recorded sequence order.
+
+    Match the desktop projection: replaying a sequence replaces that frame,
+    while distinct call IDs are already isolated by the interaction index.
+    Transport chunk metrics are never interpreted as content.
+    """
+    frames = {}
+    for record in records:
+        data = _data(record)
+        sequence = data.get('sequence')
+        if _event(record) == 'llm_delta' and type(sequence) is int and sequence > 0:
+            frames[sequence] = data.get('payload')
+    return {'events': [value for _, value in sorted(frames.items())]} if frames else None
+
+
 def node_tool_calls(index, parent_span_id):
     """Tool calls in the graph node's own output when the model span lost them.
 

@@ -49,7 +49,7 @@ class HostObservation:
             atomic_json(folder / 'result.json', redact(json_value(result), secrets))
             observed.close()
             import json
-            otel = json.loads((folder / 'otel-status.json').read_text())
+            otel = json.loads((folder / 'otel-status.json').read_text(encoding="utf-8"))
             self.metadata['evidence_availability']['framework'] = {'status': 'available'}
             self.metadata['evidence_availability']['otel'] = {
                 'status': 'available' if otel['status'] == 'complete' else otel['status'],

@@ -1,5 +1,6 @@
 """One-shot ABB matcher transport. Never calls an evaluation SDK."""
 import json
+import os
 import urllib.request
 import urllib.error
 from agentbench.sdk.plugin.local.relay import judge_model, json_object
@@ -14,7 +15,9 @@ def model_config(environ):
 
 
 def ask_once(model, *, system, payload, on_response=None):
-    body = json.dumps({'model': model.model, 'temperature': 0, 'max_tokens': 4096,
+    # Reasoning models spend completion tokens before the answer; the limit is configurable.
+    max_tokens = int(os.environ.get('ABB_GT_MAX_TOKENS', '4096'))
+    body = json.dumps({'model': model.model, 'temperature': 0, 'max_tokens': max_tokens,
                        'messages': [{'role': 'system', 'content': system},
                                     {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}]}).encode()
     request = urllib.request.Request(model.base_url + '/chat/completions', data=body,

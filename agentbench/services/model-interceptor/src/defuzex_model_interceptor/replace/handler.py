@@ -9,6 +9,7 @@ from ..security.redaction import redact
 from ..error import ErrorCode, InterceptorAuthenticationError, TargetRoutingError
 from ..registry import load_authentication, load_protocols, load_targets, load_wires
 from ..observation.capture import ResponseCapture
+from ..observation.stream import StreamEvidence
 from ..transport.json import json_bytes
 from ..routing.automatic import AutomaticModelRouter
 from ..routing.targets import ModelTargetRouter
@@ -107,6 +108,7 @@ class ReplaceInterceptor(CommonInterceptor):
         if "text/event-stream" not in ct.lower() or flow.response.status_code >= 400:
             return
         converter = wire.stream()
+        evidence = StreamEvidence()
         capture = ResponseCapture(self.config.max_trace_bytes)
         client_capture = (ResponseCapture(self.config.max_trace_bytes)
                           if getattr(wire, "capture_client_stream", False) else None)
@@ -123,6 +125,10 @@ class ReplaceInterceptor(CommonInterceptor):
             if flow.metadata.get("defuzex_stream_failed"):
                 return [] if chunk else b""
             try:
+                for frame in evidence.feed(chunk):
+                    events.emit("llm_delta", **self._fields(flow), sequence=frame['sequence'],
+                                payload=redact(frame['payload'], self.secrets),
+                                elapsed_ms=round((time.monotonic()-flow.metadata["defuzex_started"])*1000, 3))
                 if chunk:
                     capture.write(chunk)
                 forwarded = converter.feed(chunk)

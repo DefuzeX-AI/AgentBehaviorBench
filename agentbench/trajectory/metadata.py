@@ -6,6 +6,7 @@ and the registered Agent unit when the project root is available.
 import hashlib
 import json
 from pathlib import Path
+from agentbench.observe.input_artifacts import read_input_artifacts
 
 
 def _sha256(path):
@@ -45,7 +46,7 @@ def build_metadata(api, *, agent_id, framework, first_input, actors, project_roo
     if isinstance(inputs, list) and inputs and isinstance(inputs[0], dict):
         task = inputs[0].get('payload')
     if task is None:
-        first = api.read(f'{api.outputs()[0]}/input.json') if api.outputs() else None
+        first, _ = read_input_artifacts(api.outputs()[0], api.read) if api.outputs() else (None, {})
         task = first.get('payload') if isinstance(first, dict) else None
     configuration = {'agents': [{'agent_name': name} for name in actors],
                      'system_prompt': _system_prompt(first_input),
