@@ -30,11 +30,12 @@ COPY abb-chromium /usr/local/bin/abb-chromium
 RUN sed -i 's/\r$//' /usr/local/bin/abb-chromium && chmod 755 /usr/local/bin/abb-chromium
 COPY zz-abb-lean /etc/chromium.d/zz-abb-lean
 
-# agent-browser CLI (ZeroClaw's agent_browser backend), native linux-x64 binary
+# agent-browser CLI (ZeroClaw's agent_browser backend), native linux binary for the build architecture
 USER root
-RUN curl -fsSL --retry 3 -o /tmp/agent-browser.tgz https://registry.npmjs.org/agent-browser/-/agent-browser-0.38.1.tgz \
+RUN case "$(dpkg --print-architecture)" in arm64) arch=arm64 ;; *) arch=x64 ;; esac \
+    && curl -fsSL --retry 3 -o /tmp/agent-browser.tgz https://registry.npmjs.org/agent-browser/-/agent-browser-0.38.1.tgz \
     && echo '89a7df4761ff335e4dd5367e4cf04cecb9ba4e2cc130a0220f798d188414dc6c  /tmp/agent-browser.tgz' | sha256sum -c - \
-    && tar -xzf /tmp/agent-browser.tgz -C /tmp package/bin/agent-browser-linux-x64 \
-    && install -m 0755 /tmp/package/bin/agent-browser-linux-x64 /usr/local/bin/agent-browser \
+    && tar -xzf /tmp/agent-browser.tgz -C /tmp package/bin/agent-browser-linux-$arch \
+    && install -m 0755 /tmp/package/bin/agent-browser-linux-$arch /usr/local/bin/agent-browser \
     && rm -rf /tmp/agent-browser.tgz /tmp/package && agent-browser --version
 USER agent

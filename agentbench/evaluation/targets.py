@@ -69,14 +69,30 @@ def prepare_target(registration, revision, *, cache_dir, check=lambda: None,
     recipe = manifest.get('historical', {})
     if not isinstance(recipe, dict):
         raise ValueError('historical must be a table')
+    if method == 'bundled' and manifest.get('source', {}).get('repository'):
+        method = 'git'  # A bundled unit with a recorded repository can be fetched at the requested commit.
     if method not in ('git', 'install'):
         raise ValueError('Historical preparation supports git and install source methods')
-    if method == 'install' and recipe.get('strategy') != 'source':
+    strategy = recipe.get('strategy')
+    if method == 'install' and strategy not in ('source', 'release'):
         raise ValueError('Install Agent needs [historical] strategy="source" and a Dockerfile')
-    if recipe and recipe.get('strategy') != 'source':
+    if recipe and strategy not in ('source', 'release'):
         raise ValueError('Unsupported historical build strategy')
-    text = _table(text, 'source', {'method': 'git', 'revision': revision})
-    if recipe:
+    release = strategy == 'release'
+    if release:
+        # The pinned release is the historical version only when its commit is the requested one.
+        if method != 'install':
+            raise ValueError('Historical release strategy requires an install Agent')
+        # Further pinned releases may be listed as historical/releases/<commit>.json.
+        release_file = root / 'historical' / 'releases' / (revision + '.json')
+        if not release_file.is_file():
+            release_file = root / 'install' / 'distribution.json'
+        distribution = json.loads(release_file.read_text(encoding='utf-8'))
+        if str(distribution.get('commit', '')).lower() != revision:
+            raise ValueError('Requested commit is not a pinned release; a source recipe is required')
+    else:
+        text = _table(text, 'source', {'method': 'git', 'revision': revision})
+    if recipe and (not release or 'dockerfile' in recipe):
         dockerfile = recipe.get('dockerfile')
         if not isinstance(dockerfile, str) or not dockerfile:
             raise ValueError('Historical source recipe needs a Dockerfile')
@@ -85,6 +101,8 @@ def prepare_target(registration, revision, *, cache_dir, check=lambda: None,
             raise ValueError('Historical Dockerfile must exist inside the Agent unit')
         text = _table(text, 'build', {'dockerfile': dockerfile})
     spec = source_spec(tomllib.loads(text))
+    if recipe.get('omit_submodules') is True and not release:
+        spec = replace(spec, omit_submodules=True)
     parent = Path(cache_dir).resolve()
     parent.mkdir(parents=True, exist_ok=True)
     source_cache = parent.parent / 'sources'
@@ -98,7 +116,7 @@ def prepare_target(registration, revision, *, cache_dir, check=lambda: None,
         excluded = ignore_base(directory, names)
         if Path(directory).resolve() == root:
             excluded += [n for n in names if n in {'agent', 'source-manifest.json', 'provenance.json'}
-                         or n.startswith('.abb-') or (method == 'install' and n == 'install')]
+                         or n.startswith('.abb-') or (method == 'install' and not release and n == 'install')]
         return excluded
     with tempfile.TemporaryDirectory(prefix='.prepare-', dir=parent) as temporary:
         staged = Path(temporary) / 'unit'
@@ -106,20 +124,28 @@ def prepare_target(registration, revision, *, cache_dir, check=lambda: None,
         if any(p.is_symlink() for p in staged.rglob('*')):
             raise ValueError('Prepared integration files must not contain symlinks')
         (staged / 'agent.toml').write_text(text, encoding='utf-8')
+        if release:
+            # The selected release becomes the unit's install input, so it also keys the fingerprint.
+            shutil.copy2(release_file, staged / 'install' / 'distribution.json')
         fingerprint = hashlib.sha256(('abb.prepared-target.v1\n' + source_digest(staged)).encode()).hexdigest()
         target = parent / fingerprint[:24]
         with cache_lock(parent / (fingerprint + '.lock'), bounded):
             if not target.exists():
-                archive = source_archive(spec, source_cache, bounded, output_fn)
-                extract_source(archive, staged / 'agent', bounded)
+                archive = None if release else source_archive(spec, source_cache, bounded, output_fn)
+                if archive is not None:
+                    # In-tree file links are materialized later in the private build snapshot.
+                    extract_source(archive, staged / 'agent', bounded, allow_symlinks=True)
                 # Reuse installation overlays and runtime configuration checks.
                 prepare_agent_source(staged, cache_dir=source_cache, check=bounded,
                                      output_fn=output_fn)
                 provenance = {'schema': 'abb.prepared-target.v1', 'agent_id': registration.agent_id,
-                              'requested_revision': revision, 'resolved_revision': spec.revision,
-                              'repository': spec.repository, 'original_method': method,
-                              'strategy': 'source', 'fingerprint': fingerprint,
-                              'archive_sha256': hashlib.sha256(archive.read_bytes()).hexdigest()}
+                              'requested_revision': revision,
+                              'resolved_revision': revision if release else spec.revision,
+                              'repository': manifest['source'].get('repository') if release else spec.repository,
+                              'original_method': method,
+                              'strategy': strategy or 'source', 'fingerprint': fingerprint,
+                              'archive_sha256': None if archive is None
+                              else hashlib.sha256(archive.read_bytes()).hexdigest()}
                 (staged / 'provenance.json').write_text(json.dumps(provenance, indent=2), encoding='utf-8')
                 digest = source_digest(staged)
                 # The marker stays outside the unit and is published under the same lock.

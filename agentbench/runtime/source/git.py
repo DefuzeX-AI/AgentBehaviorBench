@@ -47,6 +47,6 @@ def export_source(spec, archive, check):
         if actual != spec.revision:
             raise ValueError('Downloaded source commit does not match source.revision')
         tree = run_git(directory, ['ls-tree', '-r', actual], check)
-        if any(line.startswith('160000 ') for line in tree.splitlines()):
+        if not spec.omit_submodules and any(line.startswith('160000 ') for line in tree.splitlines()):
             raise ValueError('Git source contains submodules; use bundled source until submodules are supported')
         run_git(directory, ['archive', '--format=zip', '--output=' + str(archive), actual], check)

@@ -39,34 +39,50 @@ def emitted_tool_ids(payload):
     return found
 
 
-def link_tools(rows, contexts):
-    """The containing artifact directory is the run scope; reject finer conflicts."""
-    tools = [r for r in rows if r['kind'] == 'tool' and r.get('tool_call_id')]
-    emissions = {}
-    for row in rows:
-        if row['kind'] == 'chat' and row.get('_response'):
-            emissions[row['id']] = emitted_tool_ids((row['_response']['raw'].get('data') or {}).get('payload'))
-    for row in rows:
-        if row['kind'] != 'chat':
-            continue
-        record = row.get('_response')
-        payload = (record['raw'].get('data') or {}).get('payload') if record else None
-        identifiers = emitted_tool_ids(payload)
+SCOPE_KEYS = ('run_id', 'case_id', 'attempt_id', 'input_id', 'invocation_id', 'native_session_id')
+
+
+def compatible(left, right):
+    """Missing identity is unknown; contradictory recorded identity never matches."""
+    return not (left.get('identity_conflicts') or right.get('identity_conflicts')) and all(
+        not left.get(key) or not right.get(key) or left[key] == right[key] for key in SCOPE_KEYS)
+
+
+def resolve_tools(models, tools):
+    """One rule for offline exports and live projections. IDs are scoped, not names."""
+    result = {}
+    for model in models:
         relations = []
-        for identifier in sorted(identifiers):
-            candidates = [tool for tool in tools if tool['tool_call_id'] == identifier
-                          and tool.get('case_id') == row.get('case_id')
-                          and all(not row.get(key) or not tool.get(key) or row[key] == tool[key]
-                                  for key in ('attempt_id', 'native_session_id'))]
-            emitters = [r for r in rows if identifier in emissions.get(r['id'], set())
-                        and r.get('case_id') == row.get('case_id')
-                        and all(not row.get(key) or not r.get(key) or row[key] == r[key]
-                                for key in ('attempt_id', 'native_session_id'))]
+        identifiers = model.get('emitted_tool_ids', [])
+        for identifier in (sorted(identifiers) if isinstance(identifiers, set) else dict.fromkeys(identifiers)):
+            candidates = [tool for tool in tools if tool.get('tool_call_id') == identifier
+                          and compatible(model, tool)]
+            # Count all possible owners of each execution too: incomplete scope must
+            # not let two otherwise disjoint model calls both claim the same tool.
+            emitters = [other for other in models if identifier in other.get('emitted_tool_ids', [])
+                        and (compatible(model, other) or any(compatible(other, tool) for tool in candidates))]
             relations.append({'type': 'emitted_tool', 'tool_call_id': identifier,
                 'status': 'ambiguous' if len(emitters) > 1 or len(candidates) > 1 else 'exact' if candidates else 'unobserved',
                 'interaction_ids': [tool['id'] for tool in candidates]})
+        result[model['id']] = relations
+    return result
+
+
+def link_tools(rows, contexts):
+    """The containing artifact directory is the run scope; reject finer conflicts."""
+    tools = [r for r in rows if r['kind'] == 'tool' and r.get('tool_call_id')]
+    models = []
+    for row in rows:
+        if row['kind'] == 'chat' and row.get('_response'):
+            models.append({**row, 'emitted_tool_ids': emitted_tool_ids(
+                (row['_response']['raw'].get('data') or {}).get('payload'))})
+    links = resolve_tools(models, tools)
+    for row in rows:
+        if row['kind'] != 'chat':
+            continue
+        relations = links.get(row['id'], [])
         row['tool_relations'] = relations
-        row['association_rule_version'] = 1
+        row['association_rule_version'] = 2
         if not relations:
             continue
         if any(link['status'] != 'exact' for link in relations):

@@ -37,7 +37,7 @@ are not steps. They stay in the raw evidence and are reachable through
 
 ```jsonc
 {
-  "schema": "abb.agent-trajectory.v1", "builder_version": 1,
+  "schema": "abb.agent-trajectory.v1", "builder_version": 4,
   "status": "complete" | "partial" | "failed",
   "run_id", "agent_id", "case_id", "framework",
   "metadata": {
@@ -77,12 +77,19 @@ Relationships come from recorded identifiers only; timestamps order steps.
 
 - Interceptor records group by `call_id`; framework records group by span id.
 - A wire model call joins its framework model span through the
-  `framework_span_id` header. Both sides of that pair form one step.
+  `framework_span_id` header when their recorded invocation identities are compatible.
+  Both sides of that pair form one step; conflicting identities remain separate.
 - Tool executions join the model call whose output emitted their
-  `tool_call_id` (`observe/tool_links.py`). One candidate in the same Input
-  is `exact`; several are `ambiguous`; none means the execution was
-  `not_observed`. A tool execution no model call emitted becomes a
-  `tool_only` step.
+  `tool_call_id` through the shared resolver in `observe/tool_links.py`. Recorded
+  run, Case, attempt, Input, invocation and native-session identities must not
+  conflict. Missing identity is unknown, never evidence of a match. Exactly one
+  execution candidate and one possible emitting model is `exact`; multiple
+  candidates or owners are `ambiguous`; none is `unobserved` in the interaction
+  relation (`not_observed` in the trajectory tool log). Unresolved executions
+  remain complete `tool_only` steps; no candidate is selected arbitrarily.
+- Input identity also comes from `request.json.observation_context` when absent
+  in `input.json`. Contradictions are recorded as `identity_conflicts` and block
+  exact associations. A tool ID recorded only on span end remains usable.
 - LangGraph: the acting component comes from `langgraph_checkpoint_ns` of the
   model span (`agent/subgraph` for nested graphs). ACP: the Agent identity.
 - ACP agents expose no internal model spans; their model calls are the wire
@@ -120,3 +127,47 @@ attempts, including ground-truth references.
 - `EvaluationService.evidence()` returns it under `trajectory`, raw spans under
   `spans`; the viewer route `trajectory` serves it.
 - Ground-truth matching compares reference and candidate trajectories by step.
+
+Builder version 2 retains the `abb.agent-trajectory.v1` schema. It also reconstructs
+Responses text, reasoning summaries and function arguments from recorded stream
+fragments without requiring a final response body. Final item events replace their
+partial content rather than duplicating it. Only recorded content is rendered.
+Saved trajectories are not silently rebuilt; use the explicit build command to
+regenerate an older derivation from its raw evidence.
+
+### Standalone observe inputs (builder version 3)
+
+The reader resolves standalone requests at `invocation-*/input/request.json`
+while keeping framework logs and results under `invocation-*/output/`.
+`steps/NNNN` and historical `evaluation/inputs/NNNN` remain supported.
+An existing `input.json` remains authoritative; otherwise the standalone request's
+`input` is the prompt and `framework` supplies the framework identity. The request
+is included in source hashes. Neither files nor Agent input/output are rewritten.
+
+Standalone invocation folders have distinct ordinals, so multiple calls cannot
+collapse into one `output` Input. The recorded invocation ID scopes associations;
+a benchmark `input_id` is only populated when it was actually recorded. Missing
+requests and contradictory identities remain incomplete evidence. Readers retain
+the artifact API's path-boundary and symlink checks.
+
+### Interrupted model streams (builder version 4)
+
+Replacement-mode SSE capture emits `llm_delta` with the same native payload,
+call and framework-span identifiers, sequence number and elapsed time as the
+desktop App. Each complete SSE frame is persisted as it arrives, with existing
+secret redaction, independently of stream completion. `llm_chunk` remains a
+transport metric; it does not contain text. Forwarding and model conversion are
+unchanged. Unary and non-SSE traffic retain their existing collection paths.
+
+The builder continues to prefer `llm_response`, then an available completed
+framework output. If neither exists, it reconstructs only recorded `llm_delta`
+payloads for that call, ordered and deduplicated by sequence. Existing protocol
+decoders preserve text, reasoning and tool arguments, including unfinished
+arguments. No tool execution, finish reason or final usage is invented.
+
+Such steps carry `output_source: wire_delta`, a stream event count and digest
+in `evidence`, and a warning that makes the trajectory `partial`. Recorded model
+errors and their timestamps remain present; a stream without a terminal record
+is `incomplete`, not successful. The execution's own outcome is never changed.
+A completed response supersedes stream fragments rather than duplicating text.
+Older runs with only chunk metrics cannot recover text that was never recorded.

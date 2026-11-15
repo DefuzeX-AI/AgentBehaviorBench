@@ -126,6 +126,44 @@ def _from_anthropic_content(content, finish, usage, model):
             'finish_reason': finish, 'usage': usage, 'model': model}
 
 
+def _merge_responses_events(events):
+    """Responses events address output items/content parts by protocol indexes."""
+    items, metadata = {}, {}
+    for event in events:
+        kind = event.get('type', '')
+        response = event.get('response')
+        if isinstance(response, dict):
+            metadata.update({k: response[k] for k in ('model', 'status', 'usage') if k in response})
+            if response.get('output'):
+                items = {i: dict(item) for i, item in enumerate(_objects(response['output']))}
+        index = event.get('output_index')
+        if index is None:
+            continue
+        if kind in ('response.output_item.added', 'response.output_item.done'):
+            items[index] = dict(event.get('item') or {})
+        elif kind.startswith('response.function_call_arguments.'):
+            item = items.setdefault(index, {'type': 'function_call'})
+            if kind.endswith('.delta'):
+                item['arguments'] = item.get('arguments', '') + event.get('delta', '')
+            elif 'arguments' in event:
+                item['arguments'] = event['arguments']
+        elif kind.startswith(('response.output_text.', 'response.reasoning_summary_text.',
+                              'response.content_part.', 'response.reasoning_summary_part.')):
+            reasoning = 'reasoning_summary' in kind
+            item = items.setdefault(index, {'type': 'reasoning' if reasoning else 'message'})
+            parts = item.setdefault('summary' if reasoning else 'content', [])
+            part_index = event.get('summary_index' if reasoning else 'content_index', 0)
+            while len(parts) <= part_index:
+                parts.append({'type': 'summary_text' if reasoning else 'output_text', 'text': ''})
+            if 'part' in event:
+                parts[part_index] = dict(event['part'])
+            elif kind.endswith('.delta'):
+                parts[part_index]['text'] = parts[part_index].get('text', '') + event.get('delta', '')
+            elif 'text' in event:
+                parts[part_index]['text'] = event['text']
+    return model_output({**metadata, 'output': [item for _, item in sorted(items.items())]})
+
+
 def model_output(payload):
     """One complete assistant turn from any supported wire format."""
     if not isinstance(payload, dict):
@@ -137,10 +175,8 @@ def model_output(payload):
             return _merge_openai_chunks(events)
         if any(event.get('type') in ('message_start', 'content_block_start', 'content_block_delta') for event in events):
             return _merge_anthropic_events(events)
-        completed = next((e['response'] for e in reversed(events)
-                          if e.get('type') == 'response.completed' and isinstance(e.get('response'), dict)), None)
-        if completed is not None:
-            return model_output(completed)
+        if any(str(event.get('type', '')).startswith('response.') for event in events):
+            return _merge_responses_events(events)
     choices = _objects(payload.get('choices'))
     if choices:
         message = choices[0].get('message') if isinstance(choices[0].get('message'), dict) else {}

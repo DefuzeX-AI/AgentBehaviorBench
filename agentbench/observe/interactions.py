@@ -11,7 +11,8 @@ import threading
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
-from .tool_links import link_tools
+from .input_artifacts import read_input_artifacts, request_paths, standalone_output
+from .tool_links import SCOPE_KEYS, link_tools
 from .native_links import link_native_calls
 
 _CACHE = OrderedDict()
@@ -54,6 +55,7 @@ def _files(root):
              'evaluation/workspace-artifacts.json', 'evaluation/workspace.json'}
     for pattern in ('steps/[0-9][0-9][0-9][0-9]', 'evaluation/inputs/[0-9][0-9][0-9][0-9]', 'invocation-*/output'):
         for folder in root.glob(pattern):
+            names.update(request_paths(folder.relative_to(root).as_posix()))
             for name in ('framework.jsonl', 'input.json', 'mapped-input.json', 'request.json',
                          'result.json', 'submission.json', 'file-evidence.json'):
                 names.add((folder / name).relative_to(root).as_posix())
@@ -135,16 +137,35 @@ class InteractionIndex:
                 except ValueError:
                     self.warnings.append(f'{name}: contains incomplete or invalid JSON')
 
-        for name, item in self.artifacts.items():
-            if name.endswith('/input.json'):
-                folder = name.rsplit('/', 1)[0]
-                inp = item['value']
-                self.contexts[folder] = {'folder': folder,
-                    'input_id': inp.get('input_id') if isinstance(inp, dict) else None,
-                    'case_id': inp.get('case_id') if isinstance(inp, dict) else None,
-                    **{key: self.artifacts.get(folder + '/' + filename, {}).get('value') for key, filename in {
-                        'input': 'input.json', 'mapped': 'mapped-input.json', 'invocation': 'request.json',
-                        'result': 'result.json', 'submission': 'submission.json'}.items()}}
+        folders = {name.rsplit('/', 1)[0] for name in self.artifacts if name.endswith('/input.json')}
+        for name in self.artifacts:
+            path = Path(name)
+            folder = (path.parent.parent / 'output').as_posix()
+            if path.name == 'request.json' and path.parent.name == 'input' and standalone_output(folder):
+                folders.add(folder)
+        def read_artifact(name):
+            return self.artifacts.get(name, {}).get('value')
+        for folder in sorted(folders):
+            inp, invocation = read_input_artifacts(folder, read_artifact)
+            if inp is None:
+                continue
+            context = self.contexts[folder] = {'folder': folder,
+                'input_id': inp.get('input_id'), 'case_id': inp.get('case_id'),
+                'input': inp, 'invocation': invocation,
+                **{key: read_artifact(folder + '/' + filename) for key, filename in {
+                    'mapped': 'mapped-input.json', 'result': 'result.json', 'submission': 'submission.json'}.items()}}
+            observed = invocation.get('observation_context') or {}
+            # In a standalone request, run_id identifies this invocation (the
+            # envelope's session_id identifies the enclosing observe run).
+            if standalone_output(folder) and invocation.get('schema') == 'abb.invocation.v1':
+                context['invocation_id'] = invocation.get('run_id')
+            context['identity_conflicts'] = []
+            for key in SCOPE_KEYS:
+                values = {v for v in (context.get(key), observed.get(key)) if v}
+                if len(values) > 1:
+                    context['identity_conflicts'].append(key)
+                elif values:
+                    context[key] = next(iter(values))
         spans = {}
         artifact_events = {}
         for record in records:
@@ -220,6 +241,15 @@ class InteractionIndex:
             status = 'failed' if failed else 'complete' if res else 'recorded' if not req else 'pending'
             if complete == 'legacy_address_only':
                 status = 'unknown'
+            identity = {}
+            conflicts = list((context or {}).get('identity_conflicts', []))
+            for key in SCOPE_KEYS:
+                recorded, scoped = request.get(key), (context or {}).get(key)
+                if recorded and scoped and recorded != scoped:
+                    conflicts.append(key)
+                identity[key] = recorded or scoped
+            if conflicts:
+                self.warnings.append(f'{identifier}: conflicting recorded identity: {", ".join(conflicts)}')
             self.rows.append({'id': identifier, 'kind': kind, 'tags': tags, 'title': title,
                 'timestamp': started, 'time_basis': 'recorded', 'ended': ended, 'duration_ms': duration,
                 'status': status, 'record_count': len(group), 'chunk_count': events.count('llm_chunk'),
@@ -231,13 +261,14 @@ class InteractionIndex:
                 'call_id': request.get('call_id'), 'framework_span_id': span_id or request.get('span_id'),
                 'parent_span_id': request.get('parent_span_id'), 'invocation_id': request.get('invocation_id'),
                 'native_session_id': request.get('native_session_id'),
-                'tool_call_id': request.get('tool_call_id'), 'purpose': request.get('native_purpose') or request.get('purpose', 'unknown'),
+                'tool_call_id': request.get('tool_call_id') or response.get('tool_call_id'), 'purpose': request.get('native_purpose') or request.get('purpose', 'unknown'),
                 'purpose_evidence': request.get('purpose_evidence'),
                 'required': request.get('required'),
                 'optional_operation': kind == 'http' and request.get('required') is False,
                 'artifact_directory': folder if context else None,
                 'destination': request.get('host'), '_context': folder if context else None,
-                '_request': req or (first if not res else None), '_response': res, '_callbacks': related})
+                '_request': req or (first if not res else None), '_response': res, '_callbacks': related,
+                **identity, 'identity_conflicts': conflicts})
 
         link_tools(self.rows, self.contexts)
         link_native_calls(self.rows, self.contexts)
@@ -247,7 +278,8 @@ class InteractionIndex:
                 'case_identified': sum(bool(r.get('case_id')) for r in rows),
                 'session_identified': sum(bool(r.get('native_session_id')) for r in rows),
                 'optional_failures': sum(r.get('optional_operation', False) and r['status'] == 'failed' for r in rows),
-                'input_identified': sum(bool(r.get('input_id')) for r in rows),
+                'input_identified': sum(bool(r.get('_context') or r.get('input_id'))
+                                        and not r.get('identity_conflicts') for r in rows),
                 'framework_linked': sum(bool(r['_callbacks']) for r in rows),
                 'emitted_tool_links': sum(link['status'] == 'exact' for r in rows for link in r.get('tool_relations', []))}
         chats = [r for r in self.rows if r['kind'] == 'chat']

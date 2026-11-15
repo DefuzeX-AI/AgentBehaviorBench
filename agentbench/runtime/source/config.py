@@ -8,6 +8,8 @@ from urllib.parse import urlsplit
 class GitSource:
     repository: str
     revision: str
+    # Export only the superproject tree; submodule contents are left out.
+    omit_submodules: bool = False
 
 
 @dataclass(frozen=True)
