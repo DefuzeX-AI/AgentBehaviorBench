@@ -63,3 +63,16 @@ def test_stream_protocols_and_arguments():
         {'choices': [{'delta': {'tool_calls': [{'id': 'chat'}]}}]},
         {'type': 'response.output_item.added', 'item': {'type': 'function_call', 'call_id': 'responses'}},
     ], 'input': {'type': 'tool_use', 'id': 'forged'}}) == {'anthropic', 'chat', 'responses'}
+
+
+def test_optional_execution_scope_keeps_unknown_candidates_and_legacy_default():
+    from agentbench.observe.tool_links import resolve_tools, SCOPE_KEYS
+    models = [{"id": "a", "execution_id": "child-a", "emitted_tool_ids": ["same"]},
+              {"id": "b", "execution_id": "child-b", "emitted_tool_ids": ["same"]}]
+    tools = [{"id": "ta", "execution_id": "child-a", "tool_call_id": "same"},
+             {"id": "tb", "execution_id": "child-b", "tool_call_id": "same"}]
+    assert all(v[0]["status"] == "ambiguous" for v in resolve_tools(models, tools).values())
+    scoped = (*SCOPE_KEYS, "execution_id")
+    assert all(v[0]["status"] == "exact" for v in resolve_tools(models, tools, scope_keys=scoped).values())
+    tools.append({"id": "unknown", "tool_call_id": "same"})
+    assert all(v[0]["status"] == "ambiguous" for v in resolve_tools(models, tools, scope_keys=scoped).values())

@@ -42,13 +42,13 @@ def emitted_tool_ids(payload):
 SCOPE_KEYS = ('run_id', 'case_id', 'attempt_id', 'input_id', 'invocation_id', 'native_session_id')
 
 
-def compatible(left, right):
+def compatible(left, right, *, scope_keys=SCOPE_KEYS):
     """Missing identity is unknown; contradictory recorded identity never matches."""
     return not (left.get('identity_conflicts') or right.get('identity_conflicts')) and all(
-        not left.get(key) or not right.get(key) or left[key] == right[key] for key in SCOPE_KEYS)
+        not left.get(key) or not right.get(key) or left[key] == right[key] for key in scope_keys)
 
 
-def resolve_tools(models, tools):
+def resolve_tools(models, tools, *, scope_keys=SCOPE_KEYS):
     """One rule for offline exports and live projections. IDs are scoped, not names."""
     result = {}
     for model in models:
@@ -56,11 +56,11 @@ def resolve_tools(models, tools):
         identifiers = model.get('emitted_tool_ids', [])
         for identifier in (sorted(identifiers) if isinstance(identifiers, set) else dict.fromkeys(identifiers)):
             candidates = [tool for tool in tools if tool.get('tool_call_id') == identifier
-                          and compatible(model, tool)]
+                          and compatible(model, tool, scope_keys=scope_keys)]
             # Count all possible owners of each execution too: incomplete scope must
             # not let two otherwise disjoint model calls both claim the same tool.
             emitters = [other for other in models if identifier in other.get('emitted_tool_ids', [])
-                        and (compatible(model, other) or any(compatible(other, tool) for tool in candidates))]
+                        and (compatible(model, other, scope_keys=scope_keys) or any(compatible(other, tool, scope_keys=scope_keys) for tool in candidates))]
             relations.append({'type': 'emitted_tool', 'tool_call_id': identifier,
                 'status': 'ambiguous' if len(emitters) > 1 or len(candidates) > 1 else 'exact' if candidates else 'unobserved',
                 'interaction_ids': [tool['id'] for tool in candidates]})

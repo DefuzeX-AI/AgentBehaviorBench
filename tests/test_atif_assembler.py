@@ -1,0 +1,76 @@
+from tests.atif_fixtures import fixture, child_bundle, lines, event, call, response
+from agentbench.trajectory.atif.export import build_export
+from agentbench.trajectory.atif.hierarchy import resolve_hierarchy
+from agentbench.trajectory.atif.assembler import assemble_atif
+from agentbench.trajectory.atif.provenance import provenance
+from agentbench.trajectory.atif.validation import walk
+
+
+def test_official_model_tool_usage_context_and_result_boundary(tmp_path):
+    fixture(tmp_path)
+    result, _ = build_export(tmp_path)
+    steps = result.document.steps
+    models = [s for s in steps if s.llm_call_count == 1]
+    assert len(models) == 1 # Runtime result is not another assistant reply.
+    model = models[0]
+    assert model.tool_calls[0].arguments == {"a": 19, "b": 23}
+    assert model.observation.results[0].content == "42"
+    assert model.observation.results[0].source_call_id == "tool-1"
+    assert model.metrics.prompt_tokens == 7
+    assert model.model_name == "observed-model"
+    assert model.extra["abb"]["model_record"]["input"]["model"] == "configured-model"
+
+
+def test_identical_text_from_two_executions_is_preserved(tmp_path):
+    bundle = child_bundle(tmp_path)
+    graph = resolve_hierarchy(bundle, adapters=["deepagents"])
+    doc = assemble_atif(bundle, graph, provenance(bundle))
+    assert sum(s.message == "identical text" for d in walk(doc) for s in d.steps) == 2
+    assert len(doc.subagent_trajectories) == 2
+    assert all([s.step_id for s in d.steps] == list(range(1, len(d.steps)+1)) for d in walk(doc))
+
+
+def test_partial_stream_and_incomplete_json_survive(tmp_path):
+    fixture(tmp_path, tool=False)
+    lines(tmp_path / "network.jsonl", [event("llm_request", call_id="wire-1", framework_span_id="model", payload={}),
+        event("llm_delta", call_id="wire-1", sequence=1, payload={"choices": [{"delta": {
+            "content": "半途 español", "tool_calls": [{"index": 0, **call(args='{"a":')}]}}]})])
+    result, _ = build_export(tmp_path)
+    model = next(s for s in result.document.steps if s.llm_call_count == 1)
+    assert model.message == "半途 español"
+    assert not model.tool_calls
+    assert model.extra["abb"]["model_record"]["output"]["tool_calls"][0]["arguments"] == '{"a":'
+    assert result.validation["status"] == "partial"
+
+
+def test_tool_errors_and_unobserved_result_do_not_become_success(tmp_path):
+    folder = fixture(tmp_path)
+    import json
+    rows = [json.loads(line) for line in (folder / "framework.jsonl").read_text(encoding="utf-8").splitlines()]
+    rows[-1] = event("span_error", span_id="tool", error="permission denied")
+    lines(folder / "framework.jsonl", rows)
+    result, _ = build_export(tmp_path)
+    observation = next(s for s in result.document.steps if s.observation).observation.results[0]
+    assert observation.extra["abb"]["tool_execution"]["execution_status"] == "error"
+    assert observation.content == "permission denied"
+
+
+def test_empty_partial_arguments_are_not_fabricated_as_empty_object(tmp_path):
+    fixture(tmp_path, tool=False)
+    lines(tmp_path / "network.jsonl", [event("llm_request", call_id="wire-1", framework_span_id="model", payload={}),
+        event("llm_delta", call_id="wire-1", sequence=1, payload={"choices": [{"delta": {
+            "tool_calls": [{"index": 0, **call(args="")}]}}]})])
+    result, _ = build_export(tmp_path)
+    step = next(s for s in result.document.steps if s.llm_call_count == 1)
+    assert not step.tool_calls
+    assert step.extra["abb"]["model_record"]["output"]["tool_calls"][0]["arguments"] == ""
+
+
+def test_known_execution_unlinked_tool_is_retained_without_fake_model(tmp_path):
+    fixture(tmp_path)
+    lines(tmp_path / "network.jsonl", [])
+    result, _ = build_export(tmp_path)
+    independent = [s for s in result.document.steps if (s.extra or {}).get("abb", {}).get("kind") == "independent_tool"]
+    assert len(independent) == 1
+    assert independent[0].llm_call_count is None
+    assert independent[0].observation.results[0].source_call_id is None
