@@ -7,6 +7,32 @@ from agentbench.trajectory import build, read, validate, write
 from tests.trajectory_fixtures import acp_attempt, langgraph_attempt, PROMPT
 
 
+def test_saved_tool_sets_round_trip_and_read_legacy_files(tmp_path, monkeypatch):
+    root = langgraph_attempt(tmp_path)
+    value = build(root)
+    first, second = value['steps']
+    second['input']['tools'] = list(reversed(first['input']['tools']))
+    monkeypatch.setattr('agentbench.trajectory.build', lambda *args, **kwargs: value)
+    path = root / 'trajectory.json'
+    path.write_text(json.dumps(value), encoding='utf-8')
+    assert read(root) == value
+
+    write(root, environ={})
+    stored = json.loads(path.read_text(encoding='utf-8'))
+    config = stored['metadata']['agent_configuration']
+    stored_first, stored_second = (step['input'] for step in stored['steps'])
+    assert all('tools' not in owner for owner in (config, stored_first, stored_second))
+    assert config['tools_ref'] == stored_first['tools_ref']
+    assert stored_second['tools_ref'] != stored_first['tools_ref']
+    assert len(stored['tool_sets']) == 2
+    assert read(root) == value
+
+    stored_first['tools_ref'] = 'missing'
+    path.write_text(json.dumps(stored), encoding='utf-8')
+    with pytest.raises(ValueError, match='unresolved tools_ref'):
+        read(root)
+
+
 def test_langgraph_model_calls_become_steps_with_linked_tool_logs(tmp_path):
     value = validate(build(langgraph_attempt(tmp_path)))
     assert value['status'] == 'complete' and value['framework'] == 'langgraph'

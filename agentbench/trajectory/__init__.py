@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .schema import SCHEMA, validate
 from .builder import build
+from . import tool_sets
 
 FILENAME = 'trajectory.json'
 
@@ -27,7 +28,7 @@ def read(directory):
     path = Path(directory) / FILENAME
     if not path.is_file() or path.is_symlink():
         return None
-    return validate(json.loads(path.read_text(encoding='utf-8')))
+    return tool_sets.expand(validate(json.loads(path.read_text(encoding='utf-8'))))
 
 
 def load(directory, *, environ=None, project_root=None):
@@ -41,10 +42,20 @@ def load(directory, *, environ=None, project_root=None):
 
 
 def write(directory, *, environ=None, project_root=None):
-    """Always leave a trajectory.json behind; failures are recorded, not raised."""
+    """
+    
+    Always leave a trajectory.json behind; failures are recorded, not raised.
+    
+    trajectory.json write from here
+    
+    
+    """
     from agentbench.sdk.common.artifacts import Artifacts
+
+    # safe content
     root = Path(directory)
     files = Artifacts(root, environ=environ)
+
     try:
         value = validate(build(root, environ=environ,
                                project_root=project_root if project_root is not None else _project_root()))
@@ -56,7 +67,9 @@ def write(directory, *, environ=None, project_root=None):
             pass
         value = {'schema': SCHEMA, 'status': 'failed', 'run_id': run.get('run_id') or root.name,
                  'agent_id': run.get('agent_id') or 'unknown', 'error_type': type(exc).__name__, 'error': str(exc)}
-    files.save(FILENAME, value)
+    
+    # saving file
+    files.save(FILENAME, tool_sets.encode(value))
     raw = (root / FILENAME).read_bytes()
     return {'status': value['status'], 'path': FILENAME, 'sha256': hashlib.sha256(raw).hexdigest(),
             'steps': len(value.get('steps') or [])}

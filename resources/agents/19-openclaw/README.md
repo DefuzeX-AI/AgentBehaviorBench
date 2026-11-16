@@ -6,6 +6,12 @@ through its built-in ACP bridge (`openclaw acp`). ABB invokes the bridge over AC
 stdio and keeps each Case in a separate empty workspace. No upstream source is
 vendored or modified.
 
+For a native Case with exactly one declared input, ABB tags the private Agent
+container's model events with that frozen `input_id`. The viewer confirms the
+link against the matching input artifact and reports
+`isolated_single_input_case` as evidence. Multi-input Cases require separate
+per-turn evidence and do not receive this tag.
+
 License: MIT (the repository's `LICENSE` file and the npm package's `license`
 field). GitHub's license detection reports `NOASSERTION` for the repository.
 

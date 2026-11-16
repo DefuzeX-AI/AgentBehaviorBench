@@ -158,6 +158,27 @@ class RunCatalogAPI:
 
 
 class RunViewAPI:
+    """Provide read-only access to the artifacts of a single run.
+
+    Args:
+        directory (Path): Directory containing the run's saved artifacts.
+
+    Attributes:
+        directory (Path): Resolved absolute path to the artifact directory.
+        run_id (str): Run identifier taken from the supplied directory name.
+
+    Methods:
+        file(relative): Resolve an artifact path within the run directory.
+        read(relative): Parse a JSON artifact, returning None if missing.
+        outputs(): List per-invocation and per-input output directories.
+        spans(): Merge saved and live OTel spans with statuses and warnings.
+        evaluation(): Collect case data, execution results, and Judge reports.
+        trajectory(): Read the saved trajectory, report pending execution,
+            or derive a trajectory for historical runs without a saved file.
+        events(offset): Read up to 100 network and framework events after
+            the given cursor.
+        route(path, query): Dispatch a viewer request to its artifact reader.
+    """
     def __init__(self, directory):
         self.directory = directory.resolve()
         self.run_id = directory.name
@@ -238,6 +259,8 @@ class RunViewAPI:
         """
         from agentbench import trajectory
         saved = trajectory.read(self.directory)
+
+        
         if saved is not None:
             return saved
         metadata = self.read('run.json') or {}
@@ -284,6 +307,9 @@ class RunViewAPI:
         if not path.startswith(prefix):
             raise ValueError('Run does not match this viewer')
         route = path[len(prefix):]
+
+
+        # commandline
         if route == 'metadata':
             return self.read('run.json') or {}
         if route == 'interactions':
