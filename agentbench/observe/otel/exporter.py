@@ -44,11 +44,11 @@ class FileExporter(SpanExporter):
                                     span_id=f'{span.context.span_id:016x}',
                                     parent_span_id=f'{span.parent.span_id:016x}' if span.parent else None,
                                     start_time_unix_nano=str(span.start_time),
-                                    end_time_unix_nano=str(span.end_time))
+                                    end_time_unix_nano=str(span.end_time) if span.end_time is not None else None)
                         data.update(dropped_attributes=span.dropped_attributes,
                                     dropped_events=span.dropped_events, dropped_links=span.dropped_links)
                         row = dict(schema='abb.observe.event.v1', source='otel', event='span',
-                                   run_id=self.session_id, timestamp=data['end_time'], data=data)
+                                   run_id=self.session_id, timestamp=data['end_time'] or datetime.now(timezone.utc).isoformat(), data=data)
                         stream.write(json.dumps(redact(row, self.secrets), ensure_ascii=False) + '\n')
                         if span.end_time is not None:
                             self.local_attributes.pop(span.context.span_id, None)
