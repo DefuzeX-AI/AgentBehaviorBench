@@ -2,6 +2,10 @@
 
 
 def _segment_name(segment):
+
+    '''
+        "researcher:abc123" -> "researcher"
+    '''
     return segment.split(':', 1)[0]
 
 

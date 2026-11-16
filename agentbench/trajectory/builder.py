@@ -127,8 +127,12 @@ def _model_step(index, entry, agent_id, limit):
 
 
 def build(directory, *, environ=None, project_root=None):
-    root = Path(directory).resolve()
-    api = RunViewAPI(root)
+    '''
+        build trajectory here
+    '''
+
+    root = Path(directory).resolve() # get attempt directory
+    api = RunViewAPI(root) # 
     index = load_index(root)
     limit = max_value_bytes(environ)
     run = api.read('run.json') or {}
@@ -237,16 +241,31 @@ def build(directory, *, environ=None, project_root=None):
                                      actors=actors, project_root=project_root)
     # Missing unit references limit context, not the step evidence itself.
     metadata['notes'] = notes
+
     sources = {s.get('source') for s in steps if s['kind'] == 'model'}
+
     model_coverage = ('wire+framework' if 'wire+framework' in sources else 'wire' if 'wire' in sources
                       else 'framework' if 'framework' in sources else 'not_observed')
+    
     acp = any(api.read(f'{folder}/acp-summary.json') for folder in folders)
+
     tool_coverage = 'acp' if acp else 'framework' if tools else 'not_observed'
+
     files_coverage = next((c for c in ('diff', 'replay', 'skipped', 'not_observed') if c in file_coverage), 'not_observed')
+
     unlinked = sum(s['kind'] == 'tool_only' for s in steps)
+
     not_observed = sum(log['execution_status'] == 'not_observed' for s in steps for log in s['tool_logs'])
+
+    # Start with index warnings and append parsing or linking warnings during the build.
+    # not_observed: count tool calls whose execution was not observed.
+    # not steps: check whether no trajectory steps were generated.
+    status = 'partial' if warnings or not_observed or not steps else 'complete'
+
+
+    # finally getting value
     value = {'schema': SCHEMA, 'builder_version': BUILDER_VERSION,
-             'status': 'partial' if warnings or not_observed or not steps else 'complete',
+             'status': status,
              'run_id': run.get('run_id') or root.name, 'agent_id': agent_id,
              'case_id': identity['case_id'], 'framework': identity['framework'],
              'metadata': bounded(metadata, limit), 'steps': steps, 'inputs': inputs,
