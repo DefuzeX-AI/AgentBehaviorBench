@@ -48,6 +48,26 @@ def test_explicit_record_identity_can_link_input(tmp_path):
     assert row['link_evidence'] == 'record_input_id'
 
 
+def test_isolated_input_scope_requires_matching_input_artifact(tmp_path):
+    write_run(tmp_path, explicit_input='step-1')
+    path = tmp_path / 'network.jsonl'
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    rows[0]['data']['input_scope'] = 'isolated_single_input_case'
+    path.write_text('\n'.join(json.dumps(row) for row in rows))
+
+    result = interactions(tmp_path, {'kinds': 'chat'})
+    row, = result['items']
+    assert row['input_id'] == 'step-1'
+    assert row['link_evidence'] == 'isolated_single_input_case'
+    assert result['correlation']['model']['input_identified'] == 1
+
+    (tmp_path / 'evaluation/inputs/0001/input.json').unlink()
+    result = interactions(tmp_path, {'kinds': 'chat'})
+    row, = result['items']
+    assert row['input_id'] is None
+    assert result['correlation']['model']['input_identified'] == 0
+
+
 def test_title_purpose_preserves_session_only_ownership(tmp_path):
     write_run(tmp_path)
     path = tmp_path / 'network.jsonl'

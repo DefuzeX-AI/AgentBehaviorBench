@@ -53,7 +53,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                    require_workspace_identity=False,
                    safe_case_replay=False, validate_failed_execution=None,
                    collect_artifacts=None, excluded_agent_environment=(),
-                   repository_target='/opt/abb-sdk-repo'):
+                   repository_target='/opt/abb-sdk-repo', model_input_id=None):
     """Run an SDK worker using the host facilities supplied to its runner.
 
     ``stage_agent`` is an image-staging context manager, usually a partial of
@@ -174,7 +174,16 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                 store = TraceStore(directory / 'logs/network.jsonl', directory.name,
                                    source='interceptor', context=identity, environ=environ)
                 class Sink:
+                    def __init__(self, input_id=None):
+                        self.input_id = input_id
+
                     def emit(self, event):
+                        if (self.input_id is not None and event.event.startswith('llm_')
+                                and not event.data.get('input_id')):
+                            event = TraceEvent(event.event, {
+                                **event.data, 'input_id': self.input_id,
+                                'input_scope': 'isolated_single_input_case',
+                            })
                         # Preserve full evidence before handing a bounded summary to UI.
                         store.emit(event)
                         if trace_sink is not None:
@@ -219,6 +228,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     agent_outputs = directory / 'agent-output'
                     Path(agent_outputs).mkdir(mode=0o700)
                     options = dict(runtime_options)
+                    options['trace_sink'] = Sink(model_input_id)
                     options['policy'] = AgentExecutionPolicy(repository, target, bool(policy.path), channel, agent_outputs)
                     options['artifact_root'] = directory / 'agent-runtime'
                     Path(options['artifact_root']).mkdir()

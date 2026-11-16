@@ -40,10 +40,12 @@ def execute(args):
     if not args.write:
         sys.stdout.write(_canonical(value).decode('utf-8') + '\n')
         return 0
+    from agentbench.trajectory.tool_sets import encode
+    stored = encode(value)
     target = directory / trajectory.FILENAME
     if target.exists() and not args.force:
-        existing = target.read_bytes()
-        if existing != _canonical(value):
+        existing = target.read_text(encoding='utf-8')
+        if existing != _canonical(stored).decode('utf-8'):
             try:
                 same = json.loads(existing).get('sources') == value.get('sources')
             except ValueError:
@@ -53,7 +55,7 @@ def execute(args):
                   + '; use --force to replace it', file=sys.stderr)
             return 1
     from agentbench.sdk.common.artifacts import Artifacts
-    Artifacts(directory).save(trajectory.FILENAME, value)
+    Artifacts(directory).save(trajectory.FILENAME, stored)
     print(f"Saved {target} ({value['status']}, {len(value['steps'])} steps)")
     return 0 if value['status'] != 'failed' else 1
 

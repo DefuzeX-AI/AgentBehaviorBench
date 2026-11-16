@@ -230,6 +230,8 @@ class InteractionIndex:
                               and (not case_id or c['case_id'] == case_id)]
                 if len(candidates) == 1:
                     context = candidates[0]; folder = context['folder']; evidence = 'record_input_id'
+                    if request.get('input_scope') == 'isolated_single_input_case':
+                        evidence = 'isolated_single_input_case'
             started = (req or first)['raw'].get('timestamp')
             ended = res['raw'].get('timestamp') if res else None
             duration = response.get('latency_ms')
@@ -248,6 +250,9 @@ class InteractionIndex:
                 if recorded and scoped and recorded != scoped:
                     conflicts.append(key)
                 identity[key] = recorded or scoped
+            if context is None and request.get('input_scope') == 'isolated_single_input_case':
+                # A declared scope is only confirmed once its invocation exists.
+                identity['input_id'] = None
             if conflicts:
                 self.warnings.append(f'{identifier}: conflicting recorded identity: {", ".join(conflicts)}')
             self.rows.append({'id': identifier, 'kind': kind, 'tags': tags, 'title': title,

@@ -17,8 +17,11 @@ a flat sequence 𝒯 = ⟨s₁…s_T⟩ where each step records
 `(input x_t, output y_t, acting component a(t), step_id, agent_id)` and tool
 logs are attached to the step that issued the call. That paper's ablation shows
 step-level attribution degrades most when per-step inputs or run metadata are
-dropped, so both are stored complete. Compression happens only when rendering
-for a reader (`render.py`), never in the stored file.
+dropped, so both are stored complete. The saved file stores each distinct tool
+list once in `tool_sets`. Model inputs and agent configuration use `tools_ref`
+to identify their list. The reader expands these references and also accepts
+older files with inline `tools`. Rendering (`render.py`) can shorten the
+presentation separately.
 
 ## Vocabulary
 

@@ -10,6 +10,7 @@ from agentbench.harness.result import BenchmarkResult, BenchmarkStepResult, Benc
 from agentbench.sdk.common.workspace import workspace_digest
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.observe.store import redact
+from agentbench.runtime.agentcontainer.config import tomllib
 from agentbench.sdk.contracts import PreparedCase
 from .cases import case_bytes, digest, unpack_case
 from .execution import run_evaluation
@@ -130,6 +131,19 @@ class ContainerSDKRunner:
                       agent_id=registration.agent_id, detail=f'Prepared {len(cases)} Cases')
         return tuple(cases)
 
+    def _single_input_model_scope(self, registration, snapshot):
+        # Only the native case contract declares the full input sequence up front.
+        inputs = snapshot.get('inputs')
+        if not getattr(self.plugin, 'execution_only', False) or not isinstance(inputs, list) or len(inputs) != 1:
+            return None
+        item = inputs[0]
+        if not isinstance(item, dict) or not isinstance(item.get('input_id'), str):
+            return None
+        manifest = tomllib.loads((registration.path / 'agent.toml').read_text(encoding='utf-8'))
+        if manifest.get('evaluation', {}).get('single_input_model_scope') is True:
+            return item['input_id']
+        return None
+
     def run_case(self, registration, case, *, on_progress=None, on_step_start=None,
                  on_step_complete=None, on_step_failure=None):
         self.validate_sdk(registration)
@@ -147,12 +161,14 @@ class ContainerSDKRunner:
             raise ValueError('Prepared Case was modified after generation')
         context = replace(self.context, job_context={**dict(self.context.job_context or {}),
                           'case_index': case.case_index, 'case_id': case.case_id})
+        model_input_id = self._single_input_model_scope(registration, snapshot)
         directory = self._run(registration, context=context, on_progress=on_progress,
             settings=self._settings(registration, mode='execute', case_index=case.case_index,
                 source_case_index=source_index,
                 expected_case_id=case.case_id, expected_content_sha256=case.content_sha256,
                 expected_artifact_sha256=case.artifact_sha256),
             private_files={'case.json': case.artifact_path},
+            model_input_id=model_input_id,
             expected_environment_sha256=case.environment_sha256, require_workspace_identity=True)
         try:
             result = self._read_result(directory, registration, case, document)
