@@ -1,0 +1,63 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "structureclaw"
+display_name = "StructureClaw (native TypeScript LangGraph)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "install"
+repository = "https://github.com/structureclaw/structureclaw"
+revision = "5224d2dcbc3a74a515938d0d79a36bbaee412492"
+downloaded_on = "2026-10-26"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 600
+cpus = 2
+env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+input_key = "message"
+output_key = "response"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
+
+[llm_interception.environment]
+LLM_BASE_URL = "https://api.openai.com/v1"
+LLM_MODEL = "gpt-4o"
+
+[[llm_interception.credentials]]
+id = "openai-compatible"
+agent_env = "LLM_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "native-openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai-compatible"
