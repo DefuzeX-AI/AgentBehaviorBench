@@ -93,16 +93,9 @@ def assemble_atif(bundle, graph, provenance):
                  observation=Observation(results=[observed(tool)]),
                  extra={"abb": {"kind": "independent_tool", "association": "unlinked"}})))
 
-    # An explicit invocation input is not inferred from repeated model history.
-    for number, item in enumerate(bundle.inputs):
-        if item["record"] is None:
-            continue
-        invocation = item["context"].get("invocation_id")
-        relevant = [m for m in bundle.models if invocation and m.get("invocation_id") == invocation]
-        first = min((stamp(m.get("timestamp")) or 0 for m in relevant), default=0)
-        pending[graph.root_id].append((first, "!input:" + str(number),
-            Step(step_id=1, source="user", message=text(item["record"].get("payload")),
-                 extra={"abb": {"invocation": item}})))
+    from .replies import root_steps
+    root_rows = root_steps(bundle, pending[graph.root_id], issues)
+    pending[graph.root_id] = [(i, "", step) for i, step in enumerate(root_rows)]
     for nid, node in graph.nodes.items():
         if nid != graph.root_id and node.input is not None:
             pending[nid].append((-1, "!input", Step(step_id=1, source="user", message=text(node.input),

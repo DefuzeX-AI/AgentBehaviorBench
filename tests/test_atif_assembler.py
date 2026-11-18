@@ -1,4 +1,5 @@
 from tests.atif_fixtures import fixture, child_bundle, lines, event, call, response
+from agentbench.trajectory.atif.reader import read_evidence
 from agentbench.trajectory.atif.export import build_export
 from agentbench.trajectory.atif.hierarchy import resolve_hierarchy
 from agentbench.trajectory.atif.assembler import assemble_atif
@@ -13,12 +14,16 @@ def test_official_model_tool_usage_context_and_result_boundary(tmp_path):
     models = [s for s in steps if s.llm_call_count == 1]
     assert len(models) == 1 # Runtime result is not another assistant reply.
     model = models[0]
-    assert model.tool_calls[0].arguments == {"a": 19, "b": 23}
-    assert model.observation.results[0].content == "42"
-    assert model.observation.results[0].source_call_id == "tool-1"
-    assert model.metrics.prompt_tokens == 7
-    assert model.model_name == "observed-model"
-    assert model.extra["abb"]["model_record"]["input"]["model"] == "configured-model"
+    assert model.tool_calls is None
+    assert model.metrics is None and model.model_name is None
+    assert model.extra["abb"]["model_record"]["source"] == "framework"
+    tool = next(s for s in steps if s.observation).observation.results[0]
+    assert tool.content == "42"
+    assert tool.extra["abb"]["tool_execution"]["input_arguments"] == {"a": 19, "b": 23}
+    wire = read_evidence(tmp_path).models[0]
+    assert wire["output"]["usage"]["prompt_tokens"] == 7
+    assert wire["output"]["model"] == "observed-model"
+
 
 
 def test_identical_text_from_two_executions_is_preserved(tmp_path):
@@ -37,10 +42,12 @@ def test_partial_stream_and_incomplete_json_survive(tmp_path):
             "content": "半途 español", "tool_calls": [{"index": 0, **call(args='{"a":')}]}}]})])
     result, _ = build_export(tmp_path)
     model = next(s for s in result.document.steps if s.llm_call_count == 1)
-    assert model.message == "半途 español"
+    assert model.message == "你好 ¡España!"
+    wire = read_evidence(tmp_path).models[0]
+    assert wire["output"]["text"] == "半途 español"
     assert not model.tool_calls
-    assert model.extra["abb"]["model_record"]["output"]["tool_calls"][0]["arguments"] == '{"a":'
-    assert result.validation["status"] == "partial"
+    assert wire["output"]["tool_calls"][0]["arguments"] == '{"a":'
+    assert wire["status"] == "incomplete"
 
 
 def test_tool_errors_and_unobserved_result_do_not_become_success(tmp_path):
@@ -63,7 +70,7 @@ def test_empty_partial_arguments_are_not_fabricated_as_empty_object(tmp_path):
     result, _ = build_export(tmp_path)
     step = next(s for s in result.document.steps if s.llm_call_count == 1)
     assert not step.tool_calls
-    assert step.extra["abb"]["model_record"]["output"]["tool_calls"][0]["arguments"] == ""
+    assert read_evidence(tmp_path).models[0]["output"]["tool_calls"][0]["arguments"] == ""
 
 
 def test_known_execution_unlinked_tool_is_retained_without_fake_model(tmp_path):
@@ -74,3 +81,41 @@ def test_known_execution_unlinked_tool_is_retained_without_fake_model(tmp_path):
     assert len(independent) == 1
     assert independent[0].llm_call_count is None
     assert independent[0].observation.results[0].source_call_id is None
+
+
+def test_numbered_turns_and_identical_deliveries(tmp_path):
+    from tests.atif_fixtures import save
+    folder = fixture(tmp_path, layout="steps", tool=False)
+    # Keep only unowned model evidence to exercise the user-visible projection.
+    lines(folder / "framework.jsonl", [])
+    for i in range(1, 12):
+        directory = folder.parent / f"{i:04d}"
+        save(directory / "input.json", {"input_id": str(i), "payload": str(i)})
+        save(directory / "result.json", {"input_id": str(i), "output": "Hola", "status": "succeeded"})
+    result, _ = build_export(tmp_path)
+    assert [(s.source, s.message) for s in result.document.steps] == [
+        pair for i in range(1, 12) for pair in [("user", str(i)), ("agent", "Hola")]]
+    assert result.validation["observed_models"] == result.validation["unassigned_records"] == 0
+    assert len(read_evidence(tmp_path).models) == 1
+
+
+def test_only_confirmed_reply_is_projected(tmp_path):
+    from tests.atif_fixtures import save
+    folder = fixture(tmp_path, layout="steps")
+    for result in ({"status": "cancelled", "output": "partial"},
+                   {"status": "failed", "output": "error"},
+                   {"status": "succeeded", "input_id": "other", "output": "wrong turn"},
+                   {"status": "succeeded", "output": {"debug": "internal state"}}):
+        save(folder / "result.json", result)
+        exported, _ = build_export(tmp_path)
+        assert all("result_source" not in s.extra["abb"] for s in exported.document.steps if s.extra)
+
+
+def test_final_provider_response_ref_reuses_root_model_step():
+    from pathlib import Path
+    exported, bundle = build_export(Path(__file__).parent / "fixtures/atif/two_children", adapters=["deepagents"])
+    answer = bundle.inputs[0]["result"]["output"]
+    delivered = [s for s in exported.document.steps if s.message == answer]
+    assert len(delivered) == 1
+    assert delivered[0].llm_call_count == 1
+    assert delivered[0].extra["abb"]["result_source"].endswith("/result.json")
