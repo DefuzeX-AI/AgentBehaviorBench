@@ -47,11 +47,12 @@ Disconnected/cyclic ancestry and conflicting boundaries never fall back to root
 ownership. Unknown tool executions remain candidates during scoped matching,
 preventing a falsely unique tool association.
 
-Unique model/framework spans merge while retaining both evidence sources. Network
-retries sharing a framework callback remain separate attempts; the final callback
-reply is retained as shared evidence rather than duplicated into each attempt's
-message. Recorded configured/actual models remain distinct. The runtime result
-is stored with its invocation, without manufacturing another model reply.
+The trace inventory links compatible network and framework spans and retains
+transport retries. Starting with builder version 4, ATIF assembly uses the
+native evidence before that join. An interceptor request or response cannot
+supply an ATIF step, system prompt, tool call or usage. The portable bundle
+keeps the transport evidence under `runs/`. A recorded outward reply can
+supply an agent step independently of model ownership.
 
 User inputs and observed initial system messages become steps. Full model
 messages/tools/parameters remain in `Step.extra.abb.model_record`. Repeated model
@@ -64,7 +65,7 @@ model call counts are not set to zero. Only recorded usage/cost is exported;
 incomplete totals are not presented as full totals.
 
 Normalized operations with unknown execution ownership are retained in root
-`extra.abb.unassigned_records`. All read JSONL records, including malformed final
+`extra.abb.unassigned_records`. Native JSONL records, including malformed final
 lines, chain events, and OTel envelopes, are preserved in `extra.abb.raw_records`.
 Auxiliary OTel payloads/runtime/configuration facts are retained separately.
 The association report accounts for every raw source position as assigned or
