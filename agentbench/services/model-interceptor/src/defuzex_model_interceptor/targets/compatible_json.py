@@ -43,6 +43,10 @@ class CompatibleJSONTarget:
             raise TargetRoutingError(str(exc)) from exc
         source_model = wire.source_model
         payload["model"] = target.model
+        # Explicit deployment option for Chat APIs supporting thinking.type.
+        # Retain source_payload for audit and leave other protocols untouched.
+        if target.chat_thinking is not None and wire.endpoint == "/chat/completions":
+            payload["thinking"] = {"type": target.chat_thinking}
         parsed = urlsplit(target.base_url)
         if parsed.scheme != "https" or not parsed.hostname:
             raise TargetRoutingError("Target base URL must use HTTPS")

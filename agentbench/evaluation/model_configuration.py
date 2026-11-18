@@ -40,6 +40,7 @@ def agent_model_configuration(registrations, *, environ, model):
                     'base_url': target.base_url, 'target_plugin': target.target_plugin,
                     'endpoint_paths': dict(target.endpoint_paths) if target.endpoint_paths is not None else None,
                     'headers': dict(target.headers),
+                    **({'chat_thinking': target.chat_thinking} if target.chat_thinking is not None else {}),
                 } for name, target in resolved.targets.items()},
                 'inputs': resolved.inputs, 'rules': resolved.rules, 'explicit': resolved.explicit,
             }, secrets)
