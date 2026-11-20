@@ -7,8 +7,6 @@ import sys
 from argparse import Action, ArgumentError, ArgumentParser, Namespace, RawDescriptionHelpFormatter, SUPPRESS
 from pathlib import Path
 
-from agentbench.onboarding.source import download_agent
-
 from .base import CommandFeature
 from .run import DEFAULT_REGISTRY_PATH
 from agentbench.cli.sdk import configure_sdk_parser
@@ -89,11 +87,12 @@ def _add(args: Namespace) -> int:
     if not args.build and (args.with_observe or args.agent_timeout is not None or args.adapter_context):
         raise ValueError("--with-observe, --agent-timeout and --adapter-context require -b")
     print("Preparing Agent source...", file=sys.stderr)
-    if args.build or args.certify:
-        from agentbench.onboarding.resume import download_or_reuse
-        result = download_or_reuse(args.repository, args.agents_dir)
-    else:
-        result = download_agent(args.repository, args.agents_dir)
+    from agentbench.onboarding.workflow import add_from_cli
+    return add_from_cli(args, on_source=_show_source,
+                        output_fn=lambda message: print(message, file=sys.stderr))
+
+
+def _show_source(result):
     print(f"Agent directory: {result.directory}", file=sys.stderr)
     if result.source_type == "local-directory":
         print(f"Local source copied from: {result.repository}", file=sys.stderr)
@@ -109,10 +108,6 @@ def _add(args: Namespace) -> int:
     print("Files relative to agent/ (source imported; benchmark configuration pending):",
           file=sys.stderr)
     print(json.dumps(result.files, ensure_ascii=False, indent=2))
-    if args.build or args.certify:
-        from agentbench.onboarding.workflow import configure_download
-        return configure_download(result, args, output_fn=lambda message: print(message, file=sys.stderr))
-    return 0
 
 
 FEATURE = CommandFeature(

@@ -6,34 +6,36 @@ from agentbench.sdk.contracts import SDKOnboarding
 from agentbench.sdk.plugins import resolve_sdk
 
 from .build_agent_env.common.registry import register_agent
-from .build_agent_env.service import build_agent_environment
+from .add import add_agent
 from .build_agent_env.common.errors import BuildError
 from .build_agent_env.common.validation import validate_unit
 from .build_agent_env.build_toml.options import options_from_cli
 
 
-def configure_download(source, args, *, output_fn=print) -> int:
+def add_from_cli(args, *, on_source=None, output_fn=print) -> int:
     """Run requested stages only; -c never implicitly generates configuration."""
 
-    load_project_environment(args.env_file)
-    loaded = execution_environment_snapshot()
-    options = sdk_arguments(args)
-
-    if "sdk_selection" not in options:
-        options["sdk_selection"] = resolve_sdk(args.sdk)
-    selection = options["sdk_selection"]
-    sdk = selection.value
-
-    if not isinstance(sdk, SDKOnboarding):
-        raise BuildError("Selected SDK has no onboarding validation capability")
-
-    
+    loaded, sdk, options = None, None, {}
+    if args.build or args.certify:
+        load_project_environment(args.env_file)
+        loaded = execution_environment_snapshot()
+        options = sdk_arguments(args)
+        if "sdk_selection" not in options:
+            options["sdk_selection"] = resolve_sdk(args.sdk)
+        sdk = options["sdk_selection"].value
+        if not isinstance(sdk, SDKOnboarding):
+            raise BuildError("Selected SDK has no onboarding validation capability")
+    added = add_agent(
+        args.repository, args.agents_dir, registry_path=args.registry,
+        build=args.build, reuse=args.certify, sdk=sdk,
+        environ=loaded.environ if loaded else None,
+        settings_path=args.build_settings, model=args.build_model, answers_path=args.answers,
+        manifest_options=options_from_cli(args) if args.build else None,
+        on_source=on_source, output_fn=output_fn,
+    )
+    source = added.source
     if args.build:
-        output_fn("Collecting source evidence and requesting an OpenRouter configuration...")
-        result = build_agent_environment(
-            source, sdk=sdk, registry_path=args.registry, environ=loaded.environ,
-            settings_path=args.build_settings, model=args.build_model, answers_path=args.answers,
-            output_fn=output_fn, manifest_options=options_from_cli(args))
+        result = added.configuration
         output_fn(f"Build status: {result.status}; records: {result.attempt}")
         for message in result.messages:
             output_fn(f"  {message}")
