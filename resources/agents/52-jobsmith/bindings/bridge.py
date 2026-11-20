@@ -258,7 +258,6 @@ class JobsmithBinding:
         run_config = dict(config or {})
         run_config.setdefault("configurable", {})
         run_config["configurable"].setdefault("thread_id", "abb-jobsmith-case")
-        run_config.setdefault("recursion_limit", 50)
         final_state = app.invoke(initial, config=run_config)
 
         cover = final_state.get("cover_letter")

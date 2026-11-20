@@ -23,8 +23,7 @@ Deployment settings (upstream setting keys, passed through `create_settings_snap
 | `search.tool` | `wikipedia` | keyless primary search engine (upstream default SearXNG needs a self-hosted instance) |
 | `search.engine.web.tavily.api_key` | `$TAVILY_API_KEY`, only when set | enables Tavily as an extra engine |
 | `policy.egress_scope` | `public_only` | upstream `strict` denies every public host, including Wikipedia |
-| `langgraph_agent.max_iterations` / `max_sub_iterations` / `max_subagent_workers` | `15` / `5` / `2` (upstream 50 / 8 / 4) | bounded budget: with defaults a 2-step KUMA Case made ~270 model calls and ~1900 Wikipedia requests and hit the 2400 s execution timeout |
-| `search.max_results`, `search.engine.web.wikipedia.default_params.max_results` | `10` (upstream 50 / 20) | same |
+| Research and search budgets | Native settings | No ABB budget override; explicit configurable.settings_snapshot values take precedence |
 
 The binding's `ainvoke` runs the synchronous API on the worker's main thread on purpose:
 upstream's `@no_db_settings` guard refuses callers on a non-`MainThread` thread that has no web

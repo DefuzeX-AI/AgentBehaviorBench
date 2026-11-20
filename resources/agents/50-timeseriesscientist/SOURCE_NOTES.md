@@ -1,3 +1,9 @@
+# Current execution configuration
+
+The historical deployment-budget notes below describe earlier runs. Current bindings
+preserve native DEFAULT_CONFIG, native model clients and their limits/retries. ABB
+no longer supplies call, input-size or output budgets. See docs/Native-Execution-Configuration.md.
+
 # TimeSeriesScientist integration
 
 The source is acquired by ABB with `method="git"` at commit `41b396316fee25462c56cb53635b42660042d890`. Inner `agent/` is ignored runtime material, not part of this contribution. A clean source preparation restores and inventories the actual upstream files; no native graph descriptor is invented. The outer factory is `bindings/tsci_workflow.py:create_graph`.

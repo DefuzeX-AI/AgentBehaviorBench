@@ -35,8 +35,8 @@ supplies the mission goal as plain text; the binding makes that text the episode
 description. The episode then loops: the policy asks the configured OpenAI-compatible
 `chat/completions` endpoint for one JSON action, applies it, and feeds the observation
 back in. The scenario is the repository's own `open_vocab_navigation` scenario: a single
-UAV asset, one target with a goal position, the `ovn_default` evaluator. A Case is bounded
-to `LINGJING_MAX_STEPS` (default 6) steps because every step is one model call.
+UAV asset, one target with a goal position, the `ovn_default` evaluator. Episode termination uses the native scenario settings. An explicit
+`configurable.max_steps` overrides `LINGJING_MAX_STEPS`; neither has an ABB default.
 
 The deployment's only outbound call is that model endpoint. The mock engine is a 2D
 point-mass simulator that moves the asset by the action's `offset` (scaled by `speed`) and
@@ -78,8 +78,8 @@ withheld ones):
   writable working directory; nothing is exposed over HTTP and nothing survives the run.
 - **No external tools.** No web search, shell, filesystem access, satellite or drone
   hardware, and no multi-agent coordination endpoint.
-- **Bounded episodes.** One Case is limited to `LINGJING_MAX_STEPS` steps; the upstream
-  scenario's own limit is 30.
+- **Native episode limits.** The native scenario and loop own termination; ABB
+  only forwards explicitly supplied step settings.
 - **Single-episode Cases.** Every Case input starts a fresh mock episode, and the agent
   answers with that episode's execution summary. Case generation should therefore target
   single-episode missions (for example, reach a goal and report the trajectory) rather

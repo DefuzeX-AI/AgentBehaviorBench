@@ -253,7 +253,10 @@ class LocalRagResearcherGraph:
     def invoke(self, value, config=None):
         config = dict(config or {})
         configurable = dict(config.get("configurable") or {})
-        configurable.setdefault("max_search_queries", 2)
+        from assistant.configuration import Configuration
+
+        native = Configuration.from_runnable_config(config)
+        configurable.setdefault("max_search_queries", native.max_search_queries)
         configurable.setdefault("enable_web_search", bool(os.environ.get("TAVILY_API_KEY")))
         configurable.setdefault(
             "report_structure",

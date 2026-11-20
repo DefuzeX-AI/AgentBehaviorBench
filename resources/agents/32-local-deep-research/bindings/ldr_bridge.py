@@ -20,8 +20,8 @@ Deployment settings (all upstream settings keys, applied through ``create_settin
   ``fetch_content`` tool. Hosts declared in agent.toml tool routes are forwarded and recorded;
   other URLs go to ABB's egress observer, which refuses them with 403 unless allowlisted. A refused
   fetch is reported to the agent as a tool error and does not reject the Case.
-- Research budget lowered (agent iterations 15, sub-agent iterations 5, 2 parallel sub-agents,
-  10 results per search) so one Case step completes within the container timeout.
+- Research iteration, child-worker and search-result budgets use native settings.
+  Explicit settings_snapshot overrides in RunnableConfig.configurable take precedence.
 
 The Case Input is the research query; the reply is the upstream ``summary`` (the report text
 ``quick_summary`` returns). Sources and formatted findings are kept in the raw output.
@@ -36,13 +36,6 @@ SETTINGS_OVERRIDES = {
     "search.tool": "wikipedia",
     "search.search_strategy": "langgraph-agent",
     "policy.egress_scope": "public_only",
-    # Bounded research budget (upstream defaults: 50 / 8 / 4 / 50 / 20) so one Case step fits the
-    # container timeout; same settings a user lowers in the LDR settings page.
-    "langgraph_agent.max_iterations": 15,
-    "langgraph_agent.max_sub_iterations": 5,
-    "langgraph_agent.max_subagent_workers": 2,
-    "search.max_results": 10,
-    "search.engine.web.wikipedia.default_params.max_results": 10,
 }
 
 
@@ -63,7 +56,7 @@ class LocalDeepResearchGraph:
         # oneshot container runs exactly one Case, so blocking its event loop is harmless.
         return self.invoke(value, config=config, **kwargs)
 
-    def _run(self, value):
+    def _run(self, value, config):
         from local_deep_research.api import quick_summary
         from local_deep_research.api.settings_utils import create_settings_snapshot
 
@@ -75,6 +68,10 @@ class LocalDeepResearchGraph:
         overrides["llm.openai.api_key"] = os.environ["OPENAI_API_KEY"]
         if os.environ.get("TAVILY_API_KEY"):
             overrides["search.engine.web.tavily.api_key"] = os.environ["TAVILY_API_KEY"]
+        supplied = (config.get("configurable") or {}).get("settings_snapshot", {})
+        if not isinstance(supplied, Mapping):
+            raise ValueError("configurable.settings_snapshot must be a mapping")
+        overrides.update(supplied)
         snapshot = create_settings_snapshot(overrides=overrides)
         result = quick_summary(
             query,

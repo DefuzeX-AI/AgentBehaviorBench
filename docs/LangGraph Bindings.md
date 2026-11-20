@@ -271,15 +271,20 @@ When a graph contains async-only nodes, provide `ainvoke` and have a sync bridge
 
 Pass `config=config` directly when the native API supports it. Configuration may contain callbacks, tags, metadata, `configurable.thread_id` and execution limits. It is not the business input, and `configurable` is not interchangeable with the native runtime context.
 
-When an explicit deployment setting adds a default execution limit, merge without mutating the incoming object:
+Do not introduce benchmark-specific recursion, iteration, model-call, search or retry budgets.
+Preserve native configuration and native validation. Prefer the native settings resolver over
+copying numeric defaults. If the native entrypoint applies a limit outside the graph, retain
+that documented limit with caller precedence; omitting it can expose a lower framework default.
 
 ```python
 run_config = dict(config or {})
-run_config.setdefault("recursion_limit", 50)
+# Only when this field is supplied by the native entrypoint's effective configuration:
+run_config.setdefault("recursion_limit", native_config.recursion_limit)
 result = await self._native.ainvoke(state, config=run_config)
 ```
 
-The limit above is illustrative, not a universal recommendation. Copy a nested dictionary before changing it, preserve unrelated keys and never overwrite the supplied Case thread identity with a random ID on every call. Keep live callback objects intact; do not deepcopy or JSON-encode the configuration.
+An explicitly supplied caller value wins. External run timeout/cancellation remains a separate
+orchestration policy and must not be converted into a smaller internal execution budget. Copy a nested dictionary before changing it, preserve unrelated keys and never overwrite the supplied Case thread identity with a random ID on every call. Keep live callback objects intact; do not deepcopy or JSON-encode the configuration.
 
 For a native context schema, implement the separate keyword and construct the native type only when that API supports it. The ReAct binding, for example, accepts `context=None` and calls its graph with `context=Context(**dict(context or {}))` alongside `config=config`. Keep secrets in the declared credential environment rather than the context table.
 

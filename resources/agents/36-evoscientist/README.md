@@ -29,7 +29,7 @@ Deployment settings (upstream config keys):
 | `auto_mode` (+ `auto_approve`, `enable_ask_user=false`) | on | upstream's unattended mode; run config sets `configurable.hitl_suppressed=true` as upstream's gateways do |
 | `enable_async_subagents` / `enable_scheduler` | off | no `langgraph dev` sidecar; writing / data-analysis sub-agents run in-process (upstream's documented setting for one-shot runs) |
 | `memory_workers_enabled` / `memory_skill_synthesis_enabled` | off | cross-session background workers cannot persist in a one-shot container |
-| `recursion_limit` | 150 (upstream 1,000,000) | bounds one turn to the container timeout |
+| `recursion_limit` | Native effective configuration | Explicit invocation configuration takes precedence |
 
 All writable state (workspace, data dir, `XDG_CONFIG_HOME`) is a fresh directory under `/tmp`.
 

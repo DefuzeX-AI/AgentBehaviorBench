@@ -20,9 +20,8 @@ Native contract (verified against the pinned revision):
   way a service lifecycle would.
 
 Deployment (see ``requirement.md``): one Case input selects the trading day and,
-optionally, the items to analyse, and every Case is bounded to
-``MAX_ITEMS_PER_RUN`` items because each item costs two model calls (risk control
-and the portfolio manager). The market data is a captured public snapshot applied
+optionally, the items to analyse. The configured item set is preserved; ABB
+adds no item-count budget. The market data is a captured public snapshot applied
 by ABB's ``install/`` mechanism at ``agent/apis/cs2market/cs2_data.csv``; the
 deployment makes no live market call. The analysis itself is the upstream
 direct-LLM pipeline of ``Direct-ds.yaml``: risk control and the portfolio manager
@@ -30,8 +29,7 @@ are the only model calls per item, and the agent's own prompts are used unchange
 
 Input: plain text, or exactly ``{"message": text}``. The text may contain one
 ``YYYY-MM-DD`` trading day (defaults to the newest day in the snapshot) and item
-names copied verbatim from the selected config (defaults to the first
-``MAX_ITEMS_PER_RUN`` configured items).
+names copied verbatim from the selected config (defaults to all configured items).
 Config: the adapter's run configuration is attached as ambient LangChain context
 around the native call, because the native lifecycle accepts no run config; it is
 never passed as an unsupported keyword.
@@ -61,10 +59,6 @@ AGENT_ROOT = UNIT_ROOT / "agent"
 DEFAULT_CONFIG = "Direct-ds.yaml"
 DEFAULT_DB_PATH = "/tmp/abb-csgotrading/cs2.db"
 
-# Upstream's own batch CLI loops every configured item, and each item costs two
-# model calls. One Case is bounded to this many items so a run stays inside the
-# Case time budget; the input may name any subset of at most this size.
-MAX_ITEMS_PER_RUN = 4
 
 DATE_PATTERN = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
 
@@ -174,12 +168,8 @@ class CsgoTradingDay:
 
         lowered = value.lower()
         selected = [item for item in self._configured_items if item.lower() in lowered]
-        if len(selected) > MAX_ITEMS_PER_RUN:
-            raise InputRefused(
-                f"Name at most {MAX_ITEMS_PER_RUN} items; got {len(selected)} "
-                f"({', '.join(selected)})")
         if not selected:
-            selected = self._configured_items[:MAX_ITEMS_PER_RUN]
+            selected = list(self._configured_items)
         return trading_date, selected
 
     def _config_path(self, items: list[str]) -> tuple[str, str]:
@@ -233,8 +223,7 @@ class CsgoTradingDay:
                  decisions: list[dict], elapsed: float) -> str:
         lines = [
             f"CS2 trading run — config {config_name} — trading day {trading_date}",
-            f"Items analysed: {len(decisions)} of {len(self._configured_items)} configured "
-            f"(this deployment bounds one run to {MAX_ITEMS_PER_RUN} items)",
+            f"Items analysed: {len(decisions)} of {len(self._configured_items)} configured",
             f"Portfolio {portfolio['id']}: cash {portfolio['cashflow']:.2f}, "
             f"total assets {portfolio['total_assets']:.2f}, "
             f"{len(portfolio['positions'])} position(s)",

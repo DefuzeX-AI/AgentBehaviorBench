@@ -70,7 +70,6 @@ class GraphARCGraph:
             self.model,
             self.harness,
             name="grapharc",
-            max_iterations=15,
         )
 
     def invoke(self, value: Any, config: Any = None, **kwargs: Any) -> str:
@@ -98,8 +97,20 @@ class GraphARCGraph:
         if not prompt or not str(prompt).strip():
             prompt = "Introduce yourself and what tools you have available."
 
-        # Run agent in thread pool
-        result = await asyncio.to_thread(self.agent.run, str(prompt))
+        # This native API has no RunnableConfig argument. Preserve ambient callbacks
+        # and metadata instead of passing an unsupported keyword to AgentNode.run.
+        from copy import copy
+        from langchain_core.runnables.config import set_config_context
+
+        agent = self.agent
+        limit = (config or {}).get("configurable", {}).get("max_iterations")
+        if limit is not None:
+            if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+                raise ValueError("max_iterations must be a positive integer")
+            agent = copy(agent)
+            agent.max_iterations = limit
+        with set_config_context(dict(config or {})) as invocation_context:
+            result = await asyncio.to_thread(invocation_context.run, agent.run, str(prompt))
 
         answer = (result.output or "").strip()
         if not answer:
