@@ -2,8 +2,8 @@
 
 This opt-in ABB export preserves recorded evidence without exporting desktop replay
 state, accumulated UI snapshots, credentials or an entire runtime directory.
-The original collectors, ownership resolver, Agent behavior, Judge/GT contracts,
-`abb.agent-trajectory.v1`, `build_export()` and `export_run()` are unchanged.
+The original collectors, ownership resolver, Agent behavior, Judge/GT contracts
+and the legacy `abb.agent-trajectory.v1` contract are unchanged.
 Application integration is a separate, approval-gated stage.
 
 ## Commands and APIs
@@ -83,10 +83,15 @@ silent alteration of the evidence. Existing collector redaction is retained.
 
 ## Readable trajectory and portable references
 
-Official ATIF message, reasoning, tool arguments/results, usage and child references
-remain directly readable. ABB diagnostic duplication moves to package-relative
-`extra.abb.evidence_refs` and `details_ref`. Unknown ownership remains an explicit
-`unassigned_records` list containing the actual output, status and identities.
+Builder version 4 derives ATIF messages and tool executions from invocation,
+ACP and framework evidence. Both assigned and unassigned interceptor calls are
+kept in `runs/`. They contribute no steps, wire-only tools, usage or reasoning
+to the trajectory. A callback linked to a wire request retains its own input and
+output. Unassigned native operations may appear in `extra.abb.unassigned_records`.
+
+Manifest coverage counts all trace operations. A run can therefore have one
+observed network model call and a two-step user/agent conversation with no
+framework model step. Step details refer to package-relative evidence.
 No text equality or filesystem order is used to invent parent/child ownership.
 
 A typical step reference points to `runs/model-calls/0001/call.json`. That file

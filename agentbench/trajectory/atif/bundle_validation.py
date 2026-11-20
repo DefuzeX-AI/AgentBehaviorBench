@@ -82,7 +82,7 @@ def verify_bundle(directory):
                         raise ValueError("Call body reference content differs")
     original = restore_document(doc, resolver)
     unknown = {r["id"]: r for r in original["extra"]["abb"]["unassigned_records"]}
-    shown = doc["extra"]["abb"]["unassigned_records"]
+    shown = doc["extra"]["abb"].get("unassigned_records", [])
     if Counter(r["id"] for r in shown) != Counter(unknown.keys()):
         raise ValueError("Unassigned display records were lost or duplicated")
     for row in shown:
@@ -123,18 +123,31 @@ def verify_bundle(directory):
         native_validation = validate_native_references(reconstructed)
         from .reader import read_evidence
         from .hierarchy import resolve_hierarchy
-        from .validation import validate_export
+        from .validation import validate_export, evidence_report
         from .validation import content_checks
         bundle = read_evidence(reconstructed, allow_incomplete=manifest["allow_incomplete"])
+        results = {item["folder"] + "/result.json": item["result"] for item in bundle.inputs}
+        for step, restored_step in zip(doc["steps"], original["steps"]):
+            abb = (step.get("extra") or {}).get("abb", {})
+            source = (restored_step.get("extra") or {}).get("abb", {}).get("result_source")
+            if source or "result_source" in abb:
+                if (source not in results or abb.get("result_source") != source
+                        or not any(reference(ref) == results[source] for ref in abb.get("evidence_refs", []))):
+                    raise ValueError("Invocation reply evidence reference mismatch")
         graph = resolve_hierarchy(bundle, adapters=manifest["adapters"])
         restored_model = Trajectory.model_validate(original)
-        association, coverage = validate_export(bundle, graph, Trajectory.model_validate(doc), evidence_resolver=resolver)
+        native = bundle
+        if manifest["provenance"].get("builder_version", 0) >= 4:
+            native = read_evidence(reconstructed, allow_incomplete=manifest["allow_incomplete"], include_network=False)
+        native_graph = graph if native is bundle else resolve_hierarchy(native, adapters=manifest["adapters"])
+        validate_export(native, native_graph, Trajectory.model_validate(doc), evidence_resolver=resolver)
+        association, coverage = evidence_report(bundle, graph, restored_model)
         # Compiler provenance/issues may evolve; identity and source content may not.
         saved = resolver.resolve(manifest["association_ref"])
         for key in ("owners", "tool_relations", "raw_record_owners"):
             if association[key] != saved[key]:
                 raise ValueError("Association changed after portable reconstruction")
-        checks = content_checks(bundle, restored_model)
+        checks = content_checks(native, restored_model)
         if not all(c["passed"] for c in checks):
             raise ValueError("Model or tool content differs from frozen source")
         observed = {r["id"]: r for r in bundle.models + bundle.tools}

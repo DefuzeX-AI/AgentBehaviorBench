@@ -203,6 +203,13 @@ class RunViewAPI:
         return folders + [f'{prefix}/{p.name}' for p in sorted(inputs.iterdir())
                           if p.is_dir() and re.fullmatch(r'\d{4}', p.name)]
 
+    def evidence_outputs(self):
+        from .artifact_paths import SESSION_OUTPUT
+        folders = self.outputs()
+        if (self.directory / SESSION_OUTPUT).is_dir():
+            folders.append(SESSION_OUTPUT)
+        return folders
+
     def spans(self):
         spans, statuses, warnings = [], [], []
         for folder in self.outputs():
