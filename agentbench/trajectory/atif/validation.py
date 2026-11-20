@@ -37,6 +37,9 @@ def validate_export(bundle, graph, document, *, evidence_resolver=None):
         raise ValueError("Observed records were lost or counted more than once")
     if locations != graph.owners:
         raise ValueError("Export ownership differs from resolved evidence")
+    # Existing bundles were built before invocation results were projected.
+    if document.extra["abb"].get("provenance", {}).get("builder_version", 0) >= 3:
+        validate_replies(bundle, document)
     recorded = document.extra["abb"]["raw_records"]
     if evidence_resolver is None:
         raw_equal = recorded == bundle.raw_records
@@ -53,6 +56,11 @@ def validate_export(bundle, graph, document, *, evidence_resolver=None):
     raw_keys = {(r["file"], r["line"]) for r in bundle.raw_records}
     if len(raw_keys) != len(bundle.raw_records):
         raise ValueError("Raw evidence contains duplicate source positions")
+    return evidence_report(bundle, graph, document)
+
+
+def evidence_report(bundle, graph, document):
+    raw_keys = {(r["file"], r["line"]) for r in bundle.raw_records}
     candidates = {}
     for record in bundle.models + bundle.tools:
         for ref in record["evidence"]:
@@ -107,3 +115,26 @@ def content_checks(bundle, document):
             checks.append({"kind": kind, "id": source["id"], "passed": len(found) == 1 and found[0][field] == source[field]})
     checks.append({"kind": "model_request_coverage", "passed": sorted(m["id"] for m in models) == sorted(m["id"] for m in bundle.models)})
     return checks
+
+
+def validate_replies(bundle, document):
+    from .replies import reply_text, result_matches
+
+    expected = {item["folder"] + "/result.json": reply_text(item) for item in bundle.inputs
+                if reply_text(item) is not None and result_matches(item)}
+    seen = set()
+    for trajectory in walk(document):
+        for step in trajectory.steps:
+            abb = (step.extra or {}).get("abb", {})
+            source = abb.get("result_source")
+            if source is None:
+                continue
+            if (trajectory is not document or source not in expected or source in seen
+                    or step.source != "agent" or step.message != expected[source]):
+                raise ValueError("Invocation reply differs from its recorded result")
+            if abb.get("kind") == "invocation_result" and (
+                    step.llm_call_count is not None or step.metrics or abb.get("record_ids")):
+                raise ValueError("Delivery step cannot claim a model operation")
+            seen.add(source)
+    if seen != expected.keys():
+        raise ValueError("Missing recorded invocation reply")

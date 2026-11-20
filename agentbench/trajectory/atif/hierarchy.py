@@ -1,11 +1,17 @@
 """One evidence-based execution ownership resolver."""
 from copy import deepcopy
+from agentbench.observe.artifact_paths import SESSION_OUTPUT
 from agentbench.observe.tool_links import SCOPE_KEYS, compatible, resolve_tools
 from .contracts import execution_key, ExecutionNode, ExecutionGraph, EvidenceIssue
 from .adapters import selected
 
 
 def resolve_hierarchy(bundle, *, adapters=()):
+    '''
+    Resolve the execution hierarchy for a given evidence bundle.
+    
+    '''
+
     key = execution_key(bundle, None, "runtime", "root")
     root = ExecutionNode(key, bundle.run.get("agent_id") or "unknown", status=bundle.run.get("status", "unknown"))
     nodes, links, issues = {key.id: root}, [], list(bundle.issues)
@@ -25,6 +31,8 @@ def resolve_hierarchy(bundle, *, adapters=()):
     bad = set()
     root_sessions = {(item.get("acp_summary") or {}).get("session", {}).get("sessionId")
                      for item in bundle.inputs}
+    shared = bundle.auxiliary_artifacts.get(SESSION_OUTPUT + "/acp-summary.json") or {}
+    root_sessions.add((shared.get("session") or {}).get("sessionId"))
     root_sessions.discard(None)
 
     def owner(span_id):

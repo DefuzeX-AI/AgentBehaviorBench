@@ -89,9 +89,9 @@ def test_cli_stage_combinations(source, plan, monkeypatch, flags, expected):
     if flags == ["-c"]:
         for name, content in FILES.items():
             write(source.directory, name, content)
-    monkeypatch.setattr("agentbench.cli.features.agent.download_agent", lambda *args: source)
+    monkeypatch.setattr("agentbench.onboarding.add.download_agent", lambda *args: source)
     monkeypatch.setattr(workflow, "load_project_environment", lambda *args: None)
-    monkeypatch.setattr(workflow, "build_agent_environment", lambda *args, **kwargs: calls.append("build") or build(source, plan))
+    monkeypatch.setattr("agentbench.onboarding.add.build_agent_environment", lambda *args, **kwargs: calls.append("build") or build(source, plan))
     def certify(agent_id, **kwargs):
         assert load_registry(kwargs["registry_path"]).find(agent_id).status == "adapting"
         calls.append("certify")
@@ -105,7 +105,7 @@ def test_cli_stage_combinations(source, plan, monkeypatch, flags, expected):
 def test_certify_without_configuration_never_requests_ai(source, monkeypatch, capsys):
     from agentbench.onboarding import workflow
     monkeypatch.setattr(workflow, "load_project_environment", lambda *args: None)
-    monkeypatch.setattr(workflow, "build_agent_environment", lambda *args, **kwargs: pytest.fail("unexpected model call"))
+    monkeypatch.setattr("agentbench.onboarding.add.build_agent_environment", lambda *args, **kwargs: pytest.fail("unexpected model call"))
     assert cli(["agent", "add", URL, "--agents-dir", str(source.directory.parent), "-c"]) == 2
     assert "Missing or unsafe integration file" in capsys.readouterr().err
 

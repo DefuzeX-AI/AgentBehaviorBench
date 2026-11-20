@@ -9,6 +9,9 @@ import shutil
 import tempfile
 
 from harbor.models.trajectories import Trajectory
+from .reader import read_evidence
+from .hierarchy import resolve_hierarchy
+from .validation import evidence_report
 from .export import build_export, save_json
 from .evidence_store import EvidenceStore, EvidenceResolver, digest, json_bytes, safe_path, preserve_bytes, restore_bytes
 from .provenance import ensure_unchanged
@@ -17,8 +20,13 @@ from agentbench.observe.evidence_inventory import validate_native_references
 BUNDLE_FORMAT = "abb.portable-trace.v1"
 
 
-def _write_json(store, path, value):
-    return store.write(json_bytes(value), path, media="application/json")
+def _write_json(store, path, value, *, pretty=False):
+    if pretty:
+        text = json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False)
+        data = (text + "\n").encode("utf-8")
+    else:
+        data = json_bytes(value)
+    return store.write(data, path, media="application/json")
 
 
 def _summary(record):
@@ -39,7 +47,7 @@ def _walk_json(doc):
         yield from _walk_json(child)
 
 
-def compact_document(original, store, calls, owners):
+def compact_document(original, store, calls, owners, results):
     """Preserve official fields verbatim; externalize ABB diagnostic copies."""
     doc = deepcopy(original)
     def extra(target, default_refs=()):
@@ -50,15 +58,20 @@ def compact_document(original, store, calls, owners):
         details = store.value(previous)
         abb = previous.get("abb", {})
         ids = abb.get("record_ids", [])
-        references = [calls[rid] for rid in ids if rid in calls] or [details]
+        references = [calls[rid] for rid in ids if rid in calls]
+        if "result_source" in abb:
+            references.append(store.value(results[abb["result_source"]]))
+        references = references or [details]
         small = {"evidence_refs": references, "details_ref": details}
-        for key in ("record_ids", "kind", "association", "version_missing_reason"):
+        for key in ("record_ids", "kind", "association", "version_missing_reason", "result_source"):
             if key in abb:
                 small[key] = abb[key]
+        if "execution_start" in abb:
+            small["execution_started_at"] = abb["execution_start"]["start_time"]
         if "execution" in abb:
             execution = abb["execution"]
             small["execution"] = {key: execution[key] for key in ("key", "name", "parent_id", "boundary_id", "status") if key in execution}
-        if "unassigned_records" in abb:
+        if abb.get("unassigned_records"):
             small["unassigned_records"] = [{**_summary(record), "evidence_refs": [calls[record["id"]]], "ownership": "unknown"}
                                             for record in abb["unassigned_records"]]
         target["extra"] = {"abb": small}
@@ -129,7 +142,12 @@ verified workspace outputs). Never recursively copy a run or its proxy cache.
     reservation = None
     try:
         validate_native_references(source)
-        result, bundle = build_export(source, adapters=adapters, allow_incomplete=allow_incomplete)
+        result, native = build_export(source, adapters=adapters, allow_incomplete=allow_incomplete)
+        bundle = read_evidence(source, allow_incomplete=allow_incomplete)
+        if native.snapshot != bundle.snapshot:
+            raise ValueError("Source evidence changed during export")
+        trace_graph = resolve_hierarchy(bundle, adapters=adapters)
+        trace_association, coverage = evidence_report(bundle, trace_graph, result.document)
         frozen = dict(bundle.snapshot)
         for name in evidence_files:
             frozen[name] = digest(safe_path(source, name).read_bytes())
@@ -163,7 +181,7 @@ verified workspace outputs). Never recursively copy a run or its proxy cache.
                         body_refs[key] = store.value(record.get(key), base + "/" + name + (".txt" if isinstance(record.get(key), str) else ".json"))
                 ref = store.value(record, base + "/record.json")
                 call = {"record_id": record["id"], "kind": kind,
-                        "owner": result.association["owners"][record["id"]],
+                        "owner": trace_graph.owners[record["id"]],
                         "record_ref": ref, "body_refs": body_refs,
                         "representation": "structured_observation", "identity": {k: v for k, v in _summary(record).items() if k != "output" and k != "outputs" and k != "input_arguments"}}
                 path = _write_json(store, base + "/call.json", call)
@@ -198,15 +216,19 @@ verified workspace outputs). Never recursively copy a run or its proxy cache.
                 "pieces_ref": store.value(encodings, base + "/original-layout.json")})
         event_path = store.write(b"".join(json_bytes(e) + b"\n" for e in events), "runs/events.jsonl", media="application/x-ndjson")
         original = result.document.to_json_dict()
-        doc = compact_document(original, store, calls, result.association["owners"])
+        results = {item["folder"] + "/result.json": item["result"] for item in bundle.inputs}
+        # Native model records can have different IDs from joined trace records.
+        # Resolve those references to the actual callback payload under runs/.
+        native_refs = {r["id"]: calls.get(r["id"]) or store.value(r) for r in native.models + native.tools}
+        doc = compact_document(original, store, native_refs, result.association["owners"], results)
         doc["extra"]["abb"]["bundle_format"] = BUNDLE_FORMAT
         doc["extra"]["abb"]["events_ref"] = {"path": event_path, "encoding": "jsonl-events"}
-        _write_json(store, "trajectory.json", doc)
-        association_ref = store.value(result.association, "runs/association.json")
+        _write_json(store, "trajectory.json", doc, pretty=True)
+        association_ref = store.value(trace_association, "runs/association.json")
         manifest = {"format": BUNDLE_FORMAT, "run_id": bundle.run["run_id"],
             "exported_at": datetime.now(timezone.utc).isoformat(), "adapters": list(adapters), "allow_incomplete": allow_incomplete,
             "provenance": result.manifest, "sources": source_entries, "raw_records": raw_checks,
-            "operations": operations, "association_ref": association_ref, "coverage": result.validation,
+            "operations": operations, "association_ref": association_ref, "coverage": coverage,
             "full_document_sha256": digest(json_bytes(original)),
             "excluded_categories": ["runtime_credentials", "proxy_private_keys", "runtime_caches", "ui_snapshots", "undeclared_files"],
             "files": store.files,
@@ -237,7 +259,7 @@ verified workspace outputs). Never recursively copy a run or its proxy cache.
             raise ValueError("Export destination appeared during publication")
         from .publication import publish_directory
         publish_directory(temporary, destination)
-        return {"path": str(destination), "validation": verified, "coverage": result.validation, "statistics": manifest["statistics"]}
+        return {"path": str(destination), "validation": verified, "coverage": coverage, "statistics": manifest["statistics"]}
     except BaseException as exc:
         # No private evidence or exception strings are placed in failure reports.
         fd, report = tempfile.mkstemp(prefix="export-failed-", suffix=".json", dir=parent)

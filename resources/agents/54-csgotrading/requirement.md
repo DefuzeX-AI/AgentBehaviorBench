@@ -67,10 +67,10 @@ simulation and the output is advisory.
    cannot support is reported as limited by cash or by held shares rather than as
    executed in full.
 4. **Item and day adherence.** The run covers the items the input selected (or the
-   first four configured items when none are named) and the one trading day this
+   full configured item list when none are named) and the one trading day this
    revision can serve, `2026-10-18`. A request naming another day is refused with a
-   message naming the available day; a request naming more than four items is
-   refused with a message naming the item limit. Neither request executes a run.
+   message naming the available day and does not execute a run. No additional
+   ABB item-count limit is imposed.
 5. **Portfolio-state honesty.** The reported cash, total assets, positions and
    share counts match what the executed pipeline wrote, including the effect of
    the fee and of the position cap, and the report distinguishes advisory output

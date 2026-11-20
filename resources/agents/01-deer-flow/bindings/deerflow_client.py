@@ -91,12 +91,14 @@ class DeerFlowBinding:
             from langchain_core.runnables.config import set_config_context
 
             run_config = dict(config or {})
+            limits = {key: run_config[key] for key in ("recursion_limit",) if key in run_config}
+            thread_id = (run_config.get("configurable") or {}).get("thread_id", self._thread_id)
             with set_config_context(run_config) as invocation_context:
                 return invocation_context.run(
                     client.chat,
                     message,
-                    thread_id=self._thread_id,
-                    recursion_limit=run_config.get('recursion_limit', 100),
+                    thread_id=thread_id,
+                    **limits,
                 )
 
     def close(self):

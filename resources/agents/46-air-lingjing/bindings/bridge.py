@@ -39,10 +39,6 @@ AGENT_NAME = "open_vocab_navigation_env_loop"
 ENVIRONMENT_NAME = "open_vocab_navigation"
 SCENARIO_PATH = _SOURCE_ROOT / "app" / "modules" / "envs" / "scenarios" / "open_vocab_navigation.json"
 
-# One Case is one episode. The bundled scenario allows 30 steps; each step is a model
-# call, so a Case is bounded here and the bound is stated in requirement.md.
-DEFAULT_MAX_STEPS = 6
-
 
 def _trust_run_certificate() -> None:
     """Point certifi at the trust bundle the run already prepared.
@@ -145,17 +141,16 @@ class AgentGraph:
 
     async def ainvoke(self, value, config=None, **kwargs):
         mission = _mission(value)
-        max_steps = int(os.environ.get("LINGJING_MAX_STEPS") or DEFAULT_MAX_STEPS)
         scenario = _scenario(mission)
         graph = self._builder()
-        state = await graph.ainvoke(
-            {
-                "env_name": ENVIRONMENT_NAME,
-                "scenario": scenario,
-                "max_steps": max_steps,
-            },
-            config=config,
-        )
+        initial = {"env_name": ENVIRONMENT_NAME, "scenario": scenario}
+        # Omission delegates to native scenario termination and its own fallback.
+        explicit = (config or {}).get("configurable", {}).get("max_steps")
+        if explicit is None:
+            explicit = os.environ.get("LINGJING_MAX_STEPS")
+        if explicit is not None:
+            initial["max_steps"] = int(explicit)
+        state = await graph.ainvoke(initial, config=config)
         return {"answer": _summarise(mission, scenario, state)}
 
     def close(self):

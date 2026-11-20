@@ -14,7 +14,7 @@ def snapshot(root):
     api = RunViewAPI(Path(root))
     names = {name for name, _, _ in _files(api.directory)}
     names.update(("run.json", "request/target.json", "request/experiment.json", "session.json", "process.json"))
-    for folder in api.outputs():
+    for folder in api.evidence_outputs():
         names.update(f"{folder}/{name}" for name in ("acp-events.jsonl", "acp-summary.json", "otel-status.json", "otel.jsonl", "otel-live.jsonl"))
         parent = Path(folder).parent
         names.add((parent / "input/execution-environment.json").as_posix())

@@ -1,9 +1,11 @@
 """Read existing ABB evidence, retaining chain nodes and original payloads."""
+from agentbench.observe.artifact_paths import SESSION_OUTPUT
 from copy import deepcopy
 from dataclasses import asdict
 from pathlib import Path
 import json
 
+from agentbench.observe.artifact_paths import canonical_relative
 from agentbench.observe.interactions import InteractionIndex, _files
 from agentbench.observe.input_artifacts import read_input_artifacts
 from agentbench.observe.tool_links import compatible
@@ -24,10 +26,12 @@ def _scope(row):
 
 
 def _span_key(record, sid):
+    if record and sid and record["file"] == SESSION_OUTPUT + "/framework.jsonl":
+        return stable_id("framework", record["file"], _data(record).get("invocation_id"), sid)
     return stable_id("framework", record["file"], sid) if record and sid else None
 
 
-def read_evidence(directory, *, allow_incomplete=False):
+def read_evidence(directory, *, allow_incomplete=False, include_network=True):
     root = Path(directory).resolve(strict=True)
     api = RunViewAPI(root)
     before = snapshot(root)
@@ -35,7 +39,12 @@ def read_evidence(directory, *, allow_incomplete=False):
     terminal = {"succeeded", "failed", "cancelled", "interrupted", "stopped", "completed", "degraded"}
     if run.get("status") not in terminal and not allow_incomplete:
         raise ValueError("Run is not known to be finished; use --allow-incomplete")
-    index = InteractionIndex(root, _files(root))
+    # Exclude the interceptor at the input boundary, before any wire/callback
+    # join. A framework span then contributes its own payload even on retries.
+    def selected(name):
+        return include_network or canonical_relative(name) != canonical_relative("network.jsonl")
+
+    index = InteractionIndex(root, [file for file in _files(root) if selected(file[0])])
     for records in index.groups.values():
         for record in records:
             record["file"] = api.file(record["file"]).relative_to(root).as_posix()
@@ -72,7 +81,7 @@ def read_evidence(directory, *, allow_incomplete=False):
                 native.append({"data": deepcopy(_data(record)), "evidence": references([record]), **_scope(row)})
 
     frameworks = framework_calls(index)
-    wires = wire_calls(index)
+    wires = wire_calls(index) if include_network else []
     matched = {wire["id"]: [f for f in frameworks if f.get("framework_span_id")
         and f["framework_span_id"] == wire.get("framework_span_id") and compatible(wire, f)] for wire in wires}
     counts = {f["id"]: sum(f in values for values in matched.values()) for f in frameworks}
@@ -174,6 +183,7 @@ def read_evidence(directory, *, allow_incomplete=False):
                        "acp_summary": api.read(f"{folder}/acp-summary.json"),
                        "context": {k: v for k, v in index.contexts.get(folder, {}).items()
                                    if k in _scope({})}})
+    for folder in api.evidence_outputs():
         try:
             path = api.file(f"{folder}/acp-events.jsonl")
         except FileNotFoundError:
@@ -183,7 +193,7 @@ def read_evidence(directory, *, allow_incomplete=False):
                 try:
                     row = json.loads(line)
                     raw_records[(path.relative_to(root).as_posix(), n)] = {"file": path.relative_to(root).as_posix(), "line": n, "raw": row}
-                    native.append({"data": row.get("data", {}), "event": row.get("event"),
+                    native.append({"data": row.get("data", {}), "event": row.get("event"), "timestamp": row.get("timestamp"),
                                    "evidence": references([{"file": path.relative_to(root).as_posix(), "line": n, "raw": row}])})
                 except (ValueError, AttributeError):
                     issues.append(EvidenceIssue("invalid_acp_event", f"{folder}/acp-events.jsonl:{n}"))
@@ -209,9 +219,14 @@ def read_evidence(directory, *, allow_incomplete=False):
         elif len(sessions) > 1:
             tool["identity_conflicts"] = [*(tool.get("identity_conflicts") or []), "native_session_id"]
     auxiliary = {}
+    shared_summary = SESSION_OUTPUT + "/acp-summary.json"
+    if shared_summary in before:
+        auxiliary[shared_summary] = api.read(shared_summary)
     # Preserve OTel envelopes/payloads and recorded runtime/configuration facts.
     # They are evidence-only until a validated adapter can interpret them.
     for name in before:
+        if not selected(name):
+            continue
         if name.endswith(".jsonl") or "/otel" in name or name.endswith("execution-environment.json") or name.startswith("request/native-config-") or name == "request/experiment.json":
             value = api.file(name).read_text(encoding="utf-8")
             if name.endswith(".jsonl"):

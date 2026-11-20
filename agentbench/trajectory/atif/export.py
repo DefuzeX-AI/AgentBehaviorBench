@@ -14,7 +14,7 @@ from .contracts import ExportResult
 
 
 def build_export(directory, *, adapters=(), allow_incomplete=False):
-    bundle = read_evidence(directory, allow_incomplete=allow_incomplete)
+    bundle = read_evidence(directory, allow_incomplete=allow_incomplete, include_network=False)
     graph = resolve_hierarchy(bundle, adapters=adapters)
     metadata = provenance(bundle)
     document = assemble_atif(bundle, graph, metadata)

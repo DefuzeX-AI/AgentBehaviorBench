@@ -276,7 +276,7 @@ class _LambChatQuickAgent:
         )
         run_config = self._config(config)
         run_config["configurable"]["thread_id"] = session_id
-        run_config["recursion_limit"] = agent.recursion_limit
+        run_config.setdefault("recursion_limit", agent.recursion_limit)
 
         result = await agent._graph.ainvoke(
             {

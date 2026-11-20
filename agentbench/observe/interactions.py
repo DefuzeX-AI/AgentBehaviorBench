@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from .input_artifacts import read_input_artifacts, request_paths, standalone_output
 from .tool_links import SCOPE_KEYS, link_tools
+from .artifact_paths import SESSION_OUTPUT
 from .native_links import link_native_calls
 
 _CACHE = OrderedDict()
@@ -59,6 +60,7 @@ def _files(root):
             for name in ('framework.jsonl', 'input.json', 'mapped-input.json', 'request.json',
                          'result.json', 'submission.json', 'file-evidence.json'):
                 names.add((folder / name).relative_to(root).as_posix())
+    names.add(SESSION_OUTPUT + '/framework.jsonl')
     for path in list((root / 'workspace-files').glob('*.json')) + list((root / 'evaluation/workspace-files').glob('*.json')):
         names.add('evaluation/workspace-files/' + path.name)
     from .artifact_paths import artifact_file
@@ -182,6 +184,8 @@ class InteractionIndex:
                 key = 'network:' + str(data['call_id'])
             elif record['file'].endswith('framework.jsonl') and data.get('span_id') and event != 'native_event':
                 key = 'span:' + record['file'] + ':' + str(data['span_id'])
+                if record['file'] == SESSION_OUTPUT + '/framework.jsonl':
+                    key = json.dumps([key, data.get('invocation_id')])
             else:
                 key = f"event:{record['file']}:{record['line']}"
             identifier = _id(key)

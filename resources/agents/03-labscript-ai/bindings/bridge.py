@@ -3,16 +3,18 @@
 Upstream entrypoint: backend.pylabrobot_agent.create_pylabrobot_agent(), the generate -> simulate -> feedback loop that run_pylabrobot_agent_and_stream_events drives with a user_query and a hardware configuration. The binding loads the default hardware profile (load_hardware_configuration()) and passes the Case Input as user_query; the answer is the generated PyLabRobot protocol code and the final outcome.
 """
 import asyncio
+import inspect
 import json
 from collections.abc import Mapping
 
 
 class AgentGraph:
     def __init__(self):
-        from backend.pylabrobot_agent import create_pylabrobot_agent, generate_dynamic_pylabrobot_knowledge
+        from backend.pylabrobot_agent import create_pylabrobot_agent, generate_dynamic_pylabrobot_knowledge, run_pylabrobot_agent_and_stream_events
         from backend.pylabrobot_utils import load_hardware_configuration
 
         self._app = create_pylabrobot_agent()
+        self._max_attempts = inspect.signature(run_pylabrobot_agent_and_stream_events).parameters["max_attempts"].default
         self._hardware = load_hardware_configuration()
         self._knowledge = generate_dynamic_pylabrobot_knowledge(self._hardware)
 
@@ -25,9 +27,12 @@ class AgentGraph:
             raise ValueError("Supply the Case Input as message text")
         state = {"user_query": text, "hardware_config": self._hardware,
                  "pylabrobot_knowledge": self._knowledge, "attempts": 0,
-                 "max_attempts": 2, "force_regenerate": False}
+                 "max_attempts": (config or {}).get("configurable", {}).get("max_attempts", self._max_attempts), "force_regenerate": False}
         # The simulator node is async-only, so the graph must be driven with ainvoke.
-        final = await self._app.ainvoke(state, {"recursion_limit": 50})
+        run_config = dict(config or {})
+        # Match the pinned native pylabrobot streaming entrypoint; retain caller overrides.
+        run_config.setdefault("recursion_limit", 100)
+        final = await self._app.ainvoke(state, config=run_config)
         code = final.get("python_code") if isinstance(final, Mapping) else None
         if not isinstance(code, str) or not code.strip():
             raise RuntimeError("Agent returned no protocol code")
