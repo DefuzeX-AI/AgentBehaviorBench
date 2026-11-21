@@ -64,12 +64,22 @@ def resolve_hierarchy(bundle, *, adapters=()):
     accepted = []
     for link in links:
         tool = tools.get(link.tool_id)
-        parent = owner(tool.get("span")) if tool else None
+        parent = owner(tool["span"]) if tool and tool.get("span") and not tool.get("identity_conflicts") else None
         if tool and tool.get("native_session_id") and tool["native_session_id"] not in root_sessions:
+            proposed = nodes.get(link.parent_id)
+            # Nested native spawns share the framework root span. Accept a
+            # different parent only when its session and owned tool both agree.
+            if (parent == key.id and proposed and proposed.key.native_session_id == tool["native_session_id"]
+                    and tool["id"] in proposed.record_ids):
+                parent = proposed.key.id
+            else:
+                parent = None
+        if link.parent_id and link.parent_id != parent:
             parent = None
         if parent is None or parent == link.child_id or nodes[link.child_id].parent_id not in (None, parent):
             issues.append(EvidenceIssue("invalid_delegation", "No unambiguous parent execution", [link.child_id]))
-            blocked_boundaries.add(nodes[link.child_id].boundary_id)
+            if nodes[link.child_id].boundary_id:
+                blocked_boundaries.add(nodes[link.child_id].boundary_id)
             continue
         link.parent_id = parent
         nodes[link.child_id].parent_id = parent
@@ -88,7 +98,8 @@ def resolve_hierarchy(bundle, *, adapters=()):
                 changed = True
     for nid, node in nodes.items():
         if nid not in valid:
-            blocked_boundaries.add(node.boundary_id)
+            if node.boundary_id:
+                blocked_boundaries.add(node.boundary_id)
             issues.append(EvidenceIssue("unconfirmed_execution", "Execution has conflicting, cyclic or missing delegation", [nid]))
     accepted = [l for l in accepted if l.child_id in valid]
     native_owners = {}
