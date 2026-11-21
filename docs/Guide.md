@@ -155,7 +155,7 @@ ABB does not install the KUMA SDK automatically. To use KUMA, install its distri
 directly in the virtual environment where you run ABB:
 
 ```bash
-python -m pip install "kuma-defuzex[otel]>=0.3.3"
+python -m pip install "kuma-defuzex[otel]>=0.3.8"
 ```
 
 Select `--sdk kuma` when running evaluations.

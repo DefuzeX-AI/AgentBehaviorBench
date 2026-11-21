@@ -13,14 +13,14 @@ _PLAIN_HTTP_HOSTS = frozenset({'localhost', '127.0.0.1', '::1', 'host.docker.int
 def validate_host_judge_dependency():
     """Check metadata before expensive Docker work, without importing the SDK."""
     from importlib.metadata import PackageNotFoundError, version
-    hint = ('Host Judge requires kuma-defuzex[otel]>=0.3.3; run python -m pip install -r '
+    hint = ('Host Judge requires kuma-defuzex[otel]>=0.3.8; run python -m pip install -r '
             'agentbench/sdk/plugin/kuma/requirements.txt')
     try:
         installed = version('kuma-defuzex')
     except PackageNotFoundError as exc:
         raise ValueError(hint) from exc
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)', installed)
-    if match is None or tuple(map(int, match.groups())) < (0, 3, 3):
+    if match is None or tuple(map(int, match.groups())) < (0, 3, 8):
         raise ValueError(hint)
 
 

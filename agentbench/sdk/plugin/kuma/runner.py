@@ -7,7 +7,8 @@ from agentbench.sdk.common.artifacts import Artifacts, plain
 from agentbench.observe.store import TraceStore
 from agentbench.observe.result import sanitize_result
 from .error_artifacts import exception_record
-from agentbench.sdk.integration.dialogue import drive_run as drive_sdk_run, submit_result, judge_run
+from agentbench.sdk.integration.dialogue import drive_run as drive_sdk_run, judge_run
+from .assessment import submit_result
 
 
 @timed('Case dialogue', kind='case')

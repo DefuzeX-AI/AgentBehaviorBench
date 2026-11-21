@@ -136,7 +136,7 @@ KUMA_API_KEY=
 ABB 不会自动安装 KUMA SDK。使用 KUMA 时，在运行 ABB 的虚拟环境中直接安装其发行包：
 
 ```bash
-python -m pip install "kuma-defuzex[otel]>=0.3.3"
+python -m pip install "kuma-defuzex[otel]>=0.3.8"
 ```
 
 运行评测时使用 `--sdk kuma`。
