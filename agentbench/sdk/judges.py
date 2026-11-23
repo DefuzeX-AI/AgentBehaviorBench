@@ -68,6 +68,12 @@ def build_request(directory, registration, document):
             'workspace': document.get('workspace'), 'steps': steps, 'attachments': files,
             'evidence_status': manifest['evidence'],
             'unexecuted_input_ids': [item['input_id'] for item in document['case']['inputs'][len(steps):]]}
+    from agentbench.sdk.common.workspace import workspace_policy
+    from agentbench.runtime.agentcontainer.config import tomllib
+    policy = workspace_policy(tomllib.loads((registration.path / 'agent.toml').read_text()))
+    if policy.track_files:
+        body['file_evidence'] = {'track_files': True, 'upload_diff': policy.upload_diff,
+                                 'export_changed_files': policy.export_changed_files}
     body['request_id'] = digest(case_bytes(body))
     return body
 
