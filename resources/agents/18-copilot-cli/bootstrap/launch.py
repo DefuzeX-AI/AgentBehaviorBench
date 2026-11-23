@@ -70,7 +70,8 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str]]:
     })
     # OpenTelemetry export is only enabled when these are set; keep it off.
     for name in ("COPILOT_OTEL_ENABLED", "OTEL_EXPORTER_OTLP_ENDPOINT", "COPILOT_OTEL_FILE_EXPORTER_PATH"):
-        child.pop(name, None)
+        if not environ.get('ABB_OTEL_PROFILE'):
+            child.pop(name, None)
     command = [copilot_binary(), "--acp", "--no-auto-update"]
     return command, child
 

@@ -3,6 +3,8 @@ import argparse
 import json
 from pathlib import Path
 
+from agentbench.trajectory.atif.adapters import ADAPTER_NAMES
+
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -10,7 +12,7 @@ def main(argv=None):
     export = commands.add_parser("export")
     export.add_argument("--input", type=Path, required=True)
     export.add_argument("--output", type=Path, required=True)
-    export.add_argument("--adapter", choices=("deepagents", "opencode"), action="append", default=[])
+    export.add_argument("--adapter", choices=ADAPTER_NAMES, action="append", default=[])
     export.add_argument("--allow-incomplete", action="store_true")
     export.add_argument("--bundle", action="store_true", help="Publish portable trace into a new child of --output")
     portable = commands.add_parser("verify-bundle")

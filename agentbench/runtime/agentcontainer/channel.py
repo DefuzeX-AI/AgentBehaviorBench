@@ -6,7 +6,7 @@ from pathlib import Path
 from agentbench.observe.store import atomic_json
 from agentbench.runtime.agentcontainer.session import AgentSession
 from agentbench.runtime.agentcontainer.worker import execute
-from agentbench.runtime.agentcontainer.telemetry import WireExporter, WireSpanProcessor
+from agentbench.harness.otel.compat.wire import WireExporter, WireSpanProcessor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 
@@ -16,6 +16,7 @@ RESPONSES = Path('/run/abb-channel/response')
 
 async def serve(root=Path('/opt/agent'), requests=REQUESTS, responses=RESPONSES):
     session = AgentSession()
+    session.capture_directory = responses / 'otel'
     provider = TracerProvider(resource=Resource({'service.name': 'abb-evaluation'}))
     exporter = WireExporter()
     provider.add_span_processor(WireSpanProcessor(exporter))

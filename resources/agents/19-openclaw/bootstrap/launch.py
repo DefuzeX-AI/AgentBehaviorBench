@@ -133,6 +133,18 @@ def main() -> int:
         state.mkdir(mode=0o700)
         port = GATEWAY_PORT
         config = gateway_config(base_url, model, port, os.getcwd())
+        if os.environ.get('ABB_OTEL_PROFILE') == 'openclaw':
+            # The official installer owns the plugin provenance database and code.
+            # Each Case gets a private writable copy of the index and configuration.
+            import shutil
+            seed = Path("/opt/abb-otel/openclaw/.openclaw")
+            shutil.copytree(seed / "state", state / "state", dirs_exist_ok=True)
+            (state / "npm").symlink_to(seed / "npm", target_is_directory=True)
+            installed = json.loads((seed / "openclaw.json").read_text(encoding="utf-8"))
+            patch = json.loads(os.environ["ABB_OTEL_GATEWAY_CONFIG"])
+            plugins = installed.get("plugins", {})
+            plugins.setdefault("entries", {}).update(patch.pop("plugins")["entries"])
+            config.update(patch, plugins=plugins)
         (state / "openclaw.json").write_text(json.dumps(config, indent=2))
         # A fresh Gateway token per Case. The bridge reads it from a 0600 file
         # so it never appears in argv; the Gateway expands it from env.

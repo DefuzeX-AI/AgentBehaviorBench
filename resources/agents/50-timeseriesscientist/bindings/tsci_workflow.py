@@ -34,9 +34,8 @@ configuration, not free-form prompt text. Optional numeric run overrides may be
 given as a JSON object or as ``LABEL: value`` lines. Other non-empty text triggers
 the default workflow and is not passed to the native agents. The dataset is chosen
 by the deployment or the packaged ETTh1 sample; a Case cannot supply a file path.
-Business defaults start at ``DEFAULT_CONFIG``, except the deployment uses one
-slice by default to bound work within its model-call budget. Optional deployment
-defaults and explicit supported Case values override them. Native orchestration argument
+Business defaults start at ``DEFAULT_CONFIG``. Explicit operator settings and
+supported Case values override them; the binding adds no model-call budget. Native orchestration argument
 omissions are repaired in a deployment subclass, without editing upstream source.
 Output: the native ``run()`` dict, unchanged — ``all_results``,
 ``aggregated_results`` and ``report``. No answer is fabricated.
@@ -81,12 +80,6 @@ _KNOWN_TEXT = {
     "k_models": int,
 }
 
-_LIMITS = {
-    "num_slices": (1, 25),
-    "input_length": (100, 100000),
-    "horizon": (1, 10000),
-    "k_models": (1, 21),
-}
 
 
 def _coerce(key, raw):
@@ -108,9 +101,8 @@ def _coerce(key, raw):
         if not text.isdigit():
             raise ValueError(f"{key} must be an integer")
         value = int(text)
-        minimum, maximum = _LIMITS[key]
-        if not minimum <= value <= maximum:
-            raise ValueError(f"{key} must be between {minimum} and {maximum}")
+        if value < 1:
+            raise ValueError(f"{key} must be positive")
         return value
     raise ValueError(f"Unsupported option: {key}")
 
@@ -128,7 +120,7 @@ def request_from_input(value):
             as an instruction to the native graph.
     Returns:
         A ``(text, overrides)`` tuple. ``text`` is the preserved request text;
-        ``overrides`` contains only bounded numeric run options.
+        ``overrides`` contains only positive numeric run options.
     Raises:
         ValueError: Empty input, malformed structured input, duplicate or
             unknown fields, or an invalid value for a recognised option.
@@ -246,89 +238,6 @@ def _resolve_data_path():
     )
 
 
-def _deployment_int(name, default, minimum, maximum):
-    value = os.environ.get(name)
-    if value is None:
-        return default
-    try:
-        result = int(value)
-    except ValueError:
-        raise ValueError(f"{name} must be an integer") from None
-    if not minimum <= result <= maximum:
-        raise ValueError(f"{name} must be between {minimum} and {maximum}")
-    return result
-
-
-class _ModelBudget:
-    """One budget shared by all native models; never retries failed calls."""
-    def __init__(self, maximum):
-        self.maximum = maximum
-        self.used = 0
-        self.exhausted = False
-        self.truncated = False
-
-    def claim(self, messages):
-        if self.truncated:
-            raise RuntimeError("Deployment model output truncated; further calls rejected")
-        size = sum(len(str(getattr(message, "content", message)))
-                   for message in messages) if isinstance(messages, (list, tuple)) else len(str(messages))
-        if self.used >= self.maximum or size > 60000:
-            self.exhausted = True
-            raise RuntimeError("Deployment model call/input budget exceeded")
-        self.used += 1
-
-
-class _BudgetedModel:
-    """Delegate to the real instrumented client, with a shared call counter."""
-    def __init__(self, client, budget, *, structured=False, return_raw=False):
-        self.client = client
-        self.budget = budget
-        self.structured = structured
-        self.return_raw = return_raw
-
-    def __getattr__(self, name):
-        return getattr(self.client, name)
-
-    def invoke(self, messages, *args, **kwargs):
-        self.budget.claim(messages)
-        return self._check_response(self.client.invoke(messages, *args, **kwargs))
-
-    async def ainvoke(self, messages, *args, **kwargs):
-        self.budget.claim(messages)
-        return self._check_response(await self.client.ainvoke(messages, *args, **kwargs))
-
-    def _check_response(self, response):
-        raw = response.get("raw") if self.structured and isinstance(response, dict) else response
-        metadata = getattr(raw, "response_metadata", None) or {}
-        if metadata.get("finish_reason") == "length":
-            self.budget.truncated = True
-            raise RuntimeError("Deployment model output truncated (finish_reason=length)")
-        if self.structured and not self.return_raw:
-            if not isinstance(response, dict) or "raw" not in response:
-                raise RuntimeError("Structured model response is missing raw evidence")
-            error = response.get("parsing_error")
-            if error is not None:
-                if isinstance(error, Exception):
-                    raise error
-                raise RuntimeError("Structured model response parsing failed")
-            if response.get("parsed") is None:
-                raise RuntimeError("Structured model response has no parsed result")
-            return response["parsed"]
-        return response
-
-    def with_structured_output(self, *args, **kwargs):
-        # Structured validation uses a derived Runnable, not client.invoke().
-        # Keep that path on the same budget rather than delegating unguarded.
-        options = dict(kwargs)
-        # The native validation node omits method. Use tool calling rather than
-        # provider-specific json_schema response_format; preserve explicit methods.
-        options.setdefault("method", "function_calling")
-        return_raw = options.get("include_raw", False)
-        options["include_raw"] = True
-        return _BudgetedModel(self.client.with_structured_output(*args, **options),
-                              self.budget, structured=True, return_raw=return_raw)
-
-
 def _deployment_graph_class():
     from graph.agent_graph import TimeSeriesAgentGraph
 
@@ -364,7 +273,6 @@ class TimeSeriesScientistWorkflow:
         self._directory = None
         self._native = None
         self._native_config = None
-        self._model_budget = None
         self._closed = False
 
     def _workspace(self):
@@ -384,42 +292,11 @@ class TimeSeriesScientistWorkflow:
             model=config["llm_model"],
             debug=config["debug"],
         )
-        # Parameter changes may rebuild the native graph inside one Case.
-        # Keep the same budget so reconfiguration cannot replenish paid calls.
-        if self._model_budget is None:
-            self._model_budget = _ModelBudget(_deployment_int("TSCI_MODEL_MAX_CALLS", 24, 1, 100))
-        max_tokens = _deployment_int("TSCI_MODEL_OUTPUT_LIMIT", 1024, 128, 4096)
-        effort = os.environ.get("TSCI_REASONING_EFFORT", "").strip()
-        if effort and effort not in {"low", "high", "max"}:
-            raise ValueError("TSCI_REASONING_EFFORT must be low, high or max")
-        for name in ("preprocess_agent", "analysis_agent", "validation_agent",
-                     "forecast_agent", "report_agent"):
-            agent = getattr(self._native, name)
-            client = agent.llm
-            client.max_tokens = max_tokens
-            client.max_retries = 0
-            client.request_timeout = 60
-            # ChatOpenAI constructs SDK clients during initialization: updating
-            # Pydantic fields alone does not update their timeout/retry policy.
-            if getattr(client, "root_client", None) is not None:
-                client.root_client = client.root_client.with_options(timeout=60, max_retries=0)
-                client.client = client.root_client.chat.completions
-            if getattr(client, "root_async_client", None) is not None:
-                client.root_async_client = client.root_async_client.with_options(timeout=60, max_retries=0)
-                client.async_client = client.root_async_client.chat.completions
-            if effort:
-                client.extra_body = {**(client.extra_body or {}),
-                                     "thinking": {"type": "enabled"},
-                                     "reasoning_effort": effort}
-            agent.llm = _BudgetedModel(client, self._model_budget)
-            tools = getattr(agent, "tools", None)
-            if tools is not None and hasattr(tools, "llm"):
-                tools.llm = agent.llm
         self._native_config = dict(config)
         return self._native
 
     def _build_config(self, overrides):
-        """Use one deployment slice, then operator and explicit Case overrides."""
+        """Use native defaults, then operator and explicit Case overrides."""
         from config.default_config import DEFAULT_CONFIG
 
         config = {key: value for key, value in DEFAULT_CONFIG.items()}
@@ -427,11 +304,12 @@ class TimeSeriesScientistWorkflow:
         # embeds the full config in the report prompt. Authentication still reads
         # os.environ; never forward that snapshot to any model or generated report.
         config.pop("env_vars", None)
-        config["num_slices"] = 1
         config["data_path"] = _resolve_data_path()
         config["output_dir"] = self._workspace()
-        for key, bounds in _LIMITS.items():
-            config[key] = _deployment_int("TSCI_DEPLOY_" + key.upper(), config[key], *bounds)
+        for key in _OPTION_KEYS:
+            explicit = os.environ.get("TSCI_DEPLOY_" + key.upper())
+            if explicit is not None:
+                config[key] = _coerce(key, explicit)
         for key, value in overrides.items():
             config[key] = value
         if not os.environ.get("OPENAI_API_KEY"):
@@ -478,13 +356,6 @@ class TimeSeriesScientistWorkflow:
         else:  # pragma: no cover
             result = native.run()
 
-        if self._model_budget.exhausted:
-            raise RuntimeError("Deployment model budget exhausted; incomplete result rejected")
-        # Native nodes may catch model exceptions and continue with fallbacks.
-        # A provider-reported truncation must still prevent a success-looking
-        # Case result. Do not retry or increase paid limits automatically.
-        if self._model_budget.truncated:
-            raise RuntimeError("Deployment model output truncated; incomplete result rejected")
         if not isinstance(result, dict) or not result.get("aggregated_results"):
             raise RuntimeError(
                 "Native workflow completed without aggregated results"

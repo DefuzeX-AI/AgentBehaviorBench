@@ -22,13 +22,8 @@ Adaptations for the ABB boundary:
   as an explicit mapping) and places the complete text into the native
   free-form ``description`` field.
 
-* Deployment bounds: the upstream ``HuntRequest`` defaults drive a ten-round
-  hunt (``max_rounds=10``) toward 200 leads, which does not terminate inside an
-  evaluation window. This deployment therefore uses single-round bounds
-  (``target_lead_count=1``, ``max_rounds=1``,
-  ``min_new_leads_threshold=1``) as its declared operating envelope; a mapping
-  input can still request different bounds within the native field ranges.
-  No value is inferred or invented beyond those declared defaults.
+* Native HuntRequest supplies defaults and validates field ranges. Explicit input
+  fields override those defaults; the binding adds no research budget.
 * A fresh native ``hunt_id`` (``uuid.uuid4()``) is generated per invocation,
   mirroring the upstream route.
 * ``config`` is forwarded to ``graph.astream`` so LangChain/LangGraph
@@ -61,18 +56,6 @@ _BACKEND_ROOT_CANDIDATES = (
     Path(__file__).resolve().parents[1] / "backend",
 )
 
-# Deployment operational bounds for this ABB unit. The upstream HuntRequest
-# defaults (backend/api/routes.py) are target_lead_count=200, max_rounds=10 and
-# min_new_leads_threshold=5, which drive an unbounded ten-round hunt with a
-# candidate budget of 20 URLs per round. The approved onboarding plan requires
-# explicit bounded deployment settings, so this unit declares single-round
-# bounds: one round, target one lead, threshold one new lead. Callers may still
-# override any of them through the mapping input; the defaults below are the
-# deployment's intended operating envelope, recorded in requirement.md.
-_DEFAULT_TARGET_LEAD_COUNT = 1
-_DEFAULT_MAX_ROUNDS = 1
-_DEFAULT_MIN_NEW_LEADS_THRESHOLD = 1
-
 # Native HuntRequest fields accepted as an explicit mapping input.
 _HUNT_REQUEST_FIELDS = frozenset(
     {
@@ -91,24 +74,6 @@ _HUNT_REQUEST_FIELDS = frozenset(
         "template_seed",
     }
 )
-
-
-def _bool_field(item: Any) -> bool:
-    """Accept only a real boolean for the native email-craft switch."""
-    if item is None:
-        return False
-    if not isinstance(item, bool):
-        raise ValueError("enable_email_craft must be a boolean")
-    return item
-
-
-def _seed_field(item: Any) -> dict[str, Any] | None:
-    """Normalize the optional native template_seed mapping."""
-    if item is None:
-        return None
-    if not isinstance(item, Mapping):
-        raise ValueError("template_seed must be a mapping when provided")
-    return dict(item)
 
 
 def hunt_request_from_input(value: Any) -> dict[str, Any]:
@@ -143,51 +108,10 @@ def hunt_request_from_input(value: Any) -> dict[str, Any]:
     else:
         raise ValueError("Input must be text or a mapping of hunt request fields")
 
-    def text_field(name: str) -> str:
-        item = raw.get(name, "")
-        if item is None:
-            return ""
-        if not isinstance(item, str):
-            raise ValueError(f"{name} must be a string")
-        return item
+    _ensure_native_import_root()
+    from api.routes import HuntRequest
 
-    def str_list(name: str) -> list[str]:
-        item = raw.get(name, [])
-        if item is None:
-            return []
-        if not isinstance(item, list) or any(not isinstance(entry, str) for entry in item):
-            raise ValueError(f"{name} must be a list of strings")
-        return list(item)
-
-    def bounded_int(name: str, default: int, low: int, high: int) -> int:
-        item = raw.get(name, default)
-        if item is None:
-            return default
-        if isinstance(item, bool) or not isinstance(item, int):
-            raise ValueError(f"{name} must be an integer")
-        if not low <= item <= high:
-            raise ValueError(f"{name} must be between {low} and {high}")
-        return item
-
-    request = {
-        "website_url": text_field("website_url"),
-        "description": text_field("description"),
-        "product_keywords": str_list("product_keywords"),
-        "target_customer_profile": text_field("target_customer_profile"),
-        "target_regions": str_list("target_regions"),
-        "uploaded_file_ids": str_list("uploaded_file_ids"),
-        "target_lead_count": bounded_int(
-            "target_lead_count", _DEFAULT_TARGET_LEAD_COUNT, 1, 10000
-        ),
-        "max_rounds": bounded_int("max_rounds", _DEFAULT_MAX_ROUNDS, 1, 50),
-        "min_new_leads_threshold": bounded_int(
-            "min_new_leads_threshold", _DEFAULT_MIN_NEW_LEADS_THRESHOLD, 1, 100
-        ),
-        "enable_email_craft": _bool_field(raw.get("enable_email_craft", False)),
-        "email_template_examples": str_list("email_template_examples"),
-        "email_template_notes": text_field("email_template_notes"),
-        "template_seed": _seed_field(raw.get("template_seed")),
-    }
+    request = HuntRequest.model_validate(raw).model_dump()
 
     if (
         not request["description"].strip()

@@ -11,7 +11,7 @@ def context_from_request(request, directory):
     from kuma.providers import JudgeContext
     from kuma.otel import configure_trace_evidence
     from opentelemetry.sdk.trace import TracerProvider
-    from agentbench.sdk.integration.telemetry import decode_span
+    from agentbench.harness.otel.compat.wire import decode_span
     from kuma.evidence.runtime import build_runtime_evidence, runtime_submission_id
 
     run_id, case_id = request['run_id'], request['case']['case_id']

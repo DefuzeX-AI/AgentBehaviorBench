@@ -4,9 +4,9 @@ import json
 
 from harbor.models.trajectories import (Agent, Step, Trajectory, ToolCall,
     Observation, ObservationResult, SubagentTrajectoryRef, Metrics, FinalMetrics)
-from agentbench.observe.interactions import stamp
 from . import SCHEMA_VERSION
 from .contracts import EvidenceIssue
+from .otel_times import SpanTimes
 
 
 def text(value):
@@ -36,15 +36,29 @@ def _metrics(output):
     return Metrics(**values, extra={"abb": {"recorded_usage": usage}}) if values else None
 
 
-def _when(record):
-    value = record.get("timestamp")
-    return value if stamp(value) is not None else None
-
-
 def assemble_atif(bundle, graph, provenance):
     pending = {nid: [] for nid in graph.nodes}
     tools = {t["id"]: t for t in bundle.tools}
     attached, issues = set(), graph.issues
+    clocks = SpanTimes(bundle, issues)
+
+    def operation_time(record):
+        native = [r for r in record.get("agent_otel", []) if r.get("start_time") and r.get("unix_nano")]
+        if len(native) == 1:
+            return {**native[0], "unix_nano": int(native[0]["unix_nano"])}
+        span = bundle.spans.get(record.get("span")) or {}
+        native = span.get("native_id")
+        return clocks.start(record, native) if native else None
+
+    def unassigned(record):
+        timing = operation_time(record)
+        return {**record, "timestamp": timing["start_time"] if timing else None, "ended_at": None}
+
+    def order(record, timing):
+        # Without a clock the original source line still preserves local order.
+        first = min((ref["file"], ref["line"]) for ref in record["evidence"])
+        return (0, timing["unix_nano"], first) if timing else (1, 0, first)
+
     revision = provenance.get("agent_revision") or "unknown"
     if revision == "unknown":
         issues.append(EvidenceIssue("missing_agent_revision", "No frozen revision in historical evidence"))
@@ -77,38 +91,33 @@ def assemble_atif(bundle, graph, provenance):
                             observations.append(observed(tools[tid], call["id"]))
                             attached.add(tid)
         reasoning = output.get("reasoning")
-        step = Step(step_id=1, source="agent", timestamp=_when(model),
+        timing = operation_time(model)
+        step = Step(step_id=1, source="agent", timestamp=timing["start_time"] if timing else None,
             message=text(output.get("text")), reasoning_content=reasoning if isinstance(reasoning, str) else None,
             model_name=model["output"].get("model") or model["input"].get("model"),
             tool_calls=calls or None, observation=Observation(results=observations) if observations else None,
             metrics=_metrics(model["output"]), llm_call_count=1,
             extra={"abb": {"record_ids": [model["id"]], "model_record": model}})
-        pending[owner].append((stamp(model.get("timestamp")) or 0, model["id"], step))
+        pending[owner].append((order(model, timing), model["id"], step))
     for tool in bundle.tools:
         owner = graph.owners[tool["id"]]
         if owner is None or tool["id"] in attached:
             continue
-        pending[owner].append((stamp(tool.get("timestamp")) or 0, tool["id"],
-            Step(step_id=1, source="agent", timestamp=_when(tool), message="",
+        timing = operation_time(tool)
+        pending[owner].append((order(tool, timing), tool["id"],
+            Step(step_id=1, source="agent", timestamp=timing["start_time"] if timing else None, message="",
                  observation=Observation(results=[observed(tool)]),
                  extra={"abb": {"kind": "independent_tool", "association": "unlinked"}})))
 
-    # An explicit invocation input is not inferred from repeated model history.
-    for number, item in enumerate(bundle.inputs):
-        if item["record"] is None:
-            continue
-        invocation = item["context"].get("invocation_id")
-        relevant = [m for m in bundle.models if invocation and m.get("invocation_id") == invocation]
-        first = min((stamp(m.get("timestamp")) or 0 for m in relevant), default=0)
-        pending[graph.root_id].append((first, "!input:" + str(number),
-            Step(step_id=1, source="user", message=text(item["record"].get("payload")),
-                 extra={"abb": {"invocation": item}})))
+    from .replies import root_steps
+    root_rows = root_steps(bundle, pending[graph.root_id], issues, clocks)
+    pending[graph.root_id] = [((0, i, ()), "", step) for i, step in enumerate(root_rows)]
     for nid, node in graph.nodes.items():
         if nid != graph.root_id and node.input is not None:
-            pending[nid].append((-1, "!input", Step(step_id=1, source="user", message=text(node.input),
+            pending[nid].append(((-1,), "!input", Step(step_id=1, source="user", message=text(node.input),
                 extra={"abb": {"kind": "child_input", "evidence": node.evidence}})))
         owned_models = sorted((m for m in bundle.models if graph.owners[m["id"]] == nid),
-                              key=lambda m: (stamp(m.get("timestamp")) or 0, m["id"]))
+                              key=lambda m: order(m, operation_time(m)))
         if owned_models:
             first = owned_models[0]["input"]
             systems = [m.get("content") for m in first.get("messages") or []
@@ -118,7 +127,7 @@ def assemble_atif(bundle, graph, provenance):
             if first.get("instructions") is not None:
                 systems.insert(0, first["instructions"])
             for i, message in enumerate(systems):
-                pending[nid].append((-2, str(i), Step(step_id=1, source="system", message=text(message))))
+                pending[nid].append(((-2,), str(i), Step(step_id=1, source="system", message=text(message))))
 
     # Children without any real step remain a gap, never a dangling reference.
     valid_nodes = {nid for nid, steps in pending.items() if steps}
@@ -148,8 +157,10 @@ def assemble_atif(bundle, graph, provenance):
             extra["version_missing_reason"] = "No independent child Agent revision was recorded"
         if nid == graph.root_id:
             extra.update(provenance=provenance, invocations=bundle.inputs,
-                unassigned_records=[r for r in bundle.models + bundle.tools if graph.owners[r["id"]] is None],
+                unassigned_records=[unassigned(r) for r in bundle.models + bundle.tools if graph.owners[r["id"]] is None],
                 native_events=bundle.native_events, issues=[asdict(i) for i in issues])
+            if bundle.unassigned_agent_spans:
+                extra["unassigned_agent_spans"] = bundle.unassigned_agent_spans
             extra["raw_records"] = bundle.raw_records
             extra["auxiliary_artifacts"] = bundle.auxiliary_artifacts
             extra["delegation_facts"] = graph.delegation_facts

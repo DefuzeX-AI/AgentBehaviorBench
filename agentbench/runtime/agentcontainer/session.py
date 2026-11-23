@@ -15,6 +15,9 @@ class AgentSession:
         self.identity = None
         self.closed = False
         self.invocations = 0
+        self.capture_directory = None
+        self.capture = None
+        self.capture_context = {}
 
     def load(self, root, envelope):
         """Return the same adapter for this Agent/session, loading it once.
@@ -36,6 +39,11 @@ class AgentSession:
             self.identity = identity
             self.adapter = DEFAULT_ADAPTER_FACTORY.create(
                 SimpleNamespace(path=root, framework=envelope['framework']))
+            if self.capture_directory is not None:
+                from agentbench.harness.otel import create_session, read_config
+                self.capture = create_session(read_config(root), self.capture_directory, envelope['agent_id'])
+                self.capture.sink.context = dict(self.capture_context)
+                self.capture.attach(self.adapter, envelope['framework'], envelope['agent_id'])
             self.adapter.load()
         self.invocations += 1
         return self.adapter
@@ -49,9 +57,13 @@ class AgentSession:
         if self.closed:
             return
         self.closed = True
-        if self.adapter is not None:
-            close = getattr(self.adapter, 'aclose', None)
-            if callable(close):
-                await close()
-            else:
-                self.adapter.close()
+        try:
+            if self.adapter is not None:
+                close = getattr(self.adapter, 'aclose', None)
+                if callable(close):
+                    await close()
+                else:
+                    self.adapter.close()
+        finally:
+            if self.capture is not None:
+                self.capture.close()

@@ -1,11 +1,17 @@
 """One evidence-based execution ownership resolver."""
 from copy import deepcopy
+from agentbench.observe.artifact_paths import SESSION_OUTPUT
 from agentbench.observe.tool_links import SCOPE_KEYS, compatible, resolve_tools
 from .contracts import execution_key, ExecutionNode, ExecutionGraph, EvidenceIssue
 from .adapters import selected
 
 
 def resolve_hierarchy(bundle, *, adapters=()):
+    '''
+    Resolve the execution hierarchy for a given evidence bundle.
+    
+    '''
+
     key = execution_key(bundle, None, "runtime", "root")
     root = ExecutionNode(key, bundle.run.get("agent_id") or "unknown", status=bundle.run.get("status", "unknown"))
     nodes, links, issues = {key.id: root}, [], list(bundle.issues)
@@ -25,6 +31,8 @@ def resolve_hierarchy(bundle, *, adapters=()):
     bad = set()
     root_sessions = {(item.get("acp_summary") or {}).get("session", {}).get("sessionId")
                      for item in bundle.inputs}
+    shared = bundle.auxiliary_artifacts.get(SESSION_OUTPUT + "/acp-summary.json") or {}
+    root_sessions.add((shared.get("session") or {}).get("sessionId"))
     root_sessions.discard(None)
 
     def owner(span_id):
@@ -56,12 +64,22 @@ def resolve_hierarchy(bundle, *, adapters=()):
     accepted = []
     for link in links:
         tool = tools.get(link.tool_id)
-        parent = owner(tool.get("span")) if tool else None
+        parent = owner(tool["span"]) if tool and tool.get("span") and not tool.get("identity_conflicts") else None
         if tool and tool.get("native_session_id") and tool["native_session_id"] not in root_sessions:
+            proposed = nodes.get(link.parent_id)
+            # Nested native spawns share the framework root span. Accept a
+            # different parent only when its session and owned tool both agree.
+            if (parent == key.id and proposed and proposed.key.native_session_id == tool["native_session_id"]
+                    and tool["id"] in proposed.record_ids):
+                parent = proposed.key.id
+            else:
+                parent = None
+        if link.parent_id and link.parent_id != parent:
             parent = None
         if parent is None or parent == link.child_id or nodes[link.child_id].parent_id not in (None, parent):
             issues.append(EvidenceIssue("invalid_delegation", "No unambiguous parent execution", [link.child_id]))
-            blocked_boundaries.add(nodes[link.child_id].boundary_id)
+            if nodes[link.child_id].boundary_id:
+                blocked_boundaries.add(nodes[link.child_id].boundary_id)
             continue
         link.parent_id = parent
         nodes[link.child_id].parent_id = parent
@@ -80,7 +98,8 @@ def resolve_hierarchy(bundle, *, adapters=()):
                 changed = True
     for nid, node in nodes.items():
         if nid not in valid:
-            blocked_boundaries.add(node.boundary_id)
+            if node.boundary_id:
+                blocked_boundaries.add(node.boundary_id)
             issues.append(EvidenceIssue("unconfirmed_execution", "Execution has conflicting, cyclic or missing delegation", [nid]))
     accepted = [l for l in accepted if l.child_id in valid]
     native_owners = {}

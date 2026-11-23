@@ -51,6 +51,11 @@ def _sources(index, api):
         sources.append({'path': 'replay/events.jsonl', 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
     except FileNotFoundError:
         pass
+    for name in ('otel/status.json', 'otel/spans.jsonl'):
+        try:
+            sources.append({'path': name, 'sha256': hashlib.sha256(api.file(name).read_bytes()).hexdigest()})
+        except FileNotFoundError:
+            pass
     return sources
 
 
@@ -191,8 +196,8 @@ def build(directory, *, environ=None, project_root=None):
                        'evidence': {'candidates': relation['interaction_ids']}}
                 # Ambiguous executions remain independent steps with every original
                 # output intact. A candidate is not an attributed execution.
-                reason = 'execution not observed' if relation['status'] == 'unobserved' else 'ambiguous execution association'
-                warnings.append(f"tool call {call_id}: {reason}")
+                if link == 'ambiguous':
+                    warnings.append(f"tool call {call_id}: ambiguous execution association")
             logs.append(bounded(log, limit))
         if entry['folder'] is None and only_folder is None and folders:
             warnings.append(f"model call {step['evidence']['interaction_id']} could not be assigned to an Input")
@@ -206,6 +211,13 @@ def build(directory, *, environ=None, project_root=None):
         steps.append({'kind': 'tool_only', 'source': 'framework', 'agent_name': langgraph_actor(agent_id, start.get('metadata')),
                       'started_at': row.get('timestamp'), 'ended_at': row.get('ended'), 'status': row.get('status'),
                       'input_ordinal': _ordinal(folder), 'tool_logs': [bounded(log, limit)], 'order': order_key(row)})
+    from .agent_otel import flat_evidence
+    agent_status = api.read('otel/status.json')
+    remaining = flat_evidence(api, steps, index.rows, limit) if agent_status is not None else []
+    for step in steps:
+        for log in step['tool_logs']:
+            if log['execution_status'] == 'not_observed' and log['link'] == 'none' and 'candidates' in log['evidence']:
+                warnings.append(f"tool call {log['tool_call_id']}: execution not observed")
     steps.sort(key=lambda s: s['order'])
     for number, step in enumerate(steps, 1):
         step.pop('order'); step['step_id'] = number
@@ -273,4 +285,7 @@ def build(directory, *, environ=None, project_root=None):
                           'ambiguous_links': ambiguous, 'unlinked_tool_calls': unlinked,
                           'unobserved_tool_executions': not_observed},
              'sources': _sources(index, api), 'warnings': warnings}
+    if agent_status is not None:
+        value['coverage']['agent_otel'] = agent_status
+        value['unassigned_agent_spans'] = remaining
     return value

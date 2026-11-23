@@ -10,11 +10,11 @@ class InvocationObservation:
         self.directory.mkdir(parents=True, exist_ok=True)
         self.store = TraceStore(self.directory / 'framework.jsonl', session_id, source='framework', context=context)
         try:
-            from .otel.session import ObservedStore
+            from agentbench.harness.otel.compat.framework_projection import ObservedStore
         except ModuleNotFoundError as exc:
             if not (exc.name or '').startswith('opentelemetry'):
                 raise
-            atomic_json(self.directory / 'otel-status.json', {'status': 'unavailable', 'reason': 'OTel SDK not installed'})
+            atomic_json(self.directory / 'otel-status.json', {'status': 'unavailable', 'origin': 'framework_projection', 'reason': 'OTel SDK not installed'})
         else:
             self.store = ObservedStore(self.store, invocation_id, provider=provider)
         self.callbacks = DEFAULT_OBSERVERS.callbacks(framework, self.store)

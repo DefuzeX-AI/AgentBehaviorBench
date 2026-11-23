@@ -301,6 +301,11 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     # trajectory contract now, before SDK diagnostics read the package.
                     try:
                         from agentbench import trajectory
+                        from agentbench.harness.otel.evidence import publish_capture
+                        try:
+                            publish_capture(Path(directory) / 'channel/response/otel', Path(directory) / 'otel')
+                        except (OSError, ValueError) as exc:
+                            status['agent_otel_error'] = type(exc).__name__
                         status['trajectory'] = trajectory.write(directory, environ=environ)
                     except Exception as exc:  # noqa: BLE001 - never alter the execution outcome
                         status['trajectory'] = {'status': 'failed', 'path': 'trajectory.json',

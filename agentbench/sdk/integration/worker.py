@@ -27,7 +27,7 @@ class RecordedEvidence:
         self.span_count += 1
 
     def spans(self):
-        from .telemetry import decode_span
+        from agentbench.harness.otel.compat.wire import decode_span
         for directory in self.steps:
             with Path(directory / 'spans.jsonl').open(encoding='utf-8') as stream:
                 for line in stream:

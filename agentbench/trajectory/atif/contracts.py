@@ -91,6 +91,7 @@ class EvidenceBundle:
     target: dict = field(default_factory=dict)
     raw_records: list[dict] = field(default_factory=list)
     auxiliary_artifacts: dict = field(default_factory=dict)
+    unassigned_agent_spans: list[dict] = field(default_factory=list)
 
 
 @dataclass

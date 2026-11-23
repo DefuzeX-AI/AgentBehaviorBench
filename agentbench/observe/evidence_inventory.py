@@ -38,7 +38,7 @@ def read_stable(root, name):
 
 
 def _otel_records(root, *, allow_incomplete=False):
-    for folder in RunViewAPI(Path(root)).outputs():
+    for folder in RunViewAPI(Path(root)).evidence_outputs():
         for filename in ("otel.jsonl", "otel-live.jsonl"):
             name = folder + "/" + filename
             path = evidence_path(root, name)
@@ -60,6 +60,11 @@ def _otel_records(root, *, allow_incomplete=False):
                     yield name, row
 
 
+def agent_trace_files(root):
+    """Case-owned Agent records have inline bodies and independent collection status."""
+    return [name for name in ("otel/status.json", "otel/spans.jsonl") if evidence_path(root, name).is_file()]
+
+
 def native_references(root, *, allow_incomplete=False):
     result = []
     for name, row in _otel_records(root, allow_incomplete=allow_incomplete):
@@ -77,7 +82,7 @@ def native_references(root, *, allow_incomplete=False):
 
 def payload_paths(root, *, allow_incomplete=False):
     names = {item["path"] for item in native_references(root, allow_incomplete=allow_incomplete)}
-    for folder in RunViewAPI(Path(root)).outputs():
+    for folder in RunViewAPI(Path(root)).evidence_outputs():
         directory = evidence_path(root, folder + "/otel-payloads")
         if directory.exists():
             for path in directory.iterdir():

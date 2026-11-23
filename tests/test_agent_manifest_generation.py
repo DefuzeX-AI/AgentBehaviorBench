@@ -153,3 +153,9 @@ def test_generated_model_selection_is_default_unless_explicitly_pinned(source, f
     assert 'model' not in render(source, facts)
     facts['model'] = {'provider': 'deepseek'}
     assert render(source, facts)['model'] == {'provider': 'deepseek'}
+
+
+def test_explicit_otel_profile_round_trips(source, facts):
+    from agentbench.harness.otel.config import parse_config
+    generated = render(source, facts, options=ManifestOptions(otel_profile="native-otlp"))
+    assert parse_config(generated).profile == "native-otlp"

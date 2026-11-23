@@ -203,6 +203,13 @@ class RunViewAPI:
         return folders + [f'{prefix}/{p.name}' for p in sorted(inputs.iterdir())
                           if p.is_dir() and re.fullmatch(r'\d{4}', p.name)]
 
+    def evidence_outputs(self):
+        from .artifact_paths import SESSION_OUTPUT
+        folders = self.outputs()
+        if (self.directory / SESSION_OUTPUT).is_dir():
+            folders.append(SESSION_OUTPUT)
+        return folders
+
     def spans(self):
         spans, statuses, warnings = [], [], []
         for folder in self.outputs():
@@ -234,6 +241,16 @@ class RunViewAPI:
                             continue
             except FileNotFoundError:
                 pass
+        from agentbench.harness.otel.evidence import display_span, legacy_origin
+        from agentbench.trajectory.agent_otel import rows
+        for span in [*latest.values(), *spans]:
+            span['origin'] = legacy_origin(span)
+        agent_status = self.read('otel/status.json')
+        if agent_status:
+            statuses.append({'invocation': 'Agent', **agent_status})
+            for ref in rows(self):
+                spans.append({**display_span(ref['raw']), 'invocation': 'Agent',
+                              'output_directory': 'otel', 'record_line': ref['line']})
         latest.update({(s.get('trace_id'), s['span_id']): s for s in spans})
         return {'spans': list(latest.values()), 'statuses': statuses, 'warnings': warnings}
 
@@ -340,6 +357,8 @@ class RunViewAPI:
         match = re.fullmatch(r'otel/([0-9a-f]{16})/payload/(input|output|error|metadata|events)', route)
         if match:
             span = next(s for s in self.spans()['spans'] if s['span_id'] == match[1])
+            if span.get('output_directory') == 'otel':
+                raise ValueError('Agent OTLP attributes are inline')
             ref = span['attributes'][f'abb.{match[2]}_ref']
             if Path(ref).is_absolute() or '..' in Path(ref).parts:
                 raise ValueError('Payload outside output')

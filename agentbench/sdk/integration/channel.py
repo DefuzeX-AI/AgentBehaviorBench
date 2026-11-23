@@ -7,7 +7,6 @@ from pathlib import Path
 
 from agentbench.observe.store import atomic_json
 from .context import REQUESTS, RESPONSES, ResponseLimits
-from .telemetry import decode_span
 
 def collect_response(source, destination, *, limits=None):
     # All reads are relative to held directory descriptors. O_NOFOLLOW and
@@ -138,6 +137,7 @@ class DirectoryAgentSession:
         spans = output / 'spans.jsonl'
         if not spans.is_file():
             raise ValueError('Agent response is missing original telemetry')
+        from agentbench.harness.otel.compat.wire import decode_span
         with spans.open(encoding='utf-8') as stream:
             for line in stream:
                 evidence.accept_span(decode_span(json.loads(line)))

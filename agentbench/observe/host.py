@@ -15,7 +15,8 @@ class HostObservation:
         self.metadata = {'schema': 'abb.evaluate.run.v1', 'run_id': self.directory.name,
                          'agent_id': registration.agent_id, 'sdk_run_id': sdk_run.run_id, 'status': 'running',
                          'evidence_availability': {
-                             'framework': {'status': 'pending'}, 'otel': {'status': 'pending'},
+                             'framework': {'status': 'pending'}, 'otel': {'status': 'pending', 'origin': 'framework_projection'},
+                             'agent_otel': {'status': 'unavailable', 'reason': 'Host callback observation'},
                              'network': {'status': 'unavailable', 'reason': 'Host execution has no interceptor capture'},
                              'sdk_wire': {'status': 'unavailable', 'reason': 'SDK did not provide private wire evidence'}}}
         self._save()
@@ -52,6 +53,7 @@ class HostObservation:
             otel = json.loads((folder / 'otel-status.json').read_text(encoding="utf-8"))
             self.metadata['evidence_availability']['framework'] = {'status': 'available'}
             self.metadata['evidence_availability']['otel'] = {
+                'origin': 'framework_projection',
                 'status': 'available' if otel['status'] == 'complete' else otel['status'],
                 'reason': otel.get('reason') or otel.get('error')}
             self._save()

@@ -45,7 +45,9 @@ def test_portable_roundtrip_and_stability(tmp_path, layout):
     assert ma == mb
     for name in ma["files"]:
         assert (pa/name).read_bytes() == (pb/name).read_bytes()
-    doc = json.loads((pa/'trajectory.json').read_text())
+    trajectory_text = (pa / "trajectory.json").read_bytes().decode("utf-8")
+    doc = json.loads(trajectory_text)
+    assert trajectory_text == json.dumps(doc, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     assert "raw_records" not in doc['extra']['abb']
     shutil.rmtree(source)
     moved = tmp_path / "moved"
@@ -248,3 +250,55 @@ def test_old_bundle_with_dangling_native_otel_reference_is_rejected(tmp_path, mo
         result = export_bundle(source, tmp_path / "old")
     with pytest.raises(ValueError, match="Missing native evidence"):
         verify_bundle(result["path"])
+
+
+def test_intercepted_calls_only_in_trace(tmp_path):
+    source = tmp_path / "source"
+    folder = fixture(source, layout="steps")
+    # One joined span and one unowned call, with different wire-only text.
+    wire = []
+    for call_id, span_id in (("attached", "model"), ("unattached", None)):
+        wire.extend([event("llm_request", call_id=call_id, framework_span_id=span_id,
+                           payload={"messages": [{"role": "system", "content": "network-only-system"}]}),
+                     event("llm_response", call_id=call_id, payload={"choices": [
+                         {"message": {"content": "network-only-" + call_id}}]})])
+    lines(source / "network.jsonl", wire)
+    save(folder / "result.json", {"status": "succeeded", "output": "Delivered"})
+    exported = export_bundle(source, tmp_path / "out")
+    root = Path(exported["path"])
+    payload = (root / "trajectory.json").read_text(encoding="utf-8")
+    assert "network-only" not in payload and "unassigned_records" not in payload
+    assert [s["message"] for s in json.loads(payload)["steps"] if s["source"] == "agent"] == [
+        "你好 ¡España!", "", "Delivered"]
+    assert exported["validation"]["models"] == 2
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    resolver = EvidenceResolver(root, manifest["files"])
+    stored = [resolver.resolve(op["ref"]) for op in manifest["operations"].values() if op["kind"] == "model"]
+    assert {r["output"]["text"] for r in stored} == {"network-only-attached", "network-only-unattached"}
+
+
+def test_acp_delivered_chunks_survive_missing_final_result(tmp_path):
+    folder = fixture(tmp_path / "source", layout="steps", tool=False)
+    lines(folder / "framework.jsonl", [])
+    save(folder / "result.json", {"status": "cancelled"})
+    save(folder / "acp-summary.json", {"session": {"sessionId": "session"}})
+    lines(folder / "acp-events.jsonl", [
+        event("session_update", session_id=session, update={"sessionUpdate": "agent_message_chunk",
+              "content": {"type": "text", "text": value}})
+        for session, value in [("session", "¡Ho"), ("different", "other"), ("session", "la!")]])
+    exported = export_bundle(tmp_path / "source", tmp_path / "out")
+    doc = json.loads((Path(exported["path"]) / "trajectory.json").read_text(encoding="utf-8"))
+    assert [(s["source"], s["message"]) for s in doc["steps"]] == [("user", "你好 ¡España!"), ("agent", "¡Hola!")]
+
+
+def test_bundle_replays_agent_otlp_evidence(tmp_path):
+    source = tmp_path / "source"
+    fixture(source)
+    save(source / "otel/status.json", {"profile": "native-otlp", "span_count": 1, "status": "received"})
+    entry = {"schema": "abb.agent-otel.v1", "origin": "agent_native", "scope": {"name": "target"},
+             "resource": {}, "span": {"name": "unassigned", "traceId": "ab" * 16, "spanId": "cd" * 8}}
+    (source / "otel/spans.jsonl").write_text(json.dumps(entry) + "\n", encoding="utf-8")
+    bundle = Path(export_bundle(source, tmp_path / "archives")["path"])
+    files = {s["original_path"] for s in json.loads((bundle / "manifest.json").read_text())["sources"]}
+    assert {"otel/spans.jsonl", "otel/status.json"} <= files
+    assert verify_bundle(bundle)["passed"]

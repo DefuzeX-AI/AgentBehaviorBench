@@ -6,6 +6,10 @@ reader compatibility boundary; there is no post-run packing or unpacking.
 from pathlib import Path, PurePosixPath
 
 
+# Session-worker evidence spans multiple invocations. It has no request of its own.
+SESSION_OUTPUT = 'session/output'
+
+
 def _safe(root, relative):
     rel = PurePosixPath(str(relative).replace('\\', '/'))
     if rel.is_absolute() or '..' in rel.parts or ':' in str(rel):

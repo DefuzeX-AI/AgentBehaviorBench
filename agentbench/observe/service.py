@@ -43,6 +43,13 @@ def observe(agent, value, *, output: Path, environ, timeout=None):
         try:
             adapter.close()
         finally:
+            from agentbench.harness.otel.evidence import publish_capture
+            spools = list(directory.glob("invocation-*/output/otel"))
+            if len(spools) == 1:
+                try:
+                    publish_capture(spools[0], directory / "otel")
+                except (OSError, ValueError) as exc:
+                    result["agent_otel_error"] = type(exc).__name__
             result["trace_summary"] = summarize(directory)
             try:
                 from agentbench import trajectory

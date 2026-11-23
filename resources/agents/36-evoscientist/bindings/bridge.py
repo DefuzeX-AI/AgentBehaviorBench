@@ -28,8 +28,8 @@ Deployment settings (all upstream config keys, passed as CLI overrides):
   post-turn background memory workers and skill synthesis are off (they persist across
   sessions, which a disposable one-shot container cannot keep, and would run LLM calls
   after the reply). Profile/observation memory reading stays on (empty per Case).
-* ``recursion_limit = 150`` (upstream default 1,000,000 = "effectively unlimited"): bounds
-  one turn so a Case finishes within the container timeout.
+* Execution limits come from the native effective configuration; caller run configuration
+  takes precedence without changing child-agent construction defaults.
 * No ``TAVILY_API_KEY``: upstream then omits ``tavily_search``; no web search.
 
 The Case Input is the user message; the reply is the text of the final AI message.
@@ -39,8 +39,6 @@ import os
 import tempfile
 import uuid
 from collections.abc import Mapping
-
-RECURSION_LIMIT = 150
 
 
 def _text(message):
@@ -99,7 +97,6 @@ class EvoScientistGraph:
             "enable_scheduler": False,
             "memory_workers_enabled": False,
             "memory_skill_synthesis_enabled": False,
-            "recursion_limit": RECURSION_LIMIT,
             "ui_backend": "cli",
         }
         self._config = get_effective_config(overrides)
@@ -120,7 +117,7 @@ class EvoScientistGraph:
         metadata = dict(run_config.get("metadata") or {})
         metadata.update(build_metadata(self._workspace, self._config.model))
         run_config["metadata"] = metadata
-        run_config.setdefault("recursion_limit", RECURSION_LIMIT)
+        run_config.setdefault("recursion_limit", self._config.recursion_limit)
         return run_config
 
     @staticmethod

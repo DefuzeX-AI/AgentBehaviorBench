@@ -78,6 +78,8 @@ def prepare(environ: dict[str, str], home: Path) -> tuple[list[str], dict[str, s
         # OpenAI SDK, which is the admitted shared route.
         "--provider", "openai", "--baseurl", base_url, "--model", model,
     ]
+    if child.get("ABB_OTEL_FILE"):
+        command.extend(["--telemetry", "--telemetry-outfile", child["ABB_OTEL_FILE"]])
     return command, child
 
 
@@ -87,7 +89,10 @@ def seed_home(environ: dict[str, str]) -> None:
         Path(environ[var]).mkdir(parents=True, exist_ok=True)
     config_dir = Path(environ["XDG_CONFIG_HOME"]) / "llxprt-code"
     config_dir.mkdir(parents=True, exist_ok=True)
-    (config_dir / "settings.json").write_text(json.dumps(SETTINGS, indent=2), encoding="utf-8")
+    settings = dict(SETTINGS)
+    if environ.get("ABB_OTEL_FILE"):
+        settings["telemetry"] = {"enabled": True, "outfile": environ["ABB_OTEL_FILE"]}
+    (config_dir / "settings.json").write_text(json.dumps(settings, indent=2), encoding="utf-8")
     # LLxprt's model registry (core/src/models/registry.ts) reads model metadata
     # from <cache>/models.json and fetches https://models.dev/api.json when the
     # file is missing or older than seven days. That host is not admitted. A fresh

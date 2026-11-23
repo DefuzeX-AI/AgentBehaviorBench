@@ -105,6 +105,9 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
     store = observed.store
     owned_session = session is None
     session = session or AgentSession()
+    if session.capture_directory is None:
+        session.capture_directory = output / 'otel'
+    session.capture_context = context if owned_session else {k: v for k, v in context.items() if k in ("agent_id", "case_id")}
     result = {"schema": "abb.result.v1", "run_id": run_id, **context}
     try:
         configure_trust()

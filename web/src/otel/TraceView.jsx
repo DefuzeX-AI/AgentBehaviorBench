@@ -17,7 +17,8 @@ function Node({ span, onSelect, selected }) {
 }
 
 export function SpanDetails({ run, span }) {
-  const [payload, setPayload] = useState(null), [label, setLabel] = useState(() => ['input', 'output', 'error', 'metadata', 'events'].find(k => span.attributes?.[`abb.${k}_ref`]) || ''), [error, setError] = useState('');
+  const payloadLabels = span.output_directory === 'otel' ? [] : ['input', 'output', 'error', 'metadata', 'events'].filter(k => span.attributes?.[`abb.${k}_ref`]);
+  const [payload, setPayload] = useState(null), [label, setLabel] = useState(() => payloadLabels[0] || ''), [error, setError] = useState('');
   useEffect(() => {
     setPayload(null); setError('');
     if (!label) return;
@@ -30,10 +31,12 @@ export function SpanDetails({ run, span }) {
   }, [run, span.span_id, label, span.live, span.attributes?.[`abb.${label}_ref`]]);
   return <aside className="span-details"><h3>{span.name}</h3>
     <p>{span.status?.status_code && span.status.status_code !== 'UNSET' ? `${span.status.status_code} · ` : ''}{duration(span)?.toFixed(1)} ms</p>
-    <div className="payload-buttons">{['input', 'output', 'error', 'metadata', 'events'].filter(k => span.attributes?.[`abb.${k}_ref`]).map(k =>
+    <div className="payload-buttons">{payloadLabels.map(k =>
       <button key={k} aria-pressed={k === label} onClick={() => setLabel(k)}>{{ input: 'Input', output: 'Output', error: 'Error', metadata: 'Metadata', events: 'Events' }[k]}</button>)}</div>
     {error && <p role="alert">{error}</p>}
     {label && !error && (payload ? <ReadableContent key={`${span.span_id}:${label}`} value={payload.payload} /> : <p role="status">Loading complete payload…</p>)}
+    <p>{span.origin || 'unknown'}{span.scope?.name && ' · ' + span.scope.name}</p>
+    {span.output_directory === 'otel' && <details><summary>Agent attributes and events</summary><ReadableContent value={{ attributes: span.attributes, events: span.events || [] }} /></details>}
     <details><summary>Trace identifiers</summary><p className="span-id">Trace {span.trace_id}<br />Span {span.span_id}<br />Parent {span.parent_span_id || 'None'}</p></details>
     <details><summary>Raw OTel span</summary><pre>{JSON.stringify({ ...span, children: undefined }, null, 2)}</pre></details>
   </aside>;
@@ -56,12 +59,16 @@ export default function TraceView({ run, revision }) {
       <small>Last synced {updated || 'waiting'}</small>
     </div>
     {error && <p role="alert">{error}; retaining the last data and retrying.</p>}
-    <p>Arrows show real parent-child calls, not data dependencies between nodes. New executions show running nodes; older records contain only completed nodes.</p>
-    <p>{data.spans.length} real OTel spans · payloads loaded on demand</p>
+
+    <p>{Object.entries(data.spans.reduce((counts, span) => {
+      const source = span.origin || 'unknown';
+      counts[source] = (counts[source] || 0) + 1;
+      return counts;
+    }, {})).map(([source, count]) => source + ' ' + count).join(' · ')}</p>
     {data.statuses.map(s => <p key={s.invocation}>{s.invocation}: {s.status}{s.error && ` · ${s.error}`}</p>)}
     {data.warnings.map((w,i) => <p key={i} role="alert">{w}</p>)}
     {!roots.length ? <section className="empty">This run has no OTel records. Older runs are not converted automatically; rerun with the updated image.</section> :
       <div className={`otel-layout ${current ? 'has-selection' : ''}`}>{mode === 'graph' ? <ExecutionGraph key={run} spans={data.spans} onSelect={setSelected} /> : <ul className="span-tree">{roots.map(s => <Node key={`${s.trace_id}:${s.span_id}`} span={s} selected={selected?.span_id} onSelect={setSelected} />)}</ul>}
-        {current ? <div className="detail-panel"><button onClick={() => setSelected(null)}>Close details · expand canvas</button><SpanDetails key={`${run}:${current.span_id}`} run={run} span={current} /></div> : <p className="graph-hint">Select a node for details. Use the wheel to zoom and drag the canvas. The lower-left control fits the full graph.</p>}</div>}
+        {current ? <div className="detail-panel"><button onClick={() => setSelected(null)}>Close details · expand canvas</button><SpanDetails key={`${run}:${current.span_id}`} run={run} span={current} /></div> : null}</div>}
   </section>;
 }

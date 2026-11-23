@@ -54,6 +54,11 @@ def render_manifest(facts, *, source, agent_id, options=None):
     from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
     manifest["runtime"].update(runtime_environment(facts["env_keys"], facts["secret_env_keys"], interception,
         network_mode=DEFAULT_ADAPTER_FACTORY.network_mode(facts['framework'])))
+    from agentbench.onboarding.discovery import discover_otel
+    manifest["otel"] = ({"profile": options.otel_profile} if options.otel_profile
+                        else discover_otel(adapter, source.directory, facts["framework"]))
+    if manifest["otel"]["profile"] == "file-export":
+        manifest["otel"]["file"] = options.otel_file or "traces.json"
     if options.observe:
         fields = facts["input_fields"]
         if len({item["name"] for item in fields}) != len(fields):

@@ -135,3 +135,25 @@ def _entrypoint_files(config: Path, root: Path) -> set[str]:
         if candidate.is_file():
             result.add(relative.as_posix())
     return result
+
+
+def discover_otel(adapter, source, framework):
+    """Use an actual executable or graph binding to select a general instrumentor."""
+    if framework == "langgraph" and (adapter.get("binding") or adapter.get("entrypoint")):
+        return {"profile": "python-auto"}
+    command = adapter.get("command") or []
+    executable = Path(command[0]).name if command else ""
+    if executable in ("node", "nodejs"):
+        return {"profile": "node-auto"}
+    if executable == "java":
+        return {"profile": "java-auto"}
+    if executable == "copilot":
+        return {"profile": "native-otlp", "enable_env": {"COPILOT_OTEL_ENABLED": "true"}}
+    # Dependency metadata can identify candidates without proving that a runtime
+    # starts an exporter. Keep that distinction in the generated manifest.
+    for name in ("package.json", "pyproject.toml", "requirements.txt"):
+        path = Path(source) / name
+        if path.is_file() and not path.is_symlink() and path.stat().st_size <= 1024 * 1024:
+            if "opentelemetry" in path.read_text(encoding="utf-8", errors="replace").lower():
+                return {"profile": "unconfigured", "reason": f"OTel dependency in {name}; exporter startup needs confirmation"}
+    return {"profile": "unconfigured", "reason": f"No verified trace exporter for {executable or framework}"}

@@ -7,8 +7,6 @@ import sys
 from argparse import Action, ArgumentError, ArgumentParser, Namespace, RawDescriptionHelpFormatter, SUPPRESS
 from pathlib import Path
 
-from agentbench.onboarding.source import download_agent
-
 from .base import CommandFeature
 from .run import DEFAULT_REGISTRY_PATH
 from agentbench.cli.sdk import configure_sdk_parser
@@ -55,6 +53,9 @@ def configure_parser(parser: ArgumentParser) -> None:
     add.add_argument("-d", action=_RejectDirectoryFlag, help=SUPPRESS)
     add.add_argument("-b", "--build", action="store_true", help="Generate, validate and save files one at a time; resume valid files.")
     add.add_argument("-c", "--certify", action="store_true", help="Run existing certification using generated or manual files.")
+    from agentbench.harness.otel.profiles import PROFILES
+    add.add_argument("--otel-profile", choices=sorted(PROFILES), help="Agent process trace configuration.")
+    add.add_argument("--otel-file", help="Relative output filename for the Agent file-export profile.")
     add.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH)
     add.add_argument("--build-settings", type=Path, help="TOML [build] overrides for generation.")
     add.add_argument("--build-model", help="OpenRouter model for configuration generation only.")
@@ -89,11 +90,12 @@ def _add(args: Namespace) -> int:
     if not args.build and (args.with_observe or args.agent_timeout is not None or args.adapter_context):
         raise ValueError("--with-observe, --agent-timeout and --adapter-context require -b")
     print("Preparing Agent source...", file=sys.stderr)
-    if args.build or args.certify:
-        from agentbench.onboarding.resume import download_or_reuse
-        result = download_or_reuse(args.repository, args.agents_dir)
-    else:
-        result = download_agent(args.repository, args.agents_dir)
+    from agentbench.onboarding.workflow import add_from_cli
+    return add_from_cli(args, on_source=_show_source,
+                        output_fn=lambda message: print(message, file=sys.stderr))
+
+
+def _show_source(result):
     print(f"Agent directory: {result.directory}", file=sys.stderr)
     if result.source_type == "local-directory":
         print(f"Local source copied from: {result.repository}", file=sys.stderr)
@@ -109,10 +111,6 @@ def _add(args: Namespace) -> int:
     print("Files relative to agent/ (source imported; benchmark configuration pending):",
           file=sys.stderr)
     print(json.dumps(result.files, ensure_ascii=False, indent=2))
-    if args.build or args.certify:
-        from agentbench.onboarding.workflow import configure_download
-        return configure_download(result, args, output_fn=lambda message: print(message, file=sys.stderr))
-    return 0
 
 
 FEATURE = CommandFeature(

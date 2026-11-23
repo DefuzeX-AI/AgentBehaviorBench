@@ -197,12 +197,14 @@ def test_cli_local_source_enters_the_existing_build_workflow(tmp_path, monkeypat
     root = tmp_path / "agents"
     observed = []
 
-    def configure(source, args, *, output_fn):
+    def configure(args, *, on_source, output_fn):
+        source = download_or_reuse(args.repository, args.agents_dir)
+        on_source(source)
         observed.append((source, args.build, args.certify))
         output_fn("build workflow reached")
         return 17
 
-    monkeypatch.setattr(workflow, "configure_download", configure)
+    monkeypatch.setattr(workflow, "add_from_cli", configure)
 
     assert cli(["agent", "add", str(local.resolve()), "--agents-dir", str(root), "-b"]) == 17
     source, build, certify = observed[0]

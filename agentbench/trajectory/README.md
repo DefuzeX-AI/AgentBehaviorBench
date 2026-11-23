@@ -174,3 +174,9 @@ errors and their timestamps remain present; a stream without a terminal record
 is `incomplete`, not successful. The execution's own outcome is never changed.
 A completed response supersedes stream fragments rather than duplicating text.
 Older runs with only chunk metrics cannot recover text that was never recorded.
+
+## Agent and framework evidence
+
+Case-level `otel/spans.jsonl` contains Agent exports. Each line carries its own resource, scope, trace identity and origin. `otel/status.json` describes that collection window. Per-Input `framework.jsonl` contains adapter callbacks, and legacy SDK OTel files can contain a `framework_projection`. Historical rows without identifiable provenance have origin `unknown`.
+
+An exact operation identifier can associate several independent evidence references with one action. Ambiguous spans retain their Case-level references. For OpenClaw, an accepted spawn, a child tool result, and a completion notification have separate evidence requirements. Model input observed by the gateway is cited as gateway evidence. [Agent trace collection](../harness/otel/README.md)
