@@ -24,9 +24,3 @@ utilities and custom-tool management. Direct code execution is disabled by
 upstream defaults. Native gateway approval decisions are not bridged into ACP
 permission requests and may reject operations. No external tool credentials or
 host Docker socket are supplied. See `requirement.md` for evaluation scope.
-
-See [validation report](../../../docs/validation/issue489-ownpilot/README.md)
-for measured execution, judgment and capture boundaries.
-
-See [current PR closeout](../../../docs/validation/issue489-ownpilot/2026-10-26-closeout.md)
-for final static checks and the unchanged runtime evidence boundary.

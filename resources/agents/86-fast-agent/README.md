@@ -39,6 +39,5 @@ source with `uv sync --frozen --no-dev --no-editable --package fast-agent-mcp`.
 ## Validation
 
 The registry remains disabled and `adapting` pending maintainer certification.
-Local Smoke evidence is kept outside the Agent unit under
-`docs/validation/issue457-fast-agent/` when produced. Local Smoke and Judge
-results are separate from official KUMA certification and the GT stage.
+Local Smoke evidence is kept outside the Agent unit when produced. Local Smoke
+and Judge results are separate from official KUMA certification and the GT stage.

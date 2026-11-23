@@ -46,8 +46,7 @@ Validated locally on 2026-10-23 against ABB `318cab5b`:
   host trace validation and cleanup succeed. The trace records three model calls.
 - The final complete Local Smoke, with `ABB_LOCAL_JUDGE_MAX_CHARS=250000`,
   finishes with 1/1 Case executed, Judge `pass`, quality gate passed and CLI
-  exit code 0. Original SDK records and reproduction instructions are in
-  [the acceptance package](../../../docs/validation/issue522-mini-opencode/README.md).
+  exit code 0.
 - The original local Judge returns `inconclusive` because complete evidence
   exceeds its default 120000-character limit (CLI exit 1). A separate assessment
   of the identical retained evidence, with `ABB_LOCAL_JUDGE_MAX_CHARS=250000`,

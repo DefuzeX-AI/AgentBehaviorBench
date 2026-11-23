@@ -35,6 +35,5 @@ account is configured. The [Agent Profile](requirement.md) describes tools and
 the network restrictions of this deployment.
 
 The committed registry stays disabled and `adapting` pending maintainer review.
-Local acceptance records, when produced, live outside the Agent build context
-under `docs/validation/issue514-coddy/`. They are separate from official KUMA
-certification and phase-two GT work.
+Local acceptance records, when produced, live outside the Agent build context.
+They are separate from official KUMA certification and phase-two GT work.
