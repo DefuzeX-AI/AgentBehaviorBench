@@ -156,3 +156,15 @@ def test_kuma_adapter_translation_is_offline(tmp_path, unit, monkeypatch):
     assert len(context.history) == 1 and context.case.case_id == 'audit-2'
     assert context.history[0].test_input.payload == 'hello'
     assert 'runtime_evidence' in context.history[0].submission.extensions
+    extensions = context.history[0].submission.extensions
+    assert 'trace_capture_summary' in extensions
+    assert extensions['agent_output_actor'] == 'target_agent'
+    assert extensions['assessment_evidence']['coverage']['public_messages'] != 'complete'
+    # Real SDK projection used to fail here because capture_summary was missing.
+    from kuma.providers import OfficialJudgeProvider
+    from kuma.providers._official_evidence_upload import judge_upload_config
+    from tests.test_kuma_deferred_judge import OfflineBackend
+    backend = OfflineBackend(context.case.case_id)
+    upload = OfficialJudgeProvider(backend)._prepare_upload(context, judge_upload_config(
+        backend.json('GET', '/sdk/judge/config/')))
+    assert any('assessment' in part.filename for part in upload.log_parts)
