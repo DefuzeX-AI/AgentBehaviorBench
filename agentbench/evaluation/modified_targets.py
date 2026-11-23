@@ -62,16 +62,15 @@ def prepare_modified_target(base, source, destination):
     manifest.write_text(_table(manifest.read_text(encoding='utf-8'), 'source',
                               {'method': 'bundled'}), encoding='utf-8')
     prepare_installation_inputs(destination)
+    effective_digest = source_digest(destination / 'agent')
     provenance = {'schema': 'abb.modified-target.v1', 'agent_id': base.registration.agent_id,
                   'base_revision': base.revision, 'base_target': base.describe(),
                   'submitted_source_sha256': submitted_digest,
-                  'effective_source_sha256': source_digest(destination / 'agent'),
-                  'source_is_modified': source_digest(destination / 'agent') != source_digest(root / 'agent')}
+                  'effective_source_sha256': effective_digest,
+                  'source_is_modified': effective_digest != source_digest(root / 'agent')}
     (destination / 'provenance.json').write_text(
         json.dumps(provenance, ensure_ascii=False, indent=2), encoding='utf-8')
     digest = source_digest(destination)
     fingerprint = hashlib.sha256(('abb.modified-target.v1\n' + digest).encode()).hexdigest()
-    target = PreparedTarget(replace(base.registration, path=destination,
+    return PreparedTarget(replace(base.registration, path=destination,
         requirement_path=destination / 'requirement.md'), base.revision, fingerprint, digest)
-    target.validate()
-    return target

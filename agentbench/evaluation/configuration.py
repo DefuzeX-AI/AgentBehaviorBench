@@ -73,14 +73,17 @@ def installed_sdk_distributions(reference):
 def build_saved_runner(configuration, environ, *, activity_sink=None):
     """Reconstruct a directory SDK runner without putting credentials in a plan."""
     from .runner import build_trace_suite_runner
-    runner = build_trace_suite_runner(
+    # Plans saved before these fields existed fall back to the current defaults.
+    defaults = ConcurrencySettings()
+    return build_trace_suite_runner(
         max_bytes=configuration['trace_max_bytes'], model=configuration.get('model_override', configuration.get('model')),
         sdk_selection=resolve_sdk(configuration['sdk']), sdk_options=configuration.get('sdk_options'),
-        concurrency=ConcurrencySettings(configuration['workers'], configuration.get('judge_workers', 2),
-                                        configuration.get('judge_queue_capacity', 8)), environ=environ,
-        activity_sink=activity_sink)
-    runner.retry_policy = RetryPolicy(**configuration.get('retry_policy', {}))
-    return runner
+        concurrency=ConcurrencySettings(
+            configuration['workers'],
+            configuration.get('judge_workers', defaults.max_parallel_judges),
+            configuration.get('judge_queue_capacity', defaults.judge_queue_capacity)),
+        environ=environ, activity_sink=activity_sink,
+        retry_policy=RetryPolicy(**configuration.get('retry_policy', {})))
 
 
 def resolve_suite(value, root=None):

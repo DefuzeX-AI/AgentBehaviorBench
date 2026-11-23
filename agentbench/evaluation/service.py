@@ -79,9 +79,9 @@ class EvaluationService:
         from agentbench.sdk.plugin.native.backend import validate_case
         if not isinstance(cases, list) or not cases:
             raise ValueError('Cases must be a non-empty list')
-        context = self.agent(agent_id, target=target)['context']
-        cases = [validate_case({**case, 'abb_agent_context': context}) for case in cases]
         registration = self._registration(agent_id, target)
+        context = load_agent_context(registration.path / 'requirement.md', agent_id=agent_id)
+        cases = [validate_case({**case, 'abb_agent_context': context}) for case in cases]
         registration = replace(registration, case_count=len(cases))
         options = {'cases': cases, 'timeout': timeout}
         if max_steps is not None:
