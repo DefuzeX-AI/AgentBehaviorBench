@@ -12,7 +12,6 @@ Their credentials and quotas are separate.
 Use a source checkout with an editable installation; the standalone wheel does
 not include all Agent resources and built viewer assets. Install Git, Python 3.10+
 with pip/venv, and Docker accessible to your user for Docker Agent execution.
-The offline demo needs no Docker.
 
 - **macOS:** install and start [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/).
 - **Linux:** install [Docker Engine](https://docs.docker.com/engine/install/) and
@@ -40,7 +39,6 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 agentbench --help
 agentbench sdk list
-python -m examples.offline_demo --output results/offline-demo.json
 ```
 
 If you have not integrated your own testing Agent, the default SDK list should
@@ -48,16 +46,6 @@ contain KUMA (shown as `kuma` in the CLI) and `local`. KUMA is the baseline test
 Agent provided for the benchmark, integrated through the `kuma` SDK plugin;
 `local` is the testing Agent for minimal offline validation, provided through
 the `local` SDK plugin.
-
-The offline demo uses a local echo Agent and a deterministic Judge, requiring no
-Docker, API key, or model calls. On success, expect
-`Case execution: 1/1 completed | Judge: pass=1`, indicating that the local testing
-flow has completed. Copy the timestamped path printed as `OFFLINE_RESULT`.
-
-If this demo stops with `Agent requirement.md is missing`, its echo fixture is
-missing an integration file. This is a demo issue, not an API-key error; use a
-revision containing the fixture correction. CLI help and SDK discovery can still
-verify the installation without credentials.
 
 ## Build the web viewer
 
@@ -80,8 +68,8 @@ cd web
 npm ci
 npm run build
 cd ..
-# Replace this example with the actual OFFLINE_RESULT path.
-agentbench view results/offline-demo-YYYYMMDD-HHMMSS.json
+# Replace SUITE_ID with the Suite printed by a run or evaluation.
+agentbench view results/suites/SUITE_ID/events.json
 ```
 
 After cloning, complete the web build above. Open the complete `View:` URL

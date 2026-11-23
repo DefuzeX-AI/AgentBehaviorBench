@@ -4,8 +4,8 @@ from copy import deepcopy
 from dataclasses import replace
 import json
 
-from agentbench.cli.viewer_catalog import ViewerSuiteCatalog
-from agentbench.cli.viewer_overview import benchmark_evaluators
+from agentbench.cli.viewer.catalog import ViewerSuiteCatalog
+from agentbench.cli.viewer.overview import benchmark_evaluators
 from agentbench.harness.ground_truth import benchmark_ground_truth
 from agentbench.harness.session import SuiteStore
 from agentbench.observe.evaluation_source import evaluation_source

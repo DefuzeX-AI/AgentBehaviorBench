@@ -2,12 +2,32 @@
 import json
 from pathlib import Path
 from .base import CommandFeature
+from agentbench.cli.options import configure_env_file, configure_model
 
 
 def configure(parser):
+    '''
+        1.agentbench api agent mini-opencode - Show one registered Agent's information.
+
+        2.agentbench api prepare mini-opencode --revision abc1234 - Prepare the Agent source at an exact historical commit.
+
+        3.agentbench api execute mini-opencode --case-file cases.json - Run the Cases in an abb.cases.v1 file and return the Suite.
+
+        4.agentbench api result --suite results/suites/SUITE_ID - Show the overall result of one Suite.
+
+        5.agentbench api evidence --suite results/suites/SUITE_ID --run-id RUN_ID - Show the recorded evidence of one run.
+
+        6.agentbench api attachment --suite results/suites/SUITE_ID --run-id RUN_ID --path FILE - Read one file saved by a run.
+
+        7.agentbench api submit-judge --suite results/suites/SUITE_ID --run-id RUN_ID --report report.json - Submit an external Judge report for a run.
+        
+        8.agentbench api gt --suite results/suites/SUITE_ID - Compare the Suite against its ground-truth issues.
+
+    '''
+
     from agentbench.project import project_root
     parser.add_argument('--root', type=Path, default=project_root())
-    parser.add_argument('--env-file', type=Path)
+    configure_env_file(parser)
     commands = parser.add_subparsers(dest='operation', required=True)
     commands.add_parser('agent').add_argument('agent_id')
     prepare = commands.add_parser('prepare')
@@ -18,7 +38,7 @@ def configure(parser):
     execute.add_argument('--case-file', type=Path, required=True)
     execute.add_argument('--results-dir', type=Path)
     execute.add_argument('--judge')
-    execute.add_argument('--model')
+    configure_model(execute)
     execute.add_argument('--timeout', type=float, default=2400)
     execute.add_argument('--max-steps', type=int)
     execute.add_argument('--revision', help='Prepare and execute this exact historical commit')

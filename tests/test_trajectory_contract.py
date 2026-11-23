@@ -45,7 +45,8 @@ def test_judge_request_attaches_trajectory_and_evidence_api_returns_it(project):
     assert evidence['schema'] == 'abb.evaluation.evidence.v2'
     assert 'trajectory.json' in evidence['request']['attachments']
     assert evidence['trajectory']['schema'] == SCHEMA and 'derived_on_read' not in evidence['trajectory']
-    assert evidence['spans']['statuses']
+    # The fake Agent exports no OTel, and ABB does not derive spans from other records.
+    assert evidence['spans'] == {'spans': [], 'statuses': [], 'warnings': []}
     attached = service.attachment(suite, run, 'trajectory.json')
     assert attached['content']
 

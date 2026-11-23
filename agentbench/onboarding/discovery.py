@@ -137,23 +137,131 @@ def _entrypoint_files(config: Path, root: Path) -> set[str]:
     return result
 
 
+# Runtime of the Agent's own process, in selection order. A compiled executable precedes
+# the package.json that may only distribute it; Bun precedes the Node manifest it shares.
+#   runtime: (files identifying it, files declaring its dependencies,
+#             declaration of an OTLP trace exporter, automatic profile)
+_JAVA_FILES = ("pom.xml", "build.gradle", "build.gradle.kts")
+_PYTHON_FILES = ("pyproject.toml", "requirements.txt", "setup.py")
+_NODE_EXPORTER = r"@opentelemetry/(sdk-node|auto-instrumentations-node|exporter-trace-otlp-)"
+_RUNTIMES = {
+    "rust": (("Cargo.toml",), ("Cargo.toml",), r"opentelemetry[-_]otlp", None),
+    "go": (("go.mod",), ("go.mod",), r"go\.opentelemetry\.io/otel/exporters/otlp/otlptrace", None),
+    "java": (_JAVA_FILES, _JAVA_FILES, r"opentelemetry-exporter-otlp", "java-auto"),
+    "bun": (("bun.lock", "bun.lockb", "bunfig.toml"), ("package.json",), _NODE_EXPORTER, None),
+    "node": (("package.json",), ("package.json",), _NODE_EXPORTER, "node-auto"),
+    "python": (_PYTHON_FILES, _PYTHON_FILES, r"opentelemetry[-_]exporter[-_]otlp", "python-auto"),
+}
+_EXECUTABLES = {"node": "node", "nodejs": "node", "java": "java", "bun": "bun"}
+
+
+def _build_text(path: Path) -> str:
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 1024 * 1024:
+        return ""
+    return path.read_text(encoding="utf-8-sig", errors="replace")
+
+
+def _build_table(path: Path) -> dict:
+    """Parse package.json or pyproject.toml; {} when absent, oversized or malformed."""
+    from agentbench.runtime.agentcontainer.config import tomllib
+    try:
+        value = (json if path.suffix == ".json" else tomllib).loads(_build_text(path))
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _table(value, *keys) -> dict:
+    """Follow nested table keys, returning {} wherever the declared shape differs."""
+    for key in keys:
+        value = value.get(key) if isinstance(value, dict) else None
+    return value if isinstance(value, dict) else {}
+
+
+def _declared_dependencies(path: Path) -> str:
+    """Return one build file's direct runtime dependency declarations as text."""
+    if path.name == "package.json":
+        package = _build_table(path)
+        return "\n".join([*_table(package, "dependencies"), *_table(package, "optionalDependencies")])
+    if path.name == "pyproject.toml":
+        project = _build_table(path)
+        direct = _table(project, "project").get("dependencies")
+        direct = [item for item in direct if isinstance(item, str)] if isinstance(direct, list) else []
+        return "\n".join([*direct, *_table(project, "tool", "poetry", "dependencies")])
+    if path.name == "go.mod":
+        return "\n".join(line for line in _build_text(path).splitlines() if "// indirect" not in line)
+    return _build_text(path)
+
+
+def _identifies(runtime: str, folder: Path, command: bool) -> bool:
+    """Whether a folder's build files name this runtime; `command` also requires an installed command."""
+    package = _build_table(folder / "package.json")
+    present = any((folder / name).is_file() and not (folder / name).is_symlink() for name in _RUNTIMES[runtime][0])
+    if runtime == "bun":
+        # A package may name Bun as its engine or package manager without committing a lockfile.
+        present = present or "bun" in _table(package, "engines") or str(package.get("packageManager", "")).startswith("bun@")
+    if not present or not command:
+        return present
+    if runtime in ("bun", "node"):
+        return bool(package.get("bin"))
+    if runtime == "python":
+        project = _build_table(folder / "pyproject.toml")
+        return bool(_table(project, "project", "scripts") or _table(project, "tool", "poetry", "scripts"))
+    return True
+
+
+def _runtime_folders(folders, *, command=False) -> dict[str, list[Path]]:
+    """Map each runtime, in selection order, to the given folders that identify it."""
+    found = {runtime: [folder for folder in folders if _identifies(runtime, folder, command)] for runtime in _RUNTIMES}
+    return {runtime: matched for runtime, matched in found.items() if matched}
+
+
 def discover_otel(adapter, source, framework):
-    """Use an actual executable or graph binding to select a general instrumentor."""
-    if framework == "langgraph" and (adapter.get("binding") or adapter.get("entrypoint")):
-        return {"profile": "python-auto"}
+    """Select the target's own OTLP exporter when declared, else its runtime's instrumentor.
+
+    Args:
+        adapter: Rendered adapter table; an ACP command names the launched executable.
+        source: Downloaded repository root.
+        framework: Registered framework name.
+    Returns:
+        The manifest's [otel] table. `reason` cites the evidence for every selection
+        that a Case-level otel/status.json may need to explain.
+
+    This reads dependency declarations only. A declared exporter is not proof that the
+    target starts it: a real run's otel/status.json remains the verification.
+    """
+    root = Path(source)
     command = adapter.get("command") or []
     executable = Path(command[0]).name if command else ""
-    if executable in ("node", "nodejs"):
-        return {"profile": "node-auto"}
-    if executable == "java":
-        return {"profile": "java-auto"}
     if executable == "copilot":
         return {"profile": "native-otlp", "enable_env": {"COPILOT_OTEL_ENABLED": "true"}}
-    # Dependency metadata can identify candidates without proving that a runtime
-    # starts an exporter. Keep that distinction in the generated manifest.
-    for name in ("package.json", "pyproject.toml", "requirements.txt"):
-        path = Path(source) / name
-        if path.is_file() and not path.is_symlink() and path.stat().st_size <= 1024 * 1024:
-            if "opentelemetry" in path.read_text(encoding="utf-8", errors="replace").lower():
-                return {"profile": "unconfigured", "reason": f"OTel dependency in {name}; exporter startup needs confirmation"}
-    return {"profile": "unconfigured", "reason": f"No verified trace exporter for {executable or framework}"}
+    # A LangGraph binding always runs in the Python worker. An ACP launcher is usually a
+    # Python wrapper, so only a direct runtime executable identifies the target by itself.
+    acp = framework != "langgraph"
+    # Build files at the source root identify the target; a monorepo keeps them one level
+    # below, where a Node or Python manifest counts only if it installs a command: a
+    # nested SDK or front end is not the Agent.
+    children = sorted(path for path in root.iterdir() if path.is_dir() and not path.is_symlink()
+                      and path.name not in SKIPPED_DIRECTORIES) if root.is_dir() else []
+    found = _runtime_folders([root]) or _runtime_folders(children, command=acp)
+    runtime = (_EXECUTABLES.get(executable) or next(iter(found), None)) if acp else "python"
+    if runtime is None:
+        return {"profile": "unconfigured", "reason": "No build file identifies the runtime of the target executable"}
+    _, declarations, exporter, automatic = _RUNTIMES[runtime]
+    declared = {path.relative_to(root).as_posix(): _declared_dependencies(path)
+                for folder in found.get(runtime) or _runtime_folders(children).get(runtime) or [root]
+                for path in (folder / name for name in declarations)}
+    for name, text in declared.items():
+        if re.search(exporter, text, re.IGNORECASE):
+            return {"profile": "native-otlp", "reason": f"OTLP trace exporter declared in {name}"}
+    notes = []
+    if acp and runtime == "python" and not re.search(r"langchain|langgraph", "\n".join(declared.values()), re.IGNORECASE):
+        notes.append("python-auto instruments LangChain only and none is declared")
+    # Bun shares package.json with Node, so that pair is one runtime, never an alternative.
+    others = sorted(set(found) - {runtime, "node" if runtime == "bun" else runtime}) if acp else []
+    if others:
+        notes.append(f"source also contains {', '.join(others)}")
+    if automatic is None:
+        return {"profile": "unsupported", "reason": "; ".join(
+            [f"No automatic instrumentation for a {runtime} executable", *notes])}
+    return {"profile": automatic, **({"reason": "; ".join([f"Selected for a {runtime} source", *notes])} if notes else {})}

@@ -2,10 +2,10 @@
 import json
 import math
 import os
-from argparse import ArgumentTypeError
 from pathlib import Path
 
 from .base import CommandFeature
+from agentbench.cli.options import configure_env_file, configure_model
 from .run import DEFAULT_REGISTRY_PATH
 from ..environment import load_project_environment
 from agentbench.observe.catalog import enabled_agents, select_agent, resolve_agent, tomllib
@@ -23,19 +23,10 @@ def configure_parser(parser):
     parser.add_argument("--list", action="store_true", help="Show all enabled Agents and exit")
     parser.add_argument("--input", type=Path, help="Native input JSON file")
     parser.add_argument("--output", type=Path, default=Path("results/observe"))
-    parser.add_argument("--env-file", type=Path)
-    parser.add_argument("--model", type=model_name, metavar="MODEL",
-                        help="Target model name (not an Agent number); defaults to the selected provider model")
+    configure_env_file(parser)
+    configure_model(parser, help="Target model name (not an Agent number); defaults to the selected provider model")
     parser.add_argument("--timeout", type=float, help="Positive execution timeout in seconds")
     parser.add_argument("--show", type=Path, help="Review a saved observe run directory offline")
-
-
-def model_name(value):
-    if value.strip().isdecimal():
-        raise ArgumentTypeError(
-            f"--model expects a model name, not an Agent number; use 'observe {value.strip()}' to select Agent {value.strip()}"
-        )
-    return value
 
 
 def native_input(agent, path, input_fn=input):

@@ -91,8 +91,9 @@ class EvaluationService:
         runner = build_trace_suite_runner(max_bytes=DEFAULT_TRACE_MAX_BYTES, model=model,
             sdk_selection=resolve_sdk('native'), sdk_options=options,
             concurrency=concurrency, environ=self.environ, retry_policy=retry_policy)
-        suite_id = runner.new_suite_id()
+        from agentbench.harness.runner.suite_runner import unused_suite_id
         parent = Path(results_dir) if results_dir is not None else self.root / 'results'
+        suite_id = unused_suite_id(runner.new_suite_id, parent / 'suites')
         with history_guard(self.root):
             store = SuiteStore.begin(parent / 'suites', suite_id, (registration,),
                 configuration=runner_configuration(runner, (registration,)), environ=self.environ)

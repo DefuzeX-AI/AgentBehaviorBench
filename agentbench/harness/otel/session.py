@@ -51,9 +51,15 @@ class CaptureSession:
                 except Exception as exc:
                     self.sink.error = type(exc).__name__
             else:
-                for key, value in self.environment.items():
-                    self.previous[key] = os.environ.get(key)
-                    os.environ[key] = value
+                self._export_environment()
+        elif self.file_spool:
+            # An in-process Agent reads ABB_OTEL_FILE from this worker's environment.
+            self._export_environment()
+
+    def _export_environment(self):
+        for key, value in self.environment.items():
+            self.previous[key] = os.environ.get(key)
+            os.environ[key] = value
 
     def close(self):
         if self.finished:

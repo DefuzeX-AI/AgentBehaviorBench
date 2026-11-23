@@ -5,7 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentbench.cli import execution, viewer
+from agentbench.cli import execution
+from agentbench.cli.viewer import server as viewer
 from agentbench.cli.sessions import configuration, control, fresh, recovery
 from agentbench.harness import SuiteRunner
 from agentbench.harness.session import SuiteStore, read_snapshot

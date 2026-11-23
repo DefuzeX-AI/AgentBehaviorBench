@@ -14,7 +14,7 @@ from .configuration import RunConfiguration
 from .features import FEATURES
 from .features.run import run
 from .terminal_ui.presentation import confirm_agents
-from .viewer import RunningViewer, start_viewer_server
+from .viewer.server import RunningViewer, start_viewer_server
 
 
 def build_parser() -> ArgumentParser:

@@ -23,6 +23,41 @@ def registration(tmp_path, *, cases=3):
     return AgentRegistration('test-agent', root, True, 'ready', 'test', 'test', cases)
 
 
+def test_new_suite_ids_are_short(tmp_path):
+    import re
+    from agentbench.harness.runner.suite_runner import SuiteRunner
+
+    identifiers = {SuiteRunner.new_suite_id() for _ in range(200)}
+    assert all(re.fullmatch(r'suite_[0-9a-f]{8}', value) for value in identifiers)
+    assert len(identifiers) == 200
+
+
+def test_taken_suite_id_is_redrawn_instead_of_failing(tmp_path):
+    from agentbench.harness.runner.suite_runner import unused_suite_id
+
+    agent = registration(tmp_path)
+    with SuiteStore.begin(tmp_path / 'suites', 'suite_88c7990c', [agent]):
+        pass
+    plan = (tmp_path / 'suites/suite_88c7990c/plan.json').read_bytes()
+    draws = iter(['suite_88c7990c', 'suite_88c7990c', 'suite_0a1b2c3d'])
+    suite_id = unused_suite_id(lambda: next(draws), tmp_path / 'suites')
+    assert suite_id == 'suite_0a1b2c3d'
+    with SuiteStore.begin(tmp_path / 'suites', suite_id, [agent]):
+        pass
+    assert (tmp_path / 'suites/suite_88c7990c/plan.json').read_bytes() == plan
+    assert unused_suite_id(lambda: 'suite_new', None) == 'suite_new'
+
+
+def test_suite_store_still_refuses_to_overwrite_an_existing_plan(tmp_path):
+    agent = registration(tmp_path)
+    with SuiteStore.begin(tmp_path / 'suites', 'suite_88c7990c', [agent]):
+        pass
+    plan = (tmp_path / 'suites/suite_88c7990c/plan.json').read_bytes()
+    with pytest.raises(FileExistsError, match='already exists'):
+        SuiteStore.begin(tmp_path / 'suites', 'suite_88c7990c', [agent])
+    assert (tmp_path / 'suites/suite_88c7990c/plan.json').read_bytes() == plan
+
+
 def prepared(tmp_path, index=0):
     path = tmp_path / f'generated-{index}.json'
     path.write_text(json.dumps({'case_id': f'case-{index}', 'inputs': ['first', 'second']}))
@@ -175,7 +210,7 @@ def test_full_report_round_trip_survives_event_bus_detachment():
 
 
 def test_cli_agent_aggregate_preserves_recovered_report_fields(tmp_path):
-    from agentbench.cli.result_export import _suite_agent_to_json
+    from agentbench.cli.result.export import _suite_agent_to_json
     from agentbench.harness.result import SuiteAgentResult
     from agentbench.harness.session import case_from_json, case_to_json
     agent = registration(tmp_path, cases=1)

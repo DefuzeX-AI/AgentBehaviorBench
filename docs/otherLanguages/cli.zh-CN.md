@@ -23,6 +23,7 @@ agent 是命令组，必须选择子命令 add；sdk 必须选择 list 或 show�
 | `agentbench run` | 在一个 Suite 中执行注册表内所有已启用且 status 为 ready 的 Agents，使用各自的 case 数量和 step 预算，执行前展示并确认选择。 |
 | `agentbench evaluate` | 通过所选 SDK 为一个已启用 Agent 生成独立 Cases，执行 Agent、收集证据并获得 Judge 结果；不会像 certify 一样修改注册表状态。 |
 | `agentbench agent add` | 导入 GitHub 仓库或本地目录。不带 -b/-c 时仅导入并列出源码；-b 生成接入配置，-c 执行认证，两者可组合使用。 |
+| `agentbench agent delete` | 移除一个 Agent 的注册表条目，并把它的整个文件夹（含 ground_truth/）移到 cache/agent-trash，不会永久删除。可先用 --dry-run 预览；删除前停止使用该 Agent 的运行与查看器。 |
 | `agentbench certify` | 执行一个已启用 adapting Agent 在注册表中配置的 Case 数，所有请求的 Cases 无调用错误完成后晋升为 ready。Judge 发现问题本身不会阻止晋升；已 ready 的 Agent 不重复执行。 |
 | `agentbench observe` | 执行一次原生输入，保存输出和轨迹，不进行 SDK 用例生成或 Judge。当前要求 Docker 的 oneshot 执行方式；--list 与 --show 用于只读查看。 |
 | `agentbench view` | 通过本地网页查看已保存结果，需先构建网页资源。打开输出的完整 View 地址并保持命令运行，Ctrl+C 关闭查看器。 |
@@ -140,6 +141,32 @@ agentbench agent add SOURCE [OPTIONS]
 agentbench agent add https://github.com/langchain-ai/react-agent
 agentbench agent add /absolute/path/to/local-agent -b --sdk kuma --build-model openai/gpt-4.1-mini
 agentbench agent add /absolute/path/to/local-agent -b -c --sdk kuma --no-view
+```
+
+## `agent delete`
+
+移除一个 Agent 的注册表条目，并把它的整个文件夹（含 ground_truth/）移到注册表所在项目根目录下的 cache/agent-trash，不会永久删除。只删除匹配的那一个 `[[agents]]` 块，其他条目的格式保持不变。如果注册表更新失败，文件夹会被移回原处。
+
+```text
+agentbench agent delete AGENT [OPTIONS]
+```
+
+| 参数 | 作用与默认行为 | 示例 |
+| --- | --- | --- |
+| `-h, --help` | 显示当前命令的帮助并退出。 | `--help` |
+| `AGENT` | 必填。已注册的 agent_id，或 --agents-dir 下的编号文件夹名。用文件夹名也可以删除只导入、尚未注册的文件夹。不接受路径。 | `my-agent`、`01-my-agent` |
+| `--agents-dir DIR` | 编号 Agent 文件夹的父目录，被删除的文件夹必须直接位于其中。默认：所选项目默认注册表旁的 resources/agents。 | `--agents-dir resources/agents` |
+| `--registry PATH` | 选择 Agent 注册表。默认：项目的 resources/registry.toml。 | `--registry resources/registry.toml` |
+| `--dry-run` | 显示 Agent、文件夹、注册表和归档位置，不修改文件；默认关闭。 | `--dry-run` |
+| `-y, --yes` | 跳过删除确认，默认询问。 | `--yes` |
+
+恢复时，把归档的文件夹移回 --agents-dir 下，并重新添加它的 `[[agents]]` 条目。删除已注册的 Agent 后，运行 `python scripts/update_agent_docs.py` 刷新 docs/Agents.md。
+
+### 示例
+
+```bash
+agentbench agent delete my-agent --dry-run
+agentbench agent delete 01-my-agent
 ```
 
 ## `certify`

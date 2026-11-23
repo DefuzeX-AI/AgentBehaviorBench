@@ -5,7 +5,7 @@ the raw records of an attempt directory and saved beside them. Schema
 `abb.agent-trajectory.v1`. Every execute-phase result package carries one; a
 generation failure still writes the file with `status: failed` and the error.
 
-The raw records (`steps/NNNN/otel*.jsonl`, `framework.jsonl`, `logs/network.jsonl`,
+The raw records (`steps/NNNN/framework.jsonl`, `logs/network.jsonl`, `otel/spans.jsonl`,
 ACP events, file evidence) remain the source of truth. The trajectory never
 replaces them: `sources` lists the files it was derived from with digests, and
 each step carries `evidence` identifiers that point back at the interaction index.
@@ -177,6 +177,6 @@ Older runs with only chunk metrics cannot recover text that was never recorded.
 
 ## Agent and framework evidence
 
-Case-level `otel/spans.jsonl` contains Agent exports. Each line carries its own resource, scope, trace identity and origin. `otel/status.json` describes that collection window. Per-Input `framework.jsonl` contains adapter callbacks, and legacy SDK OTel files can contain a `framework_projection`. Historical rows without identifiable provenance have origin `unknown`.
+Case-level `otel/spans.jsonl` contains Agent exports. Each line carries its own resource, scope, trace identity and origin. `otel/status.json` describes that collection window. Per-Input `framework.jsonl` contains adapter callbacks; attempts written before the conversion was removed can also hold per-Input OTel files derived from those callbacks (`framework_projection`). Historical rows without identifiable provenance have origin `unknown`.
 
 An exact operation identifier can associate several independent evidence references with one action. Ambiguous spans retain their Case-level references. For OpenClaw, an accepted spawn, a child tool result, and a completion notification have separate evidence requirements. Model input observed by the gateway is cited as gateway evidence. [Agent trace collection](../harness/otel/README.md)

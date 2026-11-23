@@ -55,7 +55,7 @@ def test_host_rejection_retains_only_matching_report(monkeypatch, tmp_path, fore
 def test_case_error_exports_retained_report_without_success():
     from agentbench.harness.jobs import CaseJob, SuiteCallbacks, run_case_job
     from agentbench.sdk.contracts import PreparedCase
-    from agentbench.cli.result_export import _case_to_json
+    from agentbench.cli.result.export import _case_to_json
 
     artifacts = {'directory': '/runs/host', 'received_report': {'status': 'issue', 'host_accepted': False}}
     def reject(*a, **kw):

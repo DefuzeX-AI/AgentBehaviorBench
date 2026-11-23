@@ -4,7 +4,10 @@ import zipfile
 
 import pytest
 
-from scripts.inspect_biomedical_data import inspect_archive
+from tests.registered_agents import unit_scripts
+
+unit_scripts('biomedical-aiq-research-agent')
+from inspect_biomedical_data import inspect_archive  # noqa: E402
 
 
 def inspect_fixture(path):

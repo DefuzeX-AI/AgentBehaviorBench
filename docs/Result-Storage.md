@@ -14,9 +14,10 @@ results/
     agent.json
     records/<sha256>.json       immutable results referenced by Suite events
     preparations/<id>/         generation diagnostics and SDK recovery state
-    cases/<storage-id>/
+    cases/<storage-id>/        8 hex digits (32 in Suites saved as agent-attempts-v1)
+      slot.json                owner of this Case slot (agent-attempts-v2)
       case.json                published prepared Case
-      attempts/<id>/
+      attempts/<id>/           attempt number + 6 hex digits, e.g. 01a3f9c2
         run.json               host execution, cleanup, trace acceptance and trajectory status
         trajectory.json        derived step sequence (abb.agent-trajectory.v1)
         manifest.json          SDK execution summary and step index
@@ -27,10 +28,8 @@ results/
           request.json         Agent invocation contract
           result.json          native Agent result
           submission.json      SDK-committed submission and evidence
-          otel-status.json     capture validation; other capture metadata stays here
-          spans.jsonl          step traces, alongside OTel/live traces when present
-          otel-payloads/       ordinary file paths sharing immutable blob bytes
-        blobs/<sha256>         content-addressed payload storage
+          framework.jsonl      adapter callbacks and ACP tool events of this step
+        otel/                  spans the Agent itself exported, with collection status
         judge/
           context.json         checked references to Case, Inputs and submissions
           report.json
@@ -41,6 +40,13 @@ results/
         recovery/              recovery records, when present
     gt/<suite-id>/             GT calls and evaluations for this Agent
 ```
+
+Short names keep paths below the Windows 260-character limit. New Suites record
+`artifact_layout = "agent-attempts-v2"`: a Case slot name is derived from the
+Suite, Agent and Case index, and a name owned by another Case moves on to the
+next candidate, so lookups stay stable without collisions. Suite IDs are
+`suite_` plus 8 hex digits; a taken ID is redrawn. Saved v1 Suites keep their
+32-digit names.
 
 SDK-specific private files are retained under their native names. Optional
 workspace/replay evidence and diagnostics are retained when produced. Input,

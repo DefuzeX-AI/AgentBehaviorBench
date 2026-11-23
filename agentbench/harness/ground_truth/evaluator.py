@@ -76,7 +76,8 @@ def evaluate_suite(directory, project_root, *, environ=None, output=print, ask=N
     directory, project_root = Path(directory).resolve(), Path(project_root).resolve()
     environ = dict(os.environ if environ is None else environ)
     plan, _ = read_suite(directory)
-    gt_root = directory if plan.get('artifact_layout') == 'agent-attempts-v1' else within(directory, directory / 'ground_truth')
+    from agentbench.harness.session.layout import is_managed
+    gt_root = directory if is_managed(plan) else within(directory, directory / 'ground_truth')
     gt_root.mkdir(exist_ok=True)
     with FileLock(str(gt_root / '.evaluation.lock'), timeout=0):
         return _evaluate(directory, project_root, environ, output, ask or ask_once,

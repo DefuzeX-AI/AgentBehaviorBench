@@ -29,8 +29,7 @@ class EchoRun(Run):
     def judge(self):
         outputs = [entry['output'] for entry in self.history]
         assert outputs == ['first:1', 'first:1:2'], outputs
-        spans = list(self.evidence.spans())
-        assert spans and all(span.context.is_valid for span in spans)
+        assert len(self.evidence.steps) == 2 and all(step.is_dir() for step in self.evidence.steps)
         self.report = Report('pass', 1.0)
         return self.report
 

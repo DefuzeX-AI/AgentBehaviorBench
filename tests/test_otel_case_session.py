@@ -88,3 +88,33 @@ while True: signal.pause()
             session.close()
     asyncio.run(run())
     assert json.loads((tmp_path / "otel/status.json").read_text())["span_count"] == 1
+
+
+def test_in_process_agent_receives_trace_file_path(tmp_path, monkeypatch):
+    import asyncio
+    import os
+    from agentbench.runtime.agentcontainer.session import AgentSession, DEFAULT_ADAPTER_FACTORY
+
+    span = {"traceId": "ab" * 16, "spanId": "cd" * 8, "name": "file export"}
+
+    class Agent:
+        def load(self):
+            # An in-process exporter reads its output path when the Agent loads.
+            self.path = os.environ["ABB_OTEL_FILE"]
+
+        def close(self):
+            with open(self.path, "w", encoding="utf-8") as stream:
+                json.dump({"resourceSpans": [{"scopeSpans": [{"spans": [span]}]}]}, stream)
+
+    (tmp_path / "agent.toml").write_text('[otel]\nprofile="file-export"\nfile="trace.json"\n')
+    monkeypatch.setattr(DEFAULT_ADAPTER_FACTORY, "create", lambda *_: Agent())
+    monkeypatch.delenv("ABB_OTEL_FILE", raising=False)
+    session = AgentSession()
+    session.capture_directory = tmp_path / "attempt" / "otel"
+    session.load(tmp_path, dict(agent_id="agent", framework="langgraph", run_id="i1", session_id="case"))
+    asyncio.run(session.aclose())
+
+    status = json.loads((session.capture_directory / "status.json").read_text())
+    assert status["status"] == "received" and status["span_count"] == 1
+    assert json.loads((session.capture_directory / "spans.jsonl").read_text())["transport"] == "file"
+    assert "ABB_OTEL_FILE" not in os.environ

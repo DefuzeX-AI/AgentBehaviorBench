@@ -117,6 +117,12 @@ class KumaContainerRunner:
             raise ProviderSelectionError(str(exc)) from exc
         if not (registration.path / 'requirement.md').is_file():
             raise ProviderSelectionError('Missing Agent evaluation file: requirement.md')
+        # Last preflight check, still before Case generation or Agent execution can spend credits.
+        from .integration import require_trace_evidence
+        try:
+            require_trace_evidence()
+        except ValueError as exc:
+            raise ProviderSelectionError(str(exc)) from exc
         return self.provider_mode
 
     def _evaluate(self, registration, **options):

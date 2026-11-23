@@ -6,7 +6,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 
-from agentbench.cli.result_export import _summary_to_json, _suite_agent_to_json
+from agentbench.cli.result.export import _summary_to_json, _suite_agent_to_json
 from agentbench.cli.terminal_ui.presentation import print_agent_complete, print_suite_summary
 from agentbench.harness.jobs import CaseJob, SuiteCallbacks, run_case_job
 from agentbench.harness.result import BenchmarkResult, BenchmarkSuiteResult, CaseResult, SuiteAgentResult

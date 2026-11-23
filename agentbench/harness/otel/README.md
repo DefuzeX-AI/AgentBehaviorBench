@@ -2,6 +2,23 @@
 
 Choose the profile in the registered unit's outer `agent.toml`. Inspect the pinned launcher and its actual runtime first. One Case attempt owns one receiver inside the Agent container. The worker starts it before loading the target and closes it after adapter shutdown. Persistent sessions reuse the receiver across Inputs. A standalone observe run follows the same lifecycle.
 
+### Automatic selection
+
+`agentbench agent add -b` fills `[otel]` when `--otel-profile` is omitted. It reads the dependency declarations in the downloaded source. Nothing is imported or executed.
+
+| Evidence | Selected profile |
+| --- | --- |
+| A direct dependency on an OTLP trace exporter | `native-otlp` |
+| Python graph binding, or a Python ACP source | `python-auto` |
+| `package.json` | `node-auto` |
+| `pom.xml` or a Gradle build file | `java-auto` |
+| `Cargo.toml`, `go.mod` or a Bun lockfile, with no exporter | `unsupported` |
+| No build file at the source root or one level below | `unconfigured` |
+
+A LangGraph binding always counts as Python. For ACP the build file identifies the runtime, since the launcher is usually a Python wrapper. A compiled executable takes precedence over a `package.json` that may only distribute it. `reason` records the file that decided a native selection and any other runtime found in the source.
+
+A declared exporter does not prove that the target starts it. If a real run reports `zero_spans` for a selected `native-otlp`, supply the upstream enable switch in `enable_env` or choose the profile explicitly.
+
 ### Native OTLP
 
 For a product that starts its own exporter, point that exporter at the attempt's receiver. Supply upstream enable switches only when the pinned product documents them.
@@ -45,4 +62,4 @@ Use `profile = "file-export"`, `file = "trace.json"` and `file_format = "otlp-js
 
 Open `otel/status.json` in the attempt directory, then inspect `otel/spans.jsonl`. Each JSONL line retains the resource, instrumentation scope, OTLP IDs, original nanosecond timestamps, links, events and exported attributes after the benchmark's redaction rules. Cite the filename and one-based line number.
 
-`span_count` counts persisted Agent-native and auto-instrumented spans. `record_count` includes every received record. A span emitted by the `agentbench.observe` scope is recorded as `framework_projection` even when forwarded through OTLP. `zero_spans` means the configured window closed with zero Agent spans. `unconfigured` and `unsupported` describe profile selection. `incomplete` reports a collection error. Inspect the execution result independently. The per-Input SDK files and `framework.jsonl` can exist even if the Agent exporter emitted nothing. A claim about tool output requires an actual result field or event. A claim about message delivery requires independent evidence of delivery.
+`span_count` counts persisted Agent-native and auto-instrumented spans. `record_count` includes every received record. `zero_spans` means the configured window closed with zero Agent spans. `unconfigured` and `unsupported` describe profile selection. `incomplete` reports a collection error. Inspect the execution result independently. Per-Input `framework.jsonl` can exist even if the Agent exporter emitted nothing; ABB does not turn those records into OTel spans. A claim about tool output requires an actual result field or event. A claim about message delivery requires independent evidence of delivery.

@@ -1,7 +1,10 @@
 import io
 
-from scripts.start_biomedical_ingest import RedactedStream
-from scripts.start_biomedical_ingest import pdf_pipeline_config
+from tests.registered_agents import unit_scripts
+
+unit_scripts('biomedical-aiq-research-agent')
+from start_biomedical_ingest import RedactedStream  # noqa: E402
+from start_biomedical_ingest import pdf_pipeline_config  # noqa: E402
 
 
 def test_launcher_stream_redacts_credentials():

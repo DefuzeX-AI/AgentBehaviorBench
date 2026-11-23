@@ -197,7 +197,6 @@ class ContainerSDKRunner:
         return result
 
     def _read_result(self, directory, registration, case, document):
-        from agentbench.observe.artifact_paths import resolve_artifact_path
         host = accepted(directory, execution=True)
         root = directory
         manifest = read(root / 'manifest.json')
@@ -228,9 +227,7 @@ class ContainerSDKRunner:
                     or request.get('agent_id') != registration.agent_id
                     or request.get('framework') != registration.framework
                     or request.get('observation_context') != {'case_id': case.case_id, 'input_id': item['input_id']}
-                    or not request.get('run_id') or output.get('run_id') != request['run_id']
-                    or read(root / relative / 'otel-status.json').get('status') != 'complete'
-                    or not resolve_artifact_path(root / relative / 'spans.jsonl').is_file()):
+                    or not request.get('run_id') or output.get('run_id') != request['run_id']):
                 raise ValueError('SDK input, output, submission or evidence mismatch')
             seen.add(item['input_id'])
             if output['status'] == 'succeeded':

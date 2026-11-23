@@ -123,8 +123,6 @@ class EvidenceWriter:
                     if span.get("parentSpanId"):
                         span["parentSpanId"] = _identifier(span["parentSpanId"], 16)
                     origin = "auto_instrumented" if self.config.profile.endswith("-auto") else "agent_native"
-                    if ss.get("scope", {}).get("name") == "agentbench.observe":
-                        origin = "framework_projection"
                     rows.append({"schema": "abb.agent-otel.v1", "context": self.context, "origin": origin, "transport": transport,
                                  "resource": rs.get("resource", {}), "resource_schema_url": rs.get("schemaUrl"),
                                  "scope": ss.get("scope", {}), "scope_schema_url": ss.get("schemaUrl"), "span": span})

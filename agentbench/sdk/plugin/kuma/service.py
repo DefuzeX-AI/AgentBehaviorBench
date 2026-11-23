@@ -13,11 +13,11 @@ class EvaluationPolicy(ControllerExecutionPolicy):
     """Compatibility for callers supplying KUMA's ledger directory."""
 
     def __init__(self, state, *, repository=None, target=SDK_REPOSITORY,
-                 writable=False, replay=None, channel=None, publications=()):
+                 writable=False, replay=None, publications=()):
         state = state.resolve()
         super().__init__(state.parent, repository=repository or state.parent,
                          target=target, writable=writable, replay=replay,
-                         channel=channel, publications=publications)
+                         publications=publications)
 
 
 def _completed_execution(directory):
@@ -76,5 +76,4 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
         require_workspace_identity=case_artifact is not None,
         safe_case_replay=safe_case_replay, validate_failed_execution=_completed_execution,
         collect_artifacts=collect_artifacts,
-        excluded_agent_environment=('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL'),
         repository_target=SDK_REPOSITORY)

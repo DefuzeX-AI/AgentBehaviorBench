@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 from .base import CommandFeature
+from agentbench.cli.options import configure_env_file, configure_model
 
 
 def configure(parser):
@@ -23,16 +24,16 @@ def configure(parser):
     run.add_argument('--source', type=Path, required=True, help='Absolute path to the modified source/ directory')
     run.add_argument('--runs', type=int, default=3, help='Independent repair executions (default: 3)')
     run.add_argument('--results-dir', type=Path)
-    run.add_argument('--model', help='Target model override (execution only)')
+    configure_model(run, help='Target model override (execution only)')
     run.add_argument('--timeout', type=float, default=2400, help='Timeout per Case execution in seconds')
-    run.add_argument('--env-file', type=Path)
+    configure_env_file(run)
     result = commands.add_parser('result', help='Read a saved repair result without executing anything')
     result.add_argument('--experiment', type=Path, required=True)
     judge = commands.add_parser('judge', help='Judge saved evidence without running Agents')
     modes = judge.add_subparsers(dest='judge_mode', required=True)
     auto = modes.add_parser('auto', help='Assess saved trajectories with a model')
-    auto.add_argument('--model', help='Judge model override on the configured provider')
-    auto.add_argument('--env-file', type=Path)
+    configure_model(auto, help='Judge model override on the configured provider')
+    configure_env_file(auto)
     export = modes.add_parser('export', help='Export evidence and a manual review template')
     export.add_argument('--output', type=Path, required=True)
     manual = modes.add_parser('import', help='Validate and retain a completed manual review')

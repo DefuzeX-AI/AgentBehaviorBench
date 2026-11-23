@@ -74,14 +74,13 @@ def exception_details(exc):
     return details
 
 
-async def execute(root: Path, request: Path, output: Path, *, provider=None, session=None):
+async def execute(root: Path, request: Path, output: Path, *, session=None):
     """Execute one current Input, optionally in an existing Case's Agent session.
 
     Args:
         root: Agent unit directory with its manifest and native entrypoint.
         request: JSON invocation envelope containing current input and identity.
         output: Per-invocation artifact directory.
-        provider: Optional shared OpenTelemetry provider.
         session: Case-owned AgentSession reused across Inputs; None creates and
             closes a standalone session for this invocation.
     Returns:
@@ -100,8 +99,8 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
                if isinstance(supplied, dict) and isinstance(supplied.get(key), str)}
     context.update(invocation_id=run_id, agent_id=envelope['agent_id'])
     from agentbench.observe.invocation import InvocationObservation
-    observed = InvocationObservation(output, run_id, envelope.get("session_id", run_id),
-                                     envelope["framework"], context=context, provider=provider)
+    observed = InvocationObservation(output, envelope.get("session_id", run_id),
+                                     envelope["framework"], context=context)
     store = observed.store
     owned_session = session is None
     session = session or AgentSession()
@@ -130,6 +129,9 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         interception = InterceptionConfig.from_agent_dir(root)
         hosts = [host for route in (*interception.routes, *interception.tool_routes)
                  for host in route.host_patterns] if interception else []
+
+
+        # send prompt to agent
         with model_correlation(hosts):
             with span('Invoke Agent', kind='execution', invocation_id=run_id, **{k: v for k, v in context.items() if k != 'invocation_id'}):
                 invocation = await adapter.ainvoke(envelope["input"], run_config=config)
@@ -159,8 +161,6 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         result, receipt = sanitize_result(result, environment_secrets())
         atomic_json(output / "result-redaction.json", receipt)
         atomic_json(output / "result.json", result)
-        if hasattr(store, 'close'):
-            store.close()
     return 0 if result["status"] == "succeeded" else 1
 
 

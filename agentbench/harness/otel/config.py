@@ -1,10 +1,7 @@
 """Read the same trace selection at build and launch time."""
 from dataclasses import dataclass, field
 from pathlib import Path
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib
+import tomllib
 
 from .profiles import PROFILES
 

@@ -1,4 +1,7 @@
-from scripts.biomedical_milvus_options import install_handler_policy
+from tests.registered_agents import unit_scripts
+
+unit_scripts('biomedical-aiq-research-agent')
+from biomedical_milvus_options import install_handler_policy  # noqa: E402
 
 
 def handler():

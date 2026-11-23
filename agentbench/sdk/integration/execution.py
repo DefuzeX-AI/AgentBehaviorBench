@@ -2,7 +2,8 @@
 
 SDK formats remain opaque settings and private files. SDKRunnerContext supplies
 cancellation, runtime services and ArtifactStore; this module owns the workspace,
-isolated processes, evidence validation and cleanup.
+the single container shared by the SDK worker and the Agent, evidence validation
+and cleanup.
 """
 from collections.abc import Mapping
 import json
@@ -52,7 +53,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                    generation_indices=None, expected_environment_sha256=None,
                    require_workspace_identity=False,
                    safe_case_replay=False, validate_failed_execution=None,
-                   collect_artifacts=None, excluded_agent_environment=(),
+                   collect_artifacts=None,
                    repository_target='/opt/abb-sdk-repo', model_input_id=None):
     """Run an SDK worker using the host facilities supplied to its runner.
 
@@ -90,8 +91,6 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
     directory = allocate_run(output, artifact_store, agent.agent_id, identity,
                              (generation_indices or ()) if not execute_agent else None)
     Path(directory).mkdir(parents=True, mode=0o700, exist_ok=True)
-    from agentbench.sdk.integration.context import ResponseLimits
-    response_limits = ResponseLimits.from_environ(environ)
     files = Artifacts(directory, environ=environ)
     (directory / 'logs').mkdir(exist_ok=True)
     with timing_session(directory / 'logs/host-timing.jsonl', source='host', name='Evaluation',
@@ -112,8 +111,6 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                   'safe_case_replay': safe_case_replay is True}
         files.save('run.json', status)
         session = None
-        agent_process = None
-        agent_checkpoint = None
         workspace_temp = None
         primary_error = None
         try:
@@ -195,8 +192,6 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     replay_directory = directory / 'replay'
                     Path(replay_directory).mkdir(mode=0o777)
                     Path(replay_directory).chmod(0o777)
-                from agentbench.sdk.integration.context import ExecutionChannel
-                channel = ExecutionChannel.create(directory / 'channel') if execute_agent else None
                 settings = json.loads(Path(directory / 'request/evaluation.json').read_text(encoding='utf-8'))
                 publications = ()
                 if artifact_store is not None and not execute_agent:
@@ -205,13 +200,12 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                                          for index in indices)
                     settings['case_publications'] = {str(index): f'/run/abb-published/{index}'
                                                      for index, _ in publications}
-                settings.update(private_storage='/run/abb-sdk-storage',
-                                isolated_agent=channel is not None, agent_timeout=timeout)
-                settings['agent_response_limits'] = {
-                    'max_bytes': response_limits.max_bytes, 'max_files': response_limits.max_files}
+                settings.update(private_storage='/run/abb-sdk-storage')
                 files.save('request/evaluation.json', settings)
                 runtime_options = dict(
-                    environ=environ, policy=ControllerExecutionPolicy(ledger_root, repository=repository, target=target, writable=bool(policy.path), replay=replay_directory, channel=channel, publications=publications), trace_sink=Sink(),
+                    environ=environ, policy=ControllerExecutionPolicy(ledger_root, repository=repository, target=target, writable=bool(policy.path), replay=replay_directory, publications=publications),
+                    # The Agent runs in this container, so its model traffic carries the input scope.
+                    trace_sink=Sink(model_input_id if execute_agent else None),
                     trace_max_bytes=trace_max_bytes, control=control, identity=identity,
                     timeout_sec=timeout,
                     run_id=directory.name, artifact_root=directory,
@@ -221,29 +215,6 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                 else:
                     runtime = DockerRuntime(build_coordinator=build_coordinator, **runtime_options)
                 control.check()
-                if channel is not None:
-                    from agentbench.runtime.docker.execution_policy import AgentExecutionPolicy
-                    public_inputs = directory / 'agent-request'
-                    Path(public_inputs).mkdir()
-                    agent_outputs = directory / 'agent-output'
-                    Path(agent_outputs).mkdir(mode=0o700)
-                    options = dict(runtime_options)
-                    options['trace_sink'] = Sink(model_input_id)
-                    options['policy'] = AgentExecutionPolicy(repository, target, bool(policy.path), channel, agent_outputs)
-                    options['artifact_root'] = directory / 'agent-runtime'
-                    Path(options['artifact_root']).mkdir()
-                    options['run_id'] = directory.name + '-agent'
-                    agent_runtime = (runtime_services.create_docker_runtime(**options)
-                                     if runtime_services is not None else
-                                     DockerRuntime(build_coordinator=build_coordinator, **options))
-                    agent_process = agent_runtime.start(
-                        descriptor, invocation=(public_inputs, agent_outputs),
-                        argv=('python', '-m', 'agentbench.runtime.agentcontainer.channel'),
-                        exclude_environment=tuple(tomllib.loads((descriptor.path / 'agent.toml').read_text(encoding='utf-8'))
-                                                  .get('runtime', {}).get('worker_env_keys', ())) +
-                                            tuple(excluded_agent_environment),
-                        preparation_deadline=preparation)
-                    agent_checkpoint = agent_process.trace_checkpoint()
 
                 # Start the container process, then wait for its generation/execution mode.
                 session = runtime.start(descriptor,
@@ -262,8 +233,6 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                         status['host_trace_validation'] = 'failed'
                         with span('Validate network evidence', kind='evidence'):
                             session.validate_trace(checkpoint)
-                            if agent_process is not None:
-                                agent_process.validate_trace(agent_checkpoint)
                         status['host_trace_validation'] = 'succeeded'
                 status['status'] = 'succeeded' if code == 0 else 'failed'
         except BaseException as exc:
@@ -276,36 +245,26 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
             raise
         finally:
             try:
-                errors = []
-                for active, label in ((session, 'controller'), (agent_process, 'agent')):
-                    if active is None:
-                        continue
+                if session is not None:
                     try:
-                        with span('Cleanup ' + label + ' container', kind='cleanup'):
-                            active.close()
+                        with span('Cleanup container', kind='cleanup'):
+                            session.close()
                     except BaseException as exc:
-                        errors.append(exc)
+                        status.update(status='failed', cleanup_status='failed',
+                                      cleanup_error_type=type(exc).__name__, cleanup_error=str(exc))
+                        raise
                     finally:
-                        files.save('diagnostics.json' if label == 'controller' else 'agent-diagnostics.json',
-                                   {'stdout': active.stdout, 'stderr': active.stderr, **identity})
-                if errors:
-                    exc = errors[0]
-                    status.update(status='failed', cleanup_status='failed',
-                                  cleanup_error_type=type(exc).__name__, cleanup_error=str(exc))
-                    raise exc
+                        files.save('diagnostics.json',
+                                   {'stdout': session.stdout, 'stderr': session.stderr, **identity})
                 if status['cleanup_status'] != 'failed':
-                    status['cleanup_status'] = 'succeeded' if session or agent_process else 'not_started'
+                    status['cleanup_status'] = 'succeeded' if session else 'not_started'
             finally:
                 if execute_agent:
-                    # Both containers are closed and traces validated: derive the
+                    # The container is closed and traces validated: derive the
                     # trajectory contract now, before SDK diagnostics read the package.
+                    # Agent-native OTel was written directly to otel/ by the worker.
                     try:
                         from agentbench import trajectory
-                        from agentbench.harness.otel.evidence import publish_capture
-                        try:
-                            publish_capture(Path(directory) / 'channel/response/otel', Path(directory) / 'otel')
-                        except (OSError, ValueError) as exc:
-                            status['agent_otel_error'] = type(exc).__name__
                         status['trajectory'] = trajectory.write(directory, environ=environ)
                     except Exception as exc:  # noqa: BLE001 - never alter the execution outcome
                         status['trajectory'] = {'status': 'failed', 'path': 'trajectory.json',
@@ -321,9 +280,6 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                             status['sdk_run_id'] = json.loads(Path(manifest).read_text(encoding='utf-8')).get('run_id')
                         except (OSError, ValueError, AttributeError):
                             pass  # Preserve the original container/validation outcome.
-                    if (status['cleanup_status'] == 'succeeded'
-                            and status['host_trace_validation'] == 'succeeded'):
-                        cleanup_transport(directory)
                 finally:
                     try:
                         if status['cleanup_status'] in ('succeeded', 'not_started'):
@@ -343,11 +299,6 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                             workspace_temp.cleanup()
         timing_root.status = status['status']
         return directory
-
-
-def cleanup_transport(directory):
-    """Retire only temporary communication after both containers are stopped."""
-    _remove_run_directories(directory, ('channel', 'agent-request', 'agent-output'))
 
 
 def cleanup_source(directory):

@@ -37,7 +37,6 @@ def _step_files(root, steps_prefix, framework, result='done'):
                                          'agent_id': 'alpha', 'framework': framework, 'input': PROMPT})
     write_json(folder / 'result.json', {'schema': 'abb.result.v1', 'run_id': 'run', 'case_id': CASE,
                                         'input_id': INPUT, 'agent_id': 'alpha', 'status': 'succeeded', 'output': result})
-    write_json(folder / 'otel-status.json', {'status': 'complete'})
     return folder
 
 

@@ -1,0 +1,102 @@
+"""`agentbench agent add`: import Agent source, then optionally build (-b) and certify (-c)."""
+
+from __future__ import annotations
+
+import json
+import sys
+from argparse import Action, ArgumentError, Namespace, RawDescriptionHelpFormatter, SUPPRESS
+from pathlib import Path
+
+from ..run import DEFAULT_REGISTRY_PATH
+from agentbench.cli.sdk import configure_sdk_parser
+from agentbench.cli.options import configure_env_file, configure_model
+from agentbench.cli.terminal_ui.constants import ANSI_RED, ANSI_RESET
+
+
+class _RejectDirectoryFlag(Action):
+    """Explain the obsolete-looking directory flag at the relevant command level."""
+
+    def __init__(self, option_strings, dest, **kwargs):
+        super().__init__(option_strings, dest, nargs=0, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        raise ArgumentError(
+            self,
+            "-d is not required. Absolute local directories are detected from SOURCE. "
+            "Use 'agentbench agent add SOURCE'. To change the copy destination, use "
+            "'--agents-dir DIRECTORY'.",
+        )
+
+
+def configure_parser(commands) -> None:
+    add = commands.add_parser(
+        "add",
+        help="Import an Agent and list files for onboarding.",
+        description=(
+            "Import an Agent from GitHub or an absolute local directory.\n"
+            "Local directories are detected automatically; do not use -d."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  agentbench agent add https://github.com/org/agent\n"
+            "  agentbench agent add /path/to/agent\n"
+            "  agentbench agent add /path/to/agent --agents-dir DIRECTORY"
+        ),
+        formatter_class=RawDescriptionHelpFormatter,
+    )
+    add.add_argument("repository", metavar="SOURCE",
+                     help="HTTPS GitHub repository URL or absolute local directory.")
+    add.add_argument("--agents-dir", metavar="DIRECTORY", type=Path,
+                     default=DEFAULT_REGISTRY_PATH.parent / "agents",
+                     help="Parent of numbered Agent folders (default: resources/agents).")
+    add.add_argument("-d", action=_RejectDirectoryFlag, help=SUPPRESS)
+    add.add_argument("-b", "--build", action="store_true", help="Generate, validate and save files one at a time; resume valid files.")
+    add.add_argument("-c", "--certify", action="store_true", help="Run existing certification using generated or manual files.")
+    from agentbench.harness.otel.profiles import PROFILES
+    add.add_argument("--otel-profile", choices=sorted(PROFILES), help="Agent process trace configuration.")
+    add.add_argument("--otel-file", help="Relative output filename for the Agent file-export profile.")
+    add.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH)
+
+
+    # -b
+    add.add_argument("--build-settings", type=Path, help="TOML [build] overrides for generation.")
+    add.add_argument("--build-model", help="OpenRouter model for configuration generation only.")
+    add.add_argument("--answers", type=Path, help="Text answers to a previous build plan's questions.")
+    add.add_argument("--with-observe", action="store_true", help="With -b, generate Observe fields from the input definition.")
+    add.add_argument("--agent-timeout", type=float, help="With -b, override the generated Agent timeout (default: 300 seconds).")
+    add.add_argument("--adapter-context", type=Path, help="With -b, explicit deployment overrides as a JSON object; omitted by default.")
+    configure_env_file(add, help="Host environment file; never included in source context.")
+    configure_model(add, help="Target provider model for certification, independent of --build-model.")
+    add.add_argument("--output", type=Path, help="Certification result path.")
+    add.add_argument("--no-view", action="store_true", help="Certify without starting the live viewer.")
+    add.add_argument("-y", "--yes", action="store_true", help="Confirm certification without prompting.")
+    configure_sdk_parser(add)
+    add.set_defaults(agent_handler=_add,
+                     agent_interrupted="Agent onboarding cancelled; completed files are preserved.")
+
+
+def _add(args: Namespace) -> int:
+    if not args.build and (args.with_observe or args.agent_timeout is not None or args.adapter_context):
+        raise ValueError("--with-observe, --agent-timeout and --adapter-context require -b")
+    print("Preparing Agent source...", file=sys.stderr)
+    from agentbench.onboarding.workflow import add_from_cli
+    return add_from_cli(args, on_source=_show_source,
+                        output_fn=lambda message: print(message, file=sys.stderr))
+
+
+def _show_source(result):
+    print(f"Agent directory: {result.directory}", file=sys.stderr)
+    if result.source_type == "local-directory":
+        print(f"Local source copied from: {result.repository}", file=sys.stderr)
+        print(
+            f"{ANSI_RED}Note: Please upload this Agent's source code to GitHub so others "
+            "can download and use it, and restore or update it if the local copy "
+            f"is damaged or lost.{ANSI_RESET}",
+            file=sys.stderr,
+        )
+    print(f"Source revision: {result.revision}", file=sys.stderr)
+    for warning in result.warnings:
+        print(f"Warning: {warning}", file=sys.stderr)
+    print("Files relative to agent/ (source imported; benchmark configuration pending):",
+          file=sys.stderr)
+    print(json.dumps(result.files, ensure_ascii=False, indent=2))

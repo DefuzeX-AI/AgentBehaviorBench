@@ -1,4 +1,4 @@
-"""Live ACP evidence projection; never reconstruct imaginary internal LLM spans."""
+"""Live ACP evidence records; never reconstruct imaginary internal LLM spans."""
 from uuid import uuid4
 from .store import TraceStore, atomic_json, redact
 from .acp_evidence import TerminalSnapshots, ToolEvidence
@@ -8,10 +8,9 @@ class ACPObserver:
     def __init__(self, store):
         self.store = store
         self.directory = store.path.parent
-        base = getattr(store, 'store', store)
         self.events = TraceStore(self.directory / 'acp-events.jsonl', store.run_id,
-                                 source='acp', context=base.context)
-        self.secrets = base._secrets
+                                 source='acp', context=store.context)
+        self.secrets = store._secrets
         self.tools = {}
         self.terminals = TerminalSnapshots(self.secrets)
         self.prefix = uuid4().hex
@@ -22,13 +21,8 @@ class ACPObserver:
         self.events.record(name, **data)
         self.terminals.on_event(name, data)
         if name == 'native_model_call':
-            self.store.record('native_model_call', **data, span_event=False)
-        # Stream chunks and tool updates remain in full local payloads. Tool
-        # lifecycle/content gets its own spans below; duplicating every update
-        # on the root span exhausts bounded OTel/SDK event buffers.
-        self.store.record('native_event', name='acp.' + name, payload=data,
-                          span_event=name not in ('session_update', 'terminal_started', 'terminal_output',
-                                                 'terminal_exited', 'terminal_released'))
+            self.store.record('native_model_call', **data)
+        self.store.record('native_event', name='acp.' + name, payload=data)
         if name in ('initialize', 'session', 'prompt_completed', 'failure'):
             self.summary[name] = data
         if name == 'stderr_truncated':

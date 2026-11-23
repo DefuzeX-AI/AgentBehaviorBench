@@ -6,8 +6,8 @@ from urllib.request import urlopen
 
 import pytest
 
-from agentbench.cli import viewer
-from agentbench.cli.viewer_catalog import ViewerSuiteCatalog
+from agentbench.cli.viewer import server as viewer
+from agentbench.cli.viewer.catalog import ViewerSuiteCatalog
 from agentbench.harness.session import SuiteStore
 from agentbench.harness.session.admission import admit_reuse_request
 from agentbench.harness.session.references import history_guard, register_suite_reference

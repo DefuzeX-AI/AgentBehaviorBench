@@ -9,7 +9,7 @@ Upstream: [NVIDIA-AI-Blueprints/biomedical-aiq-research-agent](https://github.co
 ## Required deployment
 
 - An OpenAI-compatible target model selected by ABB. The native planning/reflection parsers require `</think>` followed by JSON in response **content**; a separate `reasoning_content` field alone is insufficient. The supplied operator routing files select hosted `nvidia/nemotron-3-super-120b-a12b` for the native `ai_researcher` workflow without changing the Local Judge's existing DeepSeek configuration. Its API returned HTTP 200, but only a real adapted request and fresh container run can prove compatibility and acceptance.
-- A reachable NVIDIA RAG `/generate` endpoint and existing collection named by the Case. This unit defaults to the authenticated local bridge at `http://host.docker.internal:8081/v1`; the bridge currently serves the one-paper `Biomedical_Dataset` collection only. Start it with `scripts/start_biomedical_rag_api.py` and set a distinct `RAG_API_KEY` in `.env`. Keep cloud ingress to host port 8081 closed. A custom `AIRA_RAG_URL` requires its exact host/path in `agent.toml`.
+- A reachable NVIDIA RAG `/generate` endpoint and existing collection named by the Case. This unit defaults to the authenticated local bridge at `http://host.docker.internal:8081/v1`; the bridge currently serves the one-paper `Biomedical_Dataset` collection only. Start it with `resources/agents/37-biomedical-aiq-research-agent/scripts/start_biomedical_rag_api.py` and set a distinct `RAG_API_KEY` in `.env`. Keep cloud ingress to host port 8081 closed. A custom `AIRA_RAG_URL` requires its exact host/path in `agent.toml`.
 - Optional `TAVILY_API_KEY` for web fallback.
 - Optional `NVIDIA_API_KEY` plus MolMIM and DiffDock endpoints for virtual-screening requests. Public hosted endpoints are the upstream defaults.
 
@@ -29,7 +29,7 @@ the pinned native model alias/prompts and research workflow remain unchanged.
 To inspect the account's live catalog (GET only):
 
 ```bash
-python scripts/check_biomedical_reasoning.py --list-models
+python resources/agents/37-biomedical-aiq-research-agent/scripts/check_biomedical_reasoning.py --list-models
 ```
 
 A listed model is only a candidate, not proof of inference or parser compatibility.
@@ -78,7 +78,7 @@ From the ABB repository root, first run this one-request hosted inference check:
 
 ```bash
 source .venv/bin/activate
-python scripts/check_biomedical_reasoning.py --adapt-reasoning
+python resources/agents/37-biomedical-aiq-research-agent/scripts/check_biomedical_reasoning.py --adapt-reasoning
 ```
 
 It uses the pinned upstream query prompt and reasoning settings, prints no key

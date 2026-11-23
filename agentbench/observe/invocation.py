@@ -1,22 +1,14 @@
 """Shared live observation lifecycle, independent of runtime and SDK."""
 from pathlib import Path
-from .store import TraceStore, atomic_json
+from .store import TraceStore
 from .observers import DEFAULT_OBSERVERS
 
 
 class InvocationObservation:
-    def __init__(self, directory, invocation_id, session_id, framework, *, context=None, provider=None):
+    def __init__(self, directory, session_id, framework, *, context=None):
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
         self.store = TraceStore(self.directory / 'framework.jsonl', session_id, source='framework', context=context)
-        try:
-            from agentbench.harness.otel.compat.framework_projection import ObservedStore
-        except ModuleNotFoundError as exc:
-            if not (exc.name or '').startswith('opentelemetry'):
-                raise
-            atomic_json(self.directory / 'otel-status.json', {'status': 'unavailable', 'origin': 'framework_projection', 'reason': 'OTel SDK not installed'})
-        else:
-            self.store = ObservedStore(self.store, invocation_id, provider=provider)
         self.callbacks = DEFAULT_OBSERVERS.callbacks(framework, self.store)
 
     def config(self, value=None):
@@ -31,7 +23,3 @@ class InvocationObservation:
                 callbacks.add_handler(handler)
             config['callbacks'] = callbacks
         return config
-
-    def close(self):
-        if hasattr(self.store, 'close'):
-            self.store.close()

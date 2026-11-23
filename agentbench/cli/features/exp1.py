@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 from .base import CommandFeature
+from agentbench.cli.options import configure_env_file, configure_model
 
 
 def configure(parser):
@@ -17,7 +18,7 @@ def configure(parser):
     run.add_argument('--results-dir', type=Path)
     run.add_argument('--prompt-template', type=Path, help='Record the shared testing prompt template')
     run.add_argument('--scenario-file', type=Path, help='Record this Agent\'s shared scenario')
-    run.add_argument('--model', help='Target model override; oracle uses the shared provider default model')
+    configure_model(run, help='Target model override; oracle uses the shared provider default model')
     run.add_argument('--timeout', type=float, default=2400)
     match = commands.add_parser('match', help='Assess saved trajectories without executing Cases')
     match.add_argument('--experiment', type=Path, required=True)
@@ -27,7 +28,7 @@ def configure(parser):
                         help='Saved experiment directory; repeat to aggregate distinct Issues')
     for subparser in (run, match, result):
         subparser.add_argument('--root', type=Path, default=project_root())
-        subparser.add_argument('--env-file', type=Path)
+        configure_env_file(subparser)
 
 
 def execute(args):

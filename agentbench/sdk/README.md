@@ -109,10 +109,10 @@ overview shows the last CLI check, its SDK, and timestamp; it does not perform a
 network request on page load. A changed `requirement.md` invalidates the cached
 result. Historical Case selections remain separate from the current profile.
 
-## Private artifacts and isolated execution
+## Private artifacts and the shared container
 
 See [SDK integration facilities](integration/README.md) for the plugin Protocols,
-Suite/Case/Attempt storage lifecycle, and the KUMA controller/Agent boundary.
+Suite/Case/Attempt storage lifecycle, and why KUMA and the Agent share one container.
 
 ## SDK error diagnostics
 

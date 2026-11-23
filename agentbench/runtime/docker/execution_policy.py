@@ -1,18 +1,18 @@
-"""Separate controller-private storage from the Agent's current-input channel."""
+"""Mounts for the single container running the SDK worker and the Agent."""
 from pathlib import Path
 
 from .policy import DockerPolicy
 
 
 class ControllerExecutionPolicy:
-    """Mount private SDK artifacts only in the trusted controller."""
+    """Mount the workspace, SDK storage, optional replay and Case publications."""
 
     def __init__(self, storage, *, repository, target='/opt/abb-sdk-repo',
-                 writable=False, replay=None, channel=None, publications=()):
+                 writable=False, replay=None, publications=()):
         self.storage = Path(storage).resolve()
         self.repository = Path(repository).resolve()
         self.target, self.writable = target, writable
-        self.replay, self.channel, self.publications = replay, channel, publications
+        self.replay, self.publications = replay, publications
 
     def owned_directories(self):
         return (self.storage,)
@@ -27,20 +27,5 @@ class ControllerExecutionPolicy:
         return (*DockerPolicy().run_arguments(), '--mount',
                 f'type=bind,source={self.repository},target={self.target}' + ('' if self.writable else ',readonly'),
                 '--mount', f'type=bind,source={self.storage},target={STORAGE}', *recording,
-                *(self.channel.mounts(controller=True) if self.channel else ()),
                 *(arg for index, path in self.publications for arg in (
                     '--mount', f'type=bind,source={path},target=/run/abb-published/{index}')))
-
-
-class AgentExecutionPolicy:
-    def __init__(self, repository, target, writable, channel, output):
-        self.repository, self.target = repository, target
-        self.writable, self.channel, self.output = writable, channel, output
-
-    def owned_directories(self):
-        return (self.channel.requests, self.channel.responses, self.output)
-
-    def run_arguments(self):
-        return (*DockerPolicy().run_arguments(), '--mount',
-                f'type=bind,source={self.repository},target={self.target}' +
-                ('' if self.writable else ',readonly'), *self.channel.mounts())

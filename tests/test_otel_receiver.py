@@ -72,17 +72,3 @@ def test_chunked_node_exporter_request(tmp_path):
         client.close()
         session.close()
     assert json.loads((tmp_path / "spans.jsonl").read_text())["span"]["spanId"] == span["spanId"]
-
-def test_forwarded_framework_projection_does_not_count_as_native(tmp_path):
-    session = create_session(CaptureConfig("native-otlp"), tmp_path, "agent")
-    try:
-        span = {"traceId": "12"*16, "spanId": "34"*8, "name": "abb.execute"}
-        scopes = [{"scope": {"name": "agentbench.observe"}, "spans": [span]}]
-        session.sink.accept_json({"resourceSpans": [{"scopeSpans": scopes}]}, transport="application/json")
-    finally:
-        session.close()
-    state = json.loads((tmp_path / "status.json").read_text())
-    assert state["span_count"] == 0 and state["record_count"] == 1
-    assert state["status"] == "zero_spans"
-    assert state["origin_counts"] == {"framework_projection": 1}
-    assert json.loads((tmp_path / "spans.jsonl").read_text())["origin"] == "framework_projection"

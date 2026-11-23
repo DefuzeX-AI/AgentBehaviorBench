@@ -28,7 +28,6 @@ its actual `Agent`, `Step`, `ToolCall`, `ObservationResult`, and
 | `agentbench/experiments/atif/__main__.py` | Thin explicit `export`, `run`, and `verify` command dispatch. |
 | `runner.py` | Existing ABB runtime/adapter orchestration, configured workspace, read-only native configuration overrides, and controlled cancellation. |
 | `acceptance.py` | Rebuild comparison, source-content checks, actual file outcomes, and configured acceptance conditions. |
-| `experiments/atif/` | Pinned dependency input/lock, declarative Agent/model references, prompts, and reproducible instructions. |
 | `tests/atif_fixtures.py`, `tests/test_atif_*.py` | Synthetic edge cases and the historical two-child acceptance case. |
 | `tests/test_emitted_tool_links.py` | Default-scope regression and unknown-candidate preservation. |
 

@@ -1,8 +1,9 @@
-"""Reusable Agent session ownership for trusted SDK workers.
+"""Reusable Agent session ownership for SDK workers.
 
-SDKs supply invocation envelopes and an EvidenceSink. This module owns request
-artifacts, optional workspace replay and session cleanup, never SDK submission
-history or judging.
+The SDK worker and the Agent run in one container and one process. SDKs supply
+invocation envelopes. This module owns request artifacts,
+optional workspace replay and session cleanup, never SDK submission history or
+judging.
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from pathlib import Path
 from typing import Mapping
 
 from agentbench.sdk.common.artifacts import Artifacts
-from .protocols import AgentExecutionSession, EvidenceSink
+from .protocols import AgentExecutionSession
 
 
 def capture_workspace_replay(root, *, secrets=()):
@@ -27,28 +28,17 @@ def capture_workspace_replay(root, *, secrets=()):
 class ManagedAgentSession:
     """An AgentExecutionSession with durable artifacts and owned cleanup.
 
-    By default, use the isolated directory channel configured by the host's
-    agent_timeout and agent_response_limits settings. An explicitly injected
-    session implements the same protocol and is closed by this owner.
+    Production workers pass a LocalAgentSession; tests may inject any session
+    implementing the same protocol. This owner closes it.
     """
 
-    def __init__(self, *, output: Path, settings=None,
-                 session: AgentExecutionSession | None = None, replay=None):
+    def __init__(self, *, output: Path, session: AgentExecutionSession, replay=None):
         self.files = Artifacts(Path(output))
-        if session is None:
-            from .channel import DirectoryAgentSession
-            from .context import ResponseLimits
-
-            settings = settings or {}
-            session = DirectoryAgentSession(
-                timeout=settings.get('agent_timeout', 2400),
-                response_limits=ResponseLimits(**settings.get('agent_response_limits', {})))
         self.session = session
         self.replay = replay
         self.closed = False
 
-    async def invoke(self, envelope: Mapping[str, object], output: Path,
-                     evidence: EvidenceSink) -> Mapping[str, object]:
+    async def invoke(self, envelope: Mapping[str, object], output: Path) -> Mapping[str, object]:
         if self.closed:
             raise RuntimeError('Managed Agent session is closed')
         output = Path(output)
@@ -62,7 +52,7 @@ class ManagedAgentSession:
         if self.replay is not None:
             self.replay.checkpoint('input_start', input_id)
         try:
-            result = await self.session.invoke(request, output, evidence)
+            result = await self.session.invoke(request, output)
         finally:
             if self.replay is not None:
                 self.replay.checkpoint('input_end', input_id)
@@ -94,30 +84,43 @@ class ManagedAgentSession:
         await self.aclose()
 
 
-class InProcessAgentSession:
-    """Explicit local/test adapter for the native Agent worker and its session.
+class LocalAgentSession:
+    """Run the native Agent worker in this SDK process, inside the same container.
 
-    Production controller entrypoints require isolation. This adapter is only
-    selected explicitly by callers that already own the in-process worker,
-    trace provider and native session.
+    KUMA requires the SDK and the Agent to share one Docker container. Each
+    invocation leaves request.json, result.json and framework.jsonl in its step
+    directory. One native Agent session is reused for every input of the Case.
     """
 
-    def __init__(self, root, *, provider, session, invoke):
-        self.root = root
-        self.provider = provider
-        self.session = session
-        self._invoke = invoke
+    def __init__(self, root, *, capture_directory=None, invoke=None):
+        from agentbench.runtime.agentcontainer.session import AgentSession
 
-    async def invoke(self, envelope: Mapping[str, object], output: Path,
-                     evidence: EvidenceSink) -> Mapping[str, object]:
-        # Local spans already reach the supplied provider directly; transported
-        # spans and EvidenceSink are needed only for the isolated channel.
-        Artifacts(output).save('request.json', envelope)
-        await self._invoke(self.root, output / 'request.json', output,
-                           provider=self.provider, session=self.session)
-        return json.loads(Path(output / 'result.json').read_text(encoding='utf-8'))
+        if invoke is None:
+            from agentbench.runtime.agentcontainer.worker import execute as invoke
+        self.root = Path(root)
+        self._invoke = invoke
+        self.session = AgentSession()
+        # Agent-native OTel belongs beside the attempt's other evidence (otel/).
+        self.session.capture_directory = Path(capture_directory) if capture_directory else None
+        self.closed = False
+
+    async def invoke(self, envelope: Mapping[str, object], output: Path) -> Mapping[str, object]:
+        if self.closed:
+            raise RuntimeError('Agent session is closed')
+        output = Path(output)
+        request = output / 'request.json'
+        if not request.is_file():
+            Artifacts(output).save('request.json', envelope)
+        await self._invoke(self.root, request, output, session=self.session)
+        result = json.loads((output / 'result.json').read_text(encoding='utf-8'))
+        if result.get('run_id') != envelope['run_id']:
+            raise ValueError('Agent result belongs to a different invocation')
+        return result
 
     async def aclose(self) -> None:
+        if self.closed:
+            return
+        self.closed = True
         await self.session.aclose()
 
     def snapshot(self) -> Mapping[str, object]:

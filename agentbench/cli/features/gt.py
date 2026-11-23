@@ -1,11 +1,12 @@
 """Re-evaluate saved evidence without re-running or generating Agent cases."""
 from pathlib import Path
 from .base import CommandFeature
+from agentbench.cli.options import configure_env_file
 
 
 def configure(parser):
     parser.add_argument('--suite', required=True, type=Path)
-    parser.add_argument('--env-file')
+    configure_env_file(parser)
 
 
 def execute(args):

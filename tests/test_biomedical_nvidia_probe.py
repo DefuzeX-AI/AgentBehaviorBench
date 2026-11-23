@@ -2,7 +2,10 @@ import io
 import json
 import urllib.error
 
-from scripts.check_biomedical_nvidia import check
+from tests.registered_agents import unit_scripts
+
+unit_scripts('biomedical-aiq-research-agent')
+from check_biomedical_nvidia import check  # noqa: E402
 
 
 def respond(monkeypatch, body):

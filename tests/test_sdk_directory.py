@@ -86,7 +86,7 @@ class Adapter:
     execution = 'local'
     def create_benchmark_runner(self, *, context, options):
         from agentbench.harness import BenchmarkRunner
-        from examples import case_file_sdk
+        from tests.sdk_fixtures import case_file_sdk
         return BenchmarkRunner(sdk=case_file_sdk, sdk_options=options)
 plugin = Adapter()
 """
@@ -451,7 +451,7 @@ def test_discovered_adapter_runs_real_agent_and_exports_case_output_judge(
     from agentbench.cli.sessions import fresh
     monkeypatch.setattr(fresh, 'PROJECT_ROOT', tmp_path)
     from agentbench.cli.execution import run_benchmark_session
-    from agentbench.cli.trace_runtime import build_trace_suite_runner
+    from agentbench.evaluation.runner import build_trace_suite_runner
     from agentbench.harness import AgentRegistration
 
     add_adapter(adapter_directory, source=CASE_FILE_PLUGIN)
@@ -542,7 +542,7 @@ def test_discovered_adapter_runs_real_agent_and_exports_case_output_judge(
 )
 def test_directory_adapter_retains_real_container_run(adapter_directory):
     from agentbench.cli.execution import run_benchmark_session
-    from agentbench.cli.trace_runtime import build_trace_suite_runner
+    from agentbench.evaluation.runner import build_trace_suite_runner
     from agentbench.harness import AgentRegistration
 
     fixtures = Path(__file__).parent / "sdk_fixtures"
@@ -592,7 +592,7 @@ def test_directory_adapter_retains_real_container_run(adapter_directory):
 
 def test_custom_sdk_without_runtime_manifest_can_save_configuration(adapter_directory, tmp_path):
     from agentbench.cli.sessions.configuration import runner_configuration
-    from agentbench.cli.trace_runtime import build_trace_suite_runner
+    from agentbench.evaluation.runner import build_trace_suite_runner
     from agentbench.harness import AgentRegistration
     add_adapter(adapter_directory)
     runner = build_trace_suite_runner(max_bytes=1024, environ={})

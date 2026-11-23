@@ -10,6 +10,7 @@ def stage_runtime_dependencies(context, dockerfile):
     requirements = '.abb-runtime/agentbench/runtime/docker/requirements.txt'
     if not (context / requirements).is_file():
         raise ValueError('Injected runtime requirements are missing')
+    
     # Use the final stage's PATH, including an Agent-selected virtual environment.
     # pip evaluates Python markers here, never against the host's interpreter.
     dockerfile.write_text(source + '\nUSER root\n'

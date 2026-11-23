@@ -31,7 +31,7 @@ Check nearby code and module documentation before changing an interface.
 
 Every execute-phase result package (`attempts/<id>/`) carries `trajectory.json`
 (`abb.agent-trajectory.v1`): a flat step sequence derived from the raw records
-after both containers stop and host trace validation ran. The raw OTel,
+after the container stops and host trace validation ran. The raw OTel,
 framework, interceptor and file evidence stay the source of truth; the
 trajectory is a versioned derivation that must be readable on its own.
 
@@ -195,9 +195,8 @@ troubleshooting as issues are confirmed.
   web/package-lock.json and plugin requirements; explain which workflows need them.
 - Document Node/npm and `npm ci` / `npm run build` before promising a viewer.
   Headless runs do not need frontend assets; Python serves the built normal viewer.
-- Verify installation with CLI help, SDK discovery and the zero-credential offline
-  demo before asking users to configure paid services. Use the printed timestamped
-  result path when demonstrating `view`.
+- Verify installation with CLI help and SDK discovery before asking users to
+  configure paid services. Use the printed result path when demonstrating `view`.
 - Verify commands against actual `--help`, configuration precedence against code,
   and local links against exact Git path spelling/case. Do not leave empty
   troubleshooting headings or links to removed reports/CLI guides.

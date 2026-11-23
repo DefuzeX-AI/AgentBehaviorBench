@@ -6,6 +6,7 @@ import threading
 from pathlib import Path
 
 from agentbench.harness.session.atomic import atomic_bytes
+from agentbench.harness.session.layout import AGENT_ATTEMPTS_V1, MANAGED_LAYOUTS
 from agentbench.sdk.common.artifacts import Artifacts
 
 
@@ -24,6 +25,44 @@ def child(root, relative):
             p.is_symlink() for p in (target, *target.parents) if p != root.parent):
         raise ValueError('Artifact paths cannot follow links')
     return target
+
+
+SLOT_RECORD = 'slot.json'
+
+
+def _slot_owner(path):
+    try:
+        return json.loads((path / SLOT_RECORD).read_text(encoding='utf-8')).get('owner')
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def claim_case_slot(agent_directory, owner, *, attempts=100):
+    """Return the 8-digit Case directory owned by ``owner``, claiming it if new.
+
+    Candidates are derived from the owner, so every call finds the same directory.
+    A name already owned by another Case moves on to the next candidate. A claim
+    is published by renaming a prepared directory, so concurrent writers never
+    share a slot.
+    """
+    import shutil
+    from uuid import uuid4, uuid5, NAMESPACE_URL
+    cases = child(agent_directory, 'cases')
+    cases.mkdir(parents=True, exist_ok=True)
+    for probe in range(attempts):
+        name = uuid5(NAMESPACE_URL, owner if probe == 0 else f'{owner}#{probe}').hex[:8]
+        path = child(cases, name)
+        if not path.exists():
+            staging = child(cases, '.claim-' + uuid4().hex)
+            staging.mkdir(mode=0o700)
+            (staging / SLOT_RECORD).write_text(json.dumps({'owner': owner}), encoding='utf-8')
+            try:
+                staging.rename(path)
+            except OSError:
+                shutil.rmtree(staging, ignore_errors=True)  # Another writer claimed it first.
+        if _slot_owner(path) == owner:
+            return path
+    raise RuntimeError(f'No free Case slot after {attempts} candidates in {cases}')
 
 
 class FileAttemptArtifacts:
@@ -75,8 +114,9 @@ class FileArtifactStore:
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.environ = environ
         plan = self.directory / 'plan.json'
-        self.managed = (plan.is_file() and json.loads(plan.read_text(encoding='utf-8')).get(
-            'artifact_layout') == 'agent-attempts-v1')
+        self.layout = (json.loads(plan.read_text(encoding='utf-8')).get('artifact_layout')
+                       if plan.is_file() else None)
+        self.managed = self.layout in MANAGED_LAYOUTS
 
     def agent_directory(self, agent_id):
         component(agent_id)
@@ -106,6 +146,9 @@ class FileArtifactStore:
             # A slot is allocated before an SDK has generated its Case ID. Scope
             # its stable storage identity to the Suite so different runs cannot alias.
             from uuid import uuid5, NAMESPACE_URL
-            slot = uuid5(NAMESPACE_URL, f'{self.directory.as_posix()}:{agent_id}:{case_index}').hex
-            return FileCaseArtifacts(child(self.agent_directory(agent_id), f'cases/{slot}'), self.environ)
+            owner = f'{self.directory.as_posix()}:{agent_id}:{case_index}'
+            agent = self.agent_directory(agent_id)
+            if self.layout == AGENT_ATTEMPTS_V1:
+                return FileCaseArtifacts(child(agent, f'cases/{uuid5(NAMESPACE_URL, owner).hex}'), self.environ)
+            return FileCaseArtifacts(claim_case_slot(agent, owner), self.environ)
         return FileCaseArtifacts(child(self.directory, f'cases/{key}/{case_index}'), self.environ)

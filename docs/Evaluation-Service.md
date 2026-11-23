@@ -102,7 +102,7 @@ agentbench api agent my-agent
 agentbench api execute my-agent --case-file cases.json --results-dir results
 agentbench api result --suite SUITE_DIRECTORY
 agentbench api evidence --suite SUITE_DIRECTORY --run-id RUN_ID
-agentbench api attachment --suite SUITE_DIRECTORY --run-id RUN_ID --path evaluation/inputs/0001/spans.jsonl
+agentbench api attachment --suite SUITE_DIRECTORY --run-id RUN_ID --path evaluation/inputs/0001/framework.jsonl
 agentbench api submit-judge --suite SUITE_DIRECTORY --run-id RUN_ID --report report.json
 agentbench api gt --suite SUITE_DIRECTORY
 ```

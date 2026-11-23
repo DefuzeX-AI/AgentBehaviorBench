@@ -1,4 +1,4 @@
-"""Default isolated SDK controller using SDKRun and AgentExecutionSession."""
+"""Default SDK worker: SDKRun and the Agent share one container and process."""
 import argparse
 import asyncio
 import importlib
@@ -9,29 +9,17 @@ from uuid import uuid4
 from agentbench.observe.store import redact
 from agentbench.sdk.common.artifacts import Artifacts, plain
 from agentbench.sdk.common.output_permissions import share_output
-from .agent import ManagedAgentSession
+from .agent import LocalAgentSession, ManagedAgentSession
 from .artifacts import FileCaseArtifacts
 from .cases import case_bytes, digest, pack_case, snapshot, unpack_case
 from .dialogue import drive_run, submit_result
 
 
 class RecordedEvidence:
-    """Existing EvidenceSink with on-disk original spans available to the SDK."""
+    """Recorded step directories of the current Case, in execution order."""
     def __init__(self, directory):
         self.directory = Path(directory)
         self.steps = []
-        self.span_count = 0
-
-    def accept_span(self, span):
-        # DirectoryAgentSession has already saved the full original export.
-        self.span_count += 1
-
-    def spans(self):
-        from agentbench.harness.otel.compat.wire import decode_span
-        for directory in self.steps:
-            with Path(directory / 'spans.jsonl').open(encoding='utf-8') as stream:
-                for line in stream:
-                    yield decode_span(json.loads(line))
 
 
 def load_factory(reference):
@@ -135,13 +123,16 @@ async def execute_case(factory, root, repository, settings, files, summary, *, s
         if not isinstance(run.run_id, str) or not run.run_id.strip():
             raise ValueError('SDK Run needs a non-empty run_id')
         summary.update(run_id=run.run_id, case_id=case['case_id'], phase='execution')
-        async with ManagedAgentSession(output=files.directory, settings=settings, session=session) as agent:
+
+        # sending prompt to sdk
+        session = session or LocalAgentSession(Path(root), capture_directory=files.directory / 'otel')
+        async with ManagedAgentSession(output=files.directory, session=session) as agent:
             async def invoke(item, folder):
                 return await agent.invoke({
                     'schema': 'abb.invocation.v1', 'run_id': uuid4().hex, 'session_id': run.run_id,
                     'agent_id': settings['agent_id'], 'framework': settings['framework'],
                     'input': item.payload, 'observation_context': {
-                        'case_id': case['case_id'], 'input_id': item.input_id}}, folder, evidence)
+                        'case_id': case['case_id'], 'input_id': item.input_id}}, folder)
 
             async def step(current_run, item, invoke):
                 number = len(summary['steps']) + 1
@@ -158,9 +149,6 @@ async def execute_case(factory, root, repository, settings, files, summary, *, s
                 result = await invoke(item, folder)
                 if result.get('status') not in ('succeeded', 'failed', 'timeout', 'cancelled', 'aborted'):
                     raise ValueError('Unknown Agent execution status')
-                telemetry = json.loads(Path(folder / 'otel-status.json').read_bytes())
-                if telemetry.get('status') != 'complete':
-                    raise ValueError('Agent telemetry is incomplete; SDK result was not submitted')
                 # ManagedAgentSession persists redacted results before submission.
                 summary['phase'] = 'submission'
                 report = submit_result(current_run, result)
@@ -191,7 +179,7 @@ async def execute_case(factory, root, repository, settings, files, summary, *, s
                 files.save('judge/report.json', {key: plain(getattr(report, key)) for key in (
                     'status', 'confidence', 'issues', 'evidence_gaps')})
             summary.update(phase='finished', status='succeeded', run_state=run.state,
-                           history_count=len(run.history), evidence='complete', span_count=evidence.span_count)
+                           history_count=len(run.history), evidence='complete')
     except BaseException as exc:
         primary = exc
         raise
@@ -206,8 +194,6 @@ async def execute(root, output, settings, *, session=None):
         mode = settings['mode']
         if mode not in ('generate', 'execute', 'context'):
             raise ValueError('Unknown SDK worker mode')
-        if mode == 'execute' and not settings.get('isolated_agent'):
-            raise ValueError('Execution requires the isolated Agent channel')
         if mode == 'context':
             from agentbench.runtime.agentcontainer.environment import observe_environment
             from agentbench.sdk.common.agent_context import with_environment

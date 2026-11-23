@@ -82,7 +82,6 @@ def test_agent_failure_or_cancellation_closes_native_sqlite(tmp_path, terminal, 
 
 
 def test_shared_session_rejects_thread_switch_and_use_after_close(tmp_path, monkeypatch):
-    from opentelemetry.sdk.trace import TracerProvider
     from agentbench.runtime.agentcontainer.session import AgentSession
     from agentbench.runtime.agentcontainer.worker import execute
 
@@ -91,7 +90,6 @@ def test_shared_session_rejects_thread_switch_and_use_after_close(tmp_path, monk
     work = tmp_path / "work"
     work.mkdir()
     monkeypatch.chdir(work)
-    provider = TracerProvider()
     session = AgentSession()
     async def invoke(number, payload, thread_id):
         folder = tmp_path / f"invocation-{number}"
@@ -100,7 +98,7 @@ def test_shared_session_rejects_thread_switch_and_use_after_close(tmp_path, monk
         request.write_text(json.dumps({"schema": "abb.invocation.v1", "run_id": f"invoke-{number}",
             "session_id": "case-session", "agent_id": "sqlite-memory-acceptance", "framework": "langgraph",
             "input": payload, "config": {"configurable": {"thread_id": thread_id}}}))
-        code = await execute(root, request, folder, provider=provider, session=session)
+        code = await execute(root, request, folder, session=session)
         return code, json.loads((folder / "result.json").read_text())
 
     async def scenario():
@@ -113,7 +111,6 @@ def test_shared_session_rejects_thread_switch_and_use_after_close(tmp_path, monk
             return first, conflict, recall, closed
         finally:
             await session.aclose()
-            provider.shutdown()
 
     first, conflict, recall, closed = asyncio.run(scenario())
     assert first[0] == recall[0] == 0

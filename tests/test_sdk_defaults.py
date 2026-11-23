@@ -43,15 +43,14 @@ class ExampleRun(Run):
 
 
 class FakeAgent:
-    def __init__(self, *, result_status='succeeded', telemetry='complete'):
-        self.result_status, self.telemetry = result_status, telemetry
+    def __init__(self, *, result_status='succeeded'):
+        self.result_status = result_status
         self.requests = []
         self.closed = False
 
-    async def invoke(self, envelope, output, evidence):
+    async def invoke(self, envelope, output):
         self.requests.append(envelope)
-        (output / 'otel-status.json').write_text(json.dumps({'status': self.telemetry}))
-        (output / 'spans.jsonl').write_text('')
+        (output / 'framework.jsonl').write_text(json.dumps({'event': 'execution_start'}) + '\n')
         return {'run_id': envelope['run_id'], 'status': self.result_status,
                 'output': envelope['input'], 'error': 'native failure' if self.result_status != 'succeeded' else None}
 
@@ -296,15 +295,6 @@ def test_agent_failure_is_preserved_and_not_a_passing_case(tmp_path, monkeypatch
     assert all(row['error'] == 'native failure' for row in factory.runs[-1].history)
 
 
-def test_incomplete_evidence_prevents_submission_and_closes_session(tmp_path, monkeypatch, factory, unit):
-    agent = FakeAgent(telemetry='incomplete')
-    runner, processes = make_runner(tmp_path, unit, monkeypatch, agent=agent)
-    with pytest.raises(RuntimeError, match='failed'):
-        runner.run_case(unit, runner.prepare_cases(unit)[0])
-    assert factory.runs[-1].history == () and factory.runs[-1].judged == 0
-    assert agent.closed and all(p.closed for p in processes)
-
-
 def test_max_steps_rejects_extra_input_without_execution(tmp_path, monkeypatch, factory, unit):
     agent = FakeAgent()
     runner, _ = make_runner(tmp_path, unit, monkeypatch, agent=agent, max_steps=1)
@@ -345,12 +335,6 @@ def test_host_rejects_mismatched_saved_evidence(tmp_path, monkeypatch, factory, 
         runner._read_result(runner.directory, unit, case, json.loads(case.artifact_path.read_bytes()))
 
 
-def test_no_isolation_fails_before_factory_import(tmp_path, monkeypatch):
-    monkeypatch.setattr(worker, 'load_factory', lambda ref: pytest.fail('SDK imported before isolation check'))
-    assert asyncio.run(worker.execute(tmp_path, tmp_path / 'out', {'mode': 'execute'})) == 1
-    assert 'isolated' in (tmp_path / 'out/error.json').read_text()
-
-
 @pytest.mark.skipif(not os.getenv('ABB_DEFAULT_SDK_IMAGE'), reason='Opt-in local image; no network or credentials')
 def test_default_sdk_real_containers(tmp_path, monkeypatch):
     from agentbench.runtime.docker import worker_build
@@ -369,8 +353,6 @@ def test_default_sdk_real_containers(tmp_path, monkeypatch):
         'from pathlib import Path\nclass Echo:\n'
         ' def __init__(self): self.turns = 0\n'
         ' def invoke(self, value, config=None):\n'
-        '  assert not Path("/run/abb-sdk-storage").exists()\n'
-        '  assert not Path("/run/abb-output/case.json").exists()\n'
         '  self.turns += 1\n  return f"{value}:{self.turns}"\ngraph = Echo()\n')
     (root / 'agent/langgraph.json').write_text('{"graphs":{"echo":"main.py:graph"}}')
     (root / 'agent.toml').write_text(

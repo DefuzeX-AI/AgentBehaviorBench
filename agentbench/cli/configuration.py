@@ -6,7 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from agentbench.cli.viewer import RunningViewer, start_viewer_server
+from agentbench.cli.viewer.server import RunningViewer, start_viewer_server
 from agentbench.harness import SDK, SuiteRunner
 from agentbench.harness.concurrency import ConcurrencySettings
 from agentbench.harness.scheduling import RetryPolicy

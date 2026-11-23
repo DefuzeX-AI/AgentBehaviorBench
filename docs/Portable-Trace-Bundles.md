@@ -9,7 +9,7 @@ Application integration is a separate, approval-gated stage.
 ## Commands and APIs
 
 Use the existing isolated Python 3.12+ Harbor environment described in
-[the ATIF experiment](../experiments/atif/README.md). Harbor remains pinned to
+[the ATIF experiment](ATIF-Experiment.md). Harbor remains pinned to
 `ec6aeab7fe0eb51df52b4e72c524daf5ea9cc5f4`, producing `ATIF-v1.8`.
 
 ```sh
@@ -18,7 +18,7 @@ cache/atif/venv/bin/python -m agentbench.experiments.atif export --bundle \
 cache/atif/venv/bin/python -m agentbench.experiments.atif verify-bundle \
   --input <export-parent>/run-xxxxxxxx
 cache/atif/venv/bin/python -m agentbench.experiments.atif run --bundle \
-  --config experiments/atif/experiment.toml --case langgraph-two-children \
+  --config <experiment.toml> --case <case-name> \
   --output <new-experiment-directory>
 ```
 

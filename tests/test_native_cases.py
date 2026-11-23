@@ -87,7 +87,7 @@ def test_independent_judge_uses_saved_evidence_and_rejects_tampering(tmp_path, u
     assert execute_judge(judge, request, directory=runner.directory, environ={}).status == 'issue'
     assert execute_judge(judge, request, directory=runner.directory, environ={}).status == 'issue'
     assert len(calls) == 1
-    (runner.directory / 'steps/0001/spans.jsonl').write_text('changed')
+    (runner.directory / 'steps/0001/framework.jsonl').write_text('changed')
     with pytest.raises(ValueError, match='evidence changed'):
         execute_judge(judge, request, directory=runner.directory, environ={})
 
@@ -146,13 +146,12 @@ def test_execution_only_suite_view_state(tmp_path, unit, monkeypatch):
     assert item['quality_gate'] == 'not_evaluated'
 
 
-def test_kuma_adapter_translation_is_offline(tmp_path, unit, monkeypatch):
+def test_kuma_adapter_reports_disconnected_trace_evidence(tmp_path, unit, monkeypatch):
     pytest.importorskip('kuma')
     from agentbench.sdk.plugin.kuma.native_judge import context_from_request
     runner, _ = native_runner(tmp_path, unit, monkeypatch)
     runner.run_case(unit, runner.prepare_cases(unit)[1])
     request = json.loads((runner.directory / 'judge/request.json').read_bytes())
-    context = context_from_request(request, runner.directory)
-    assert len(context.history) == 1 and context.case.case_id == 'audit-2'
-    assert context.history[0].test_input.payload == 'hello'
-    assert 'runtime_evidence' in context.history[0].submission.extensions
+    # KUMA judges on Agent-exported spans, which are not connected to it yet.
+    with pytest.raises(ValueError, match='not connected to KUMA trace evidence'):
+        context_from_request(request, runner.directory)

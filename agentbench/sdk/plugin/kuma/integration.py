@@ -1,4 +1,4 @@
-"""KUMA-specific adaptation of ABB's private storage and remote telemetry."""
+"""KUMA-specific adaptation of ABB's private storage."""
 import inspect
 from pathlib import Path
 
@@ -13,14 +13,15 @@ def storage_options(create_run, storage):
     return {'storage_path': root}
 
 
-class KumaEvidenceSink:
-    def __init__(self, capture):
-        self.capture = capture
+def require_trace_evidence():
+    """Stop KUMA work until Agent-exported OTel feeds its trace evidence.
 
-    def accept_span(self, span):
-        # These are transported original ended spans, not spans regenerated from
-        # text logs. Run.get_input has already opened the SDK capture window.
-        self.capture.export_span(span)
+    KUMA judges on spans the Agent itself exported. ABB no longer synthesizes
+    OTel spans from its own framework records, and the attempt's otel/ capture
+    is not connected to the KUMA capture yet.
+    """
+    raise ValueError('KUMA evaluation is unavailable: Agent-exported OTel is not connected to '
+                     'KUMA trace evidence yet. Use another SDK (for example --sdk local).')
 
 
 def published_case(directory, index, workspace, files):

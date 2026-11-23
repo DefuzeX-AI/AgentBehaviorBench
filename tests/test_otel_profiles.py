@@ -17,12 +17,6 @@ def test_target_and_tool_environments_are_distinct():
     assert patch["diagnostics"]["otel"]["endpoint"].startswith("http://127.0.0.1:")
 
 
-def test_legacy_imports_share_classes():
-    from agentbench.observe.otel.session import ObservedStore
-    from agentbench.harness.otel.compat.framework_projection import ObservedStore as moved
-    assert ObservedStore is moved
-
-
 def test_llxprt_spool_skips_metrics_and_keeps_original(tmp_path):
     from agentbench.harness.otel import create_session
     from pathlib import Path
