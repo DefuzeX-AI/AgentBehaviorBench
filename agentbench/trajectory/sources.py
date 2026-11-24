@@ -2,10 +2,8 @@
 
 Pairing follows recorded identifiers only: the interceptor call id, the
 framework span id carried in request headers, and tool call ids emitted by the
-model. Timestamps order steps; they never create relationships.
+model. Timestamps never create relationships.
 """
-from agentbench.observe.interactions import stamp
-
 from .content import exit_status
 
 
@@ -30,14 +28,6 @@ def tool_rows(index):
     return [row for row in index.rows if row['kind'] == 'tool']
 
 
-def llm_record(row, event):
-    """The framework span_start/span_end record linked to a wire call, if any."""
-    records = row.get('_callbacks') or []
-    if not any(_event(r) == 'span_start' and _data(r).get('kind') == 'llm' for r in records):
-        return None
-    return next((r for r in reversed(records) if _event(r) == event), None)
-
-
 def wire_stream(records):
     """Native SSE payloads for one indexed call, in recorded sequence order.
 
@@ -52,37 +42,6 @@ def wire_stream(records):
         if _event(record) == 'llm_delta' and type(sequence) is int and sequence > 0:
             frames[sequence] = data.get('payload')
     return {'events': [value for _, value in sorted(frames.items())]} if frames else None
-
-
-def node_tool_calls(index, parent_span_id):
-    """Tool calls in the graph node's own output when the model span lost them.
-
-    Streamed LangChain generations keep no tool_calls; the enclosing node span
-    (parent of the model span) still records the AI message the graph appended.
-    """
-    if not parent_span_id:
-        return []
-    for row in index.rows:
-        if row['kind'] != 'callback' or row.get('framework_span_id') != parent_span_id:
-            continue
-        end = next((r for r in reversed(index.groups.get(row['id'], [])) if _event(r) == 'span_end'), None)
-        output = _data(end).get('output') if end else None
-        calls = []
-        for update in output if isinstance(output, list) else [output]:
-            value = update.get('update') if isinstance(update, dict) and isinstance(update.get('update'), dict) else update
-            messages = value.get('messages') if isinstance(value, dict) else None
-            for message in messages if isinstance(messages, list) else []:
-                if isinstance(message, dict) and message.get('type') == 'ai':
-                    for call in message.get('tool_calls') or []:
-                        if isinstance(call, dict) and call.get('id'):
-                            calls.append({'id': call['id'], 'name': call.get('name'), 'arguments': call.get('args')})
-        return calls
-    return []
-
-
-def order_key(row):
-    at = stamp(row.get('timestamp'))
-    return (0 if at is not None else 1, at if at is not None else 0.0, row['id'])
 
 
 def tool_log(index, row):

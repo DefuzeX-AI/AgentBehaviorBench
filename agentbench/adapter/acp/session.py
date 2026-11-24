@@ -11,7 +11,8 @@ from agentbench.observe.acp_evidence import terminal_capabilities
 
 
 class ACPSession:
-    def __init__(self, config):
+    def __init__(self, config, *, trace_environment=None):
+        self.trace_environment = trace_environment or {}
         self.config = config
         self.process = self.conn = self.drain_task = None
         self.client = ACPClient(config, self.emit)
@@ -29,8 +30,11 @@ class ACPSession:
     async def start(self):
         from .evidence import load_reader
         self.evidence_reader = load_reader(self.config)
+        command = self.config.command
+        if self.trace_environment.get("ABB_OTEL_PROFILE") == "python-auto":
+            command = ("opentelemetry-instrument", *command)
         self.process = await asyncio.create_subprocess_exec(
-            *self.config.command, cwd=self.config.cwd, env=child_environment(self.config),
+            *command, cwd=self.config.cwd, env=child_environment(self.config, target=self.trace_environment),
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE, limit=self.config.max_output_bytes,
             start_new_session=os.name == 'posix')
@@ -52,6 +56,9 @@ class ACPSession:
             await self.conn.authenticate(method_id=self.config.auth_method)
         session = await self.conn.new_session(cwd=self.config.cwd, mcp_servers=[])
         await self.client.bind_session(session.session_id)
+        if self.trace_environment.get("ABB_OTEL_SESSION_FILE"):
+            from pathlib import Path
+            Path(self.trace_environment["ABB_OTEL_SESSION_FILE"]).write_text(str(session.session_id), encoding="utf-8")
         self.info['session'] = plain(session)
         self.emit('session', self.info['session'])
 
@@ -149,7 +156,8 @@ class ACPSession:
             finally:
                 try:
                     try:
-                        await terminate_group(self.process, self.config.cleanup_timeout)
+                        await terminate_group(self.process, self.config.cleanup_timeout,
+                                              flush_descendants=bool(self.trace_environment))
                     finally:
                         await self.client.terminals.close()
                 finally:

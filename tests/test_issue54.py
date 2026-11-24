@@ -36,7 +36,7 @@ def test_credential_values_under_suffixed_names_are_masked(field):
 
 
 def test_every_harvesting_site_uses_the_one_rule(tmp_path):
-    from agentbench.cli.result_export import _environment_secrets
+    from agentbench.cli.result.export import _environment_secrets
     from agentbench.harness.session.plan import environment_secrets as plan_secrets
     from agentbench.sdk.common.artifacts import Artifacts
     environ = {'DEFUZEX_API_KEY': 'dfx_abcdefghijklmnopqrstuvwxyz', 'GOG_KEYRING_BACKEND': 'file',

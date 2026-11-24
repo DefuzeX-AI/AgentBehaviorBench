@@ -2,6 +2,7 @@
 import importlib.util
 from functools import lru_cache
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -38,6 +39,15 @@ def binding(agent_id):
     spec.loader.exec_module(module)
     assert callable(getattr(module, factory))
     return module
+
+
+def unit_scripts(agent_id):
+    """Put a unit's outer scripts/ directory on sys.path so tests import them by module name."""
+    path = unit(agent_id) / 'scripts'
+    assert path.is_dir(), f'Missing unit scripts directory: {path}'
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+    return path
 
 
 def require_source(agent_id, relative):

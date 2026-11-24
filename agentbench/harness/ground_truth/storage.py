@@ -9,7 +9,8 @@ from agentbench.sdk.common.artifacts import Artifacts
 
 
 def agent_roots(directory, plan):
-    if plan.get('artifact_layout') != 'agent-attempts-v1':
+    from agentbench.harness.session.layout import is_managed
+    if not is_managed(plan):
         return {}
     store = FileArtifactStore(directory)
     return {a['agent_id']: store.agent_directory(a['agent_id']) / 'gt' / plan['suite_id']

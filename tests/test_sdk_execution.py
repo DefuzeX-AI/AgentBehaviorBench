@@ -97,7 +97,7 @@ def fake_services(*, reject_trace=False):
                 report.write_text(json.dumps({'status': 'pass', 'outputs': ['first:1', 'second:2']}))
             def validate(checkpoint):
                 record['validated'].append(checkpoint)
-                if reject_trace and role == 'agent':
+                if reject_trace:
                     raise RuntimeError('Agent evidence rejected')
             def close():
                 record['closed'] += 1
@@ -121,32 +121,32 @@ def test_independent_sdk_uses_shared_host_and_private_case_storage(tmp_path):
     case, = runner.prepare_cases(agent)
     result = runner.run_case(agent, case)
     assert result.passed
-    controller = next(call for call in calls if call['role'] == 'controller')
-    endpoint = next(call for call in calls if call['role'] == 'agent')
-    assert controller['settings']['isolated_agent'] is True
+    # KUMA requires the SDK and the Agent to share one container.
+    controller, = calls
+    assert controller['role'] == 'controller'
+    assert 'isolated_agent' not in controller['settings']
     assert controller['settings']['case_file'] == 'independent/case.json'
     assert (runner.directory / 'sdk-repo/independent/case.json').read_bytes() == case.artifact_path.read_bytes()
     assert '/run/abb-sdk-storage' in str(controller['options']['policy'].run_arguments())
-    assert '/run/abb-sdk-storage' not in str(endpoint['options']['policy'].run_arguments())
-    assert endpoint['start_options']['argv'][-1] == 'agentbench.runtime.agentcontainer.channel'
-    assert all(call['closed'] == 1 and call['validated'] == [call['role']] for call in calls)
+    assert 'argv' not in controller['start_options']
+    assert controller['closed'] == 1 and controller['validated'] == ['controller']
     status = json.loads((runner.directory / 'run.json').read_text())
     assert (status['status'], status['cleanup_status'], status['host_trace_validation']) == (
         'succeeded', 'succeeded', 'succeeded')
     assert status['source_cleanup_status'] == 'succeeded'
     assert not (runner.directory / 'sdk-source').exists()
     assert (agent.path / 'agent/echo.py').is_file()
-    assert (runner.directory / 'trajectory.json').is_file()
+    assert status['atif']['path'] == 'trajectory.atif.json' and 'trajectory' not in status
 
 
-def test_shared_host_cleans_both_sessions_when_agent_evidence_is_rejected(tmp_path):
+def test_shared_host_cleans_the_container_when_agent_evidence_is_rejected(tmp_path):
     agent = source_agent(tmp_path)
     services, calls = fake_services(reject_trace=True)
     runner = make_runner(tmp_path, services)
     case, = runner.prepare_cases(agent)
     with pytest.raises(RuntimeError, match='Agent evidence rejected'):
         runner.run_case(agent, case)
-    assert all(call['closed'] == 1 for call in calls)
+    assert [call['closed'] for call in calls] == [1]
     directory = runner.context.artifacts.case(agent.agent_id, 0).attempt('independent-attempt').directory
     status = json.loads((directory / 'run.json').read_text())
     assert status['status'] == 'failed' and status['cleanup_status'] == 'succeeded'
@@ -193,8 +193,6 @@ def test_independent_sdk_real_container_retains_case_output_and_judge(tmp_path, 
         'class Echo:\n'
         ' def __init__(self): self.turns = 0\n'
         ' def invoke(self, value, config=None):\n'
-        '  assert not Path("/run/abb-sdk-storage").exists()\n'
-        '  assert not Path("/run/abb-output/case.json").exists()\n'
         '  self.turns += 1\n'
         '  return f"{value}:{self.turns}"\n'
         'graph = Echo()\n')
@@ -230,12 +228,12 @@ def test_independent_sdk_real_container_retains_case_output_and_judge(tmp_path, 
         assert json.loads((evaluation / 'case.json').read_text()) == json.loads(case.artifact_path.read_text())
         assert json.loads((evaluation / 'session.json').read_text())['invocations'] == 2
         verification = json.loads((evaluation / 'verification.json').read_text())
-        assert verification['vendor_imported'] is False and verification['span_count'] > 0
+        assert verification['vendor_imported'] is False
         assert json.loads((runner.directory / 'run.json').read_text())['cleanup_status'] == 'succeeded'
         assert json.loads((runner.directory / 'run.json').read_text())['source_cleanup_status'] == 'succeeded'
         assert not (evaluation / 'sdk-source').exists()
         assert (evaluation / 'sdk-repo/independent/case.json').is_file()
-        assert (evaluation / 'trajectory.json').is_file()
+        assert 'atif' in json.loads((evaluation / 'run.json').read_text())
         assert (root / 'agent.toml').read_bytes() == original_manifest
         assert (root / 'Dockerfile').read_bytes() == original_dockerfile
         print('Independent SDK acceptance:', runner.directory)

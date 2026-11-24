@@ -21,4 +21,13 @@ def allocate_run(output, store, agent_id, identity, indices=None):
         path.mkdir(parents=True, mode=0o700)
         return path
     case = store.case(agent_id, identity['case_index'])
-    return case.attempt(identity.get('attempt_id') or uuid4().hex).directory
+    attempt_id = identity.get('attempt_id')
+    if not attempt_id:
+        # Without a scheduler attempt number, redraw a short ID that is already taken.
+        for _ in range(100):
+            attempt_id = uuid4().hex[:8]
+            if not (Path(case.directory) / 'attempts' / attempt_id).exists():
+                break
+        else:
+            raise RuntimeError('No unused attempt ID after 100 attempts')
+    return case.attempt(attempt_id).directory

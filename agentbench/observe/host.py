@@ -15,7 +15,8 @@ class HostObservation:
         self.metadata = {'schema': 'abb.evaluate.run.v1', 'run_id': self.directory.name,
                          'agent_id': registration.agent_id, 'sdk_run_id': sdk_run.run_id, 'status': 'running',
                          'evidence_availability': {
-                             'framework': {'status': 'pending'}, 'otel': {'status': 'pending'},
+                             'framework': {'status': 'pending'},
+                             'agent_otel': {'status': 'unavailable', 'reason': 'Host callback observation'},
                              'network': {'status': 'unavailable', 'reason': 'Host execution has no interceptor capture'},
                              'sdk_wire': {'status': 'unavailable', 'reason': 'SDK did not provide private wire evidence'}}}
         self._save()
@@ -30,9 +31,9 @@ class HostObservation:
         invocation_id = uuid4().hex
         context = {'agent_id': self.agent.agent_id, 'input_id': test_input.input_id,
                    'invocation_id': invocation_id, 'sdk_run_id': self.run.run_id}
-        observed = InvocationObservation(folder, invocation_id, self.run.run_id, self.agent.framework, context=context)
+        observed = InvocationObservation(folder, self.run.run_id, self.agent.framework, context=context)
         store = observed.store
-        secrets = getattr(getattr(store, 'store', store), '_secrets', ())
+        secrets = store._secrets
         atomic_json(folder / 'input.json', redact(json_value({'input_id': test_input.input_id, 'payload': test_input.payload}), secrets))
         result = {'schema': 'abb.result.v1', 'run_id': invocation_id, **context}
         try:
@@ -47,13 +48,7 @@ class HostObservation:
             raise
         finally:
             atomic_json(folder / 'result.json', redact(json_value(result), secrets))
-            observed.close()
-            import json
-            otel = json.loads((folder / 'otel-status.json').read_text(encoding="utf-8"))
             self.metadata['evidence_availability']['framework'] = {'status': 'available'}
-            self.metadata['evidence_availability']['otel'] = {
-                'status': 'available' if otel['status'] == 'complete' else otel['status'],
-                'reason': otel.get('reason') or otel.get('error')}
             self._save()
 
     def finish(self, result=None, error=None):

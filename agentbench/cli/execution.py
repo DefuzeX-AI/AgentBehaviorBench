@@ -28,10 +28,10 @@ from .terminal_ui.presentation import (
 from .terminal_ui.progress import ProgressPrinter, configuration_error
 from .terminal_ui.live_cases import LiveCases
 from .terminal_ui.loading import loading_line
-from .result_export import ResultLogWriter, start_result_log
+from .result.export import ResultLogWriter, start_result_log
 from .terminal_ui import LLMActivity
-from .viewer import RunningViewer
-from .result_paths import validate_results_dir
+from .viewer.server import RunningViewer
+from .result.paths import legacy_results_parent, validate_results_dir
 
 
 def run_benchmark_session(
@@ -104,20 +104,26 @@ def run_benchmark_once(
     after_suite: Callable | None = None,
 ) -> BenchmarkExecution:
 
-    directory = validate_results_dir(output_path, results_dir)
-    # step 1: prepare suite
-    suite_id = runner.new_suite_id()
+    directory = validate_results_dir(output_path, results_dir) # results/...
+    # step 1: prepare suite; a short ID already used in this result root is redrawn.
+    from agentbench.harness.runner.suite_runner import unused_suite_id
+    parent = directory if directory is not None else (
+        legacy_results_parent(output_path) if output_path is not None else None)
+    suite_id = unused_suite_id(runner.new_suite_id, parent / 'suites' if parent is not None else None)
     parallelism = runner.concurrency.max_parallel_cases  # Configured concurrent Case limit.
     total_case_count = sum(agent.case_count for agent in agents) # Agent x Case = total Case count
     effective_workers = min(total_case_count, parallelism)
     concurrent = effective_workers > 1
 
-    
+    # result display
     result_log: ResultLogWriter | None = None
     viewer: RunningViewer | None = None
+
     activity = llm_activity or LLMActivity(output_fn)
     activity.compact = True
     activity.case_counts = {agent.agent_id: agent.case_count for agent in agents}
+    
+    
     progress_printer = None
     live_cases: LiveCases | None = None
     primary_error = None

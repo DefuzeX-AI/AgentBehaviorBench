@@ -2,7 +2,10 @@ from zipfile import ZipInfo
 
 import pytest
 
-from scripts.ingest_biomedical_one import choose_pdf
+from tests.registered_agents import unit_scripts
+
+unit_scripts('biomedical-aiq-research-agent')
+from ingest_biomedical_one import choose_pdf  # noqa: E402
 
 
 def member(name, size):

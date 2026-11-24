@@ -1,6 +1,6 @@
 # Sequential Agent configuration
 
-CLI registration remains in `agentbench/cli/features/agent.py`.
+CLI registration remains in `agentbench/cli/features/agent/add.py`.
 `service.py` coordinates the following stages:
 
 ```text

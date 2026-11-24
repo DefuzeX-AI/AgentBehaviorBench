@@ -5,7 +5,7 @@ from agentbench.harness.session import SuiteStore
 from agentbench.harness.session.references import history_guard, register_suite_reference
 
 from .log import SuiteResultLog
-from agentbench.cli.result_paths import legacy_results_parent, validate_results_dir
+from agentbench.cli.result.paths import legacy_results_parent, validate_results_dir
 
 
 def begin_result_log(output_path, suite_id, agents, *, configuration, environ, results_dir=None):

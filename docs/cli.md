@@ -23,6 +23,7 @@ agent is a command group with the required subcommand add. sdk requires list or 
 | `agentbench run` | Run all enabled Agents whose registry status is ready in one Suite. Use each entry’s case count and step budget. The CLI confirms the selected Agents before execution. |
 | `agentbench evaluate` | Generate independent Cases for one enabled Agent, execute it, collect evidence, and obtain Judge results through the selected SDK. Unlike certify, it does not change registry status. |
 | `agentbench agent add` | Import a GitHub repository or local directory. With no -b/-c, only import and list source files. -b generates integration configuration; -c runs certification. The two flags can be combined. |
+| `agentbench agent delete` | Remove one Agent's registry entry and move its whole folder, including ground_truth/, to cache/agent-trash. Nothing is permanently erased. Preview with --dry-run; stop runs and viewers that use the Agent first. |
 | `agentbench certify` | Execute the registered Case budget of one enabled adapting Agent and promote it to ready when all requested Cases complete without invocation errors. A Judge finding does not by itself prevent promotion; already-ready Agents are not rerun. |
 | `agentbench observe` | Execute one native input and save outputs and traces without SDK Case generation or Judge. Currently requires Docker with oneshot execution. --list and --show provide read-only inspection. |
 | `agentbench view` | Serve saved results in the local web viewer. Build the web assets first. Open the printed full View URL and keep the command running; Ctrl+C stops it. |
@@ -141,6 +142,32 @@ Use an absolute local path. On Windows, SOURCE can be "C:\work\local-agent". -d 
 agentbench agent add https://github.com/langchain-ai/react-agent
 agentbench agent add /absolute/path/to/local-agent -b --sdk kuma --build-model openai/gpt-4.1-mini
 agentbench agent add /absolute/path/to/local-agent -b -c --sdk kuma --no-view
+```
+
+## `agent delete`
+
+Remove one Agent's registry entry and move its whole folder, including ground_truth/, to cache/agent-trash beside the registry's project root. Nothing is permanently erased. Only the matching `[[agents]]` block is removed; other entries keep their formatting. If the registry cannot be updated, the folder is moved back.
+
+```text
+agentbench agent delete AGENT [OPTIONS]
+```
+
+| Argument | Purpose and default | Example |
+| --- | --- | --- |
+| `-h, --help` | Show help for this command and exit. | `--help` |
+| `AGENT` | Required registered agent_id, or a numbered folder name under --agents-dir. A folder name also removes a folder that was imported but never registered. Paths are rejected. | `my-agent`, `01-my-agent` |
+| `--agents-dir DIR` | Parent directory for numbered Agent units. The deleted folder must be directly inside it. Default: resources/agents beside the selected project's default registry. | `--agents-dir resources/agents` |
+| `--registry PATH` | Choose the Agent registry. Default: project resources/registry.toml. | `--registry resources/registry.toml` |
+| `--dry-run` | Show the Agent, folder, registry and archive location without changing files. Default: off. | `--dry-run` |
+| `-y, --yes` | Skip the deletion confirmation prompt. Default: ask. | `--yes` |
+
+To restore, move the archived folder back under --agents-dir and re-add its `[[agents]]` entry. After deleting a registered Agent, refresh docs/Agents.md with `python scripts/update_agent_docs.py`.
+
+### Examples
+
+```bash
+agentbench agent delete my-agent --dry-run
+agentbench agent delete 01-my-agent
 ```
 
 ## `certify`

@@ -4,7 +4,7 @@ import json
 import pytest
 
 from agentbench.cli.sessions.configuration import build_saved_runner, runner_configuration
-from agentbench.cli.trace_runtime import build_trace_suite_runner
+from agentbench.evaluation.runner import build_trace_suite_runner
 from agentbench.harness.registry import AgentRegistration
 from agentbench.harness.session.plan import build_plan, validate_provenance, SuiteProvenanceError
 from agentbench.sdk.plugins import resolve_sdk

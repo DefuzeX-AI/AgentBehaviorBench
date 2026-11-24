@@ -60,6 +60,11 @@ def _otel_records(root, *, allow_incomplete=False):
                     yield name, row
 
 
+def agent_trace_files(root):
+    """Case-owned Agent records have inline bodies and independent collection status."""
+    return [name for name in ("otel/status.json", "otel/spans.jsonl") if evidence_path(root, name).is_file()]
+
+
 def native_references(root, *, allow_incomplete=False):
     result = []
     for name, row in _otel_records(root, allow_incomplete=allow_incomplete):

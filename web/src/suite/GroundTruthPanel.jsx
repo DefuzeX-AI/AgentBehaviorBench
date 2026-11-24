@@ -7,11 +7,12 @@ export default function GroundTruthPanel({ evaluation }) {
   if (!evaluation) return null;
   if (['legacy', 'stale', 'invalid'].includes(evaluation.status)) return <Alert type="warning" showIcon
     message={`Ground truth assessment: ${evaluation.status}`}
-    description="Evaluate saved results using the current summary and trace protocol." />;
+    description="Evaluate saved results using the current summary protocol." />;
   const scores = evaluation.scores || {};
   return <section aria-label="Ground truth matching">
     <Typography.Title level={3}>Ground truth discovery</Typography.Title>
-    <p>Compare Judge finding summaries first, then verify both traces. Repeated discoveries count once per GT.</p>
+    <p>Compare Judge finding summaries with each GT description. A summary match stays pending until
+      step attribution is rebuilt on the ATIF trajectory. Repeated discoveries count once per GT.</p>
     <p>Matched: {scores.matched ?? 0}/{scores.defect_count ?? 0} · Not discovered: {scores.unmatched ?? 0} · Pending: {scores.pending ?? 0}</p>
     <p>Final discovery rate: {scores.discovery_rate == null ? 'Pending' : `${(scores.discovery_rate * 100).toFixed(1)}%`}.
       {' '}Assessment: {evaluation.status}. Original Agent and Judge results are preserved.</p>
@@ -27,8 +28,6 @@ export default function GroundTruthPanel({ evaluation }) {
         { title: 'GT', dataIndex: 'ground_truth_id' },
         { title: 'Case', dataIndex: 'case_index', render: n => n == null ? 'No execution' : n + 1 },
         { title: 'Summary comparison', render: (_, r) => r.summary_match ? decision(r.summary_match.match) : 'Not compared' },
-        { title: 'Trajectory verification', render: (_, r) => r.trajectory_match ? decision(r.trajectory_match.match) : 'Not inspected' },
-        { title: 'Decisive step', render: (_, r) => r.localization?.candidate_decisive_step ?? '—' },
         { title: 'Score', dataIndex: 'score', render: scoreLabel },
         { title: 'Reason', dataIndex: 'reason' },
       ]}
@@ -36,19 +35,6 @@ export default function GroundTruthPanel({ evaluation }) {
         <p><strong>GT summary:</strong> {row.gt_summary}</p>
         <p><strong>Judge finding:</strong> {typeof row.finding === 'string' ? row.finding : row.finding?.message || 'Unavailable'}</p>
         {row.summary_match && <p><strong>Summary decision:</strong> {row.summary_match.reason}</p>}
-        {row.trajectory_match && <p><strong>Trajectory decision:</strong> {row.trajectory_match.reason}
-          {row.render_mode ? ` (rendered: ${row.render_mode})` : ''}</p>}
-        {row.localization && <p><strong>Localization:</strong> reference decisive step {row.localization.reference_decisive_step};
-          candidate decisive step {row.localization.candidate_decisive_step ?? 'none'};
-          Judge-cited steps {row.localization.judge_cited_steps ? row.localization.judge_cited_steps.join(', ') : 'not reported'};
-          step match {row.localization.step_match == null ? 'not scored' : String(row.localization.step_match)}</p>}
-        {['reference', 'candidate'].map(side => row.trajectory_evidence?.[side]?.length > 0 && <div key={side}>
-          <strong>{side === 'reference' ? 'GT reference steps' : 'Candidate execution steps'}</strong>
-          {row.trajectory_evidence[side].map(step => <details key={`${step.attempt || 'candidate'}/${step.step_id}`}>
-            <summary>Step {step.step_id} · {step.agent_name} · {step.kind}</summary>
-            <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(step, null, 2)}</pre>
-          </details>)}
-        </div>)}
         <p>Attempt: {row.attempt_id || 'None'}</p>
       </div> }} />
   </section>;

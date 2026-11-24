@@ -3,15 +3,15 @@
 No Agent invocation or case generation occurs here. KUMA imports are lazy and
 only this adapter owns the translation to its public contracts.
 """
-import json
 
 
 def context_from_request(request, directory):
+    from .integration import require_trace_evidence
+    require_trace_evidence()
     from kuma import Case, KumaInput, Submission, HistoryItem, CaptureStatus
     from kuma.providers import JudgeContext
     from kuma.otel import configure_trace_evidence
     from opentelemetry.sdk.trace import TracerProvider
-    from agentbench.sdk.integration.telemetry import decode_span
     from kuma.evidence.runtime import build_runtime_evidence, runtime_submission_id
 
     run_id, case_id = request['run_id'], request['case']['case_id']
@@ -31,9 +31,6 @@ def context_from_request(request, directory):
             if item.input_id != step['input']['input_id']:
                 raise ValueError('ABB evidence does not match its Case')
             capture.begin_step(run_id, case_id, item.input_id)
-            with (directory / step['evidence_prefix'] / 'spans.jsonl').open(encoding='utf-8') as stream:
-                for line in stream:
-                    capture.export_span(decode_span(json.loads(line)))
             prepared = capture.prepare_step(run_id, case_id, item.input_id)
             result = step['result']
             status = {'succeeded': 'completed', 'cancelled': 'aborted'}.get(result['status'], result['status'])

@@ -1,11 +1,10 @@
-"""SDK-independent session ownership keeps original evidence and cleanup intact."""
+"""SDK-independent session ownership keeps invocation artifacts and cleanup intact."""
 import asyncio
 import json
 
 import pytest
 
-from agentbench.sdk.integration.agent import ManagedAgentSession
-from agentbench.sdk.integration.channel import DirectoryAgentSession
+from agentbench.sdk.integration.agent import LocalAgentSession, ManagedAgentSession
 
 
 class RecordingSession:
@@ -14,11 +13,9 @@ class RecordingSession:
         self.error = error
         self.close_error = close_error
         self.closes = 0
-        self.span = object()
 
-    async def invoke(self, envelope, output, evidence):
+    async def invoke(self, envelope, output):
         self.requests.append(envelope)
-        evidence.accept_span(self.span)
         if self.error is not None:
             raise self.error
         return {'run_id': envelope['run_id'], 'status': 'succeeded', 'output': envelope['input']}
@@ -30,14 +27,6 @@ class RecordingSession:
 
     def snapshot(self):
         return {'invocations': len(self.requests), 'closed': self.closes > 0}
-
-
-class Sink:
-    def __init__(self):
-        self.spans = []
-
-    def accept_span(self, span):
-        self.spans.append(span)
 
 
 class Replay:
@@ -57,24 +46,23 @@ def request(index):
             'observation_context': {'case_id': 'case', 'input_id': f'input-{index}'}}
 
 
-def test_injected_session_preserves_multiturn_envelopes_and_original_spans(tmp_path):
-    session, evidence, replay = RecordingSession(), Sink(), Replay()
+def test_injected_session_preserves_multiturn_envelopes(tmp_path):
+    session, replay = RecordingSession(), Replay()
 
     async def execute():
         async with ManagedAgentSession(output=tmp_path, session=session, replay=replay) as managed:
             for index in (1, 2):
                 folder = tmp_path / 'inputs' / str(index)
-                result = await managed.invoke(request(index), folder, evidence)
+                result = await managed.invoke(request(index), folder)
                 assert result == json.loads((folder / 'result.json').read_text())
                 assert result['output'] == f'current {index}'
                 assert json.loads((folder / 'request.json').read_text()) == request(index)
         await managed.aclose()  # No duplicate close or replay finalization.
         with pytest.raises(RuntimeError, match='closed'):
-            await managed.invoke(request(3), tmp_path / 'inputs' / '3', evidence)
+            await managed.invoke(request(3), tmp_path / 'inputs' / '3')
 
     asyncio.run(execute())
     assert session.requests == [request(1), request(2)]
-    assert evidence.spans == [session.span, session.span]
     assert session.closes == 1
     assert replay.events == [('input_start', 'input-1'), ('input_end', 'input-1'),
                              ('input_start', 'input-2'), ('input_end', 'input-2'), 'finished']
@@ -87,7 +75,7 @@ def test_failure_and_cancellation_close_session_and_finish_replay(tmp_path, erro
 
     async def execute():
         async with ManagedAgentSession(output=tmp_path, session=session, replay=replay) as managed:
-            await managed.invoke(request(1), tmp_path / 'inputs' / '1', Sink())
+            await managed.invoke(request(1), tmp_path / 'inputs' / '1')
 
     with pytest.raises(type(error)):
         asyncio.run(execute())
@@ -105,16 +93,46 @@ def test_close_failure_still_saves_snapshot_and_finishes_replay(tmp_path):
     assert replay.events == ['finished']
 
 
-def test_default_session_uses_host_channel_limits_and_rejects_outside_output(tmp_path):
-    managed = ManagedAgentSession(output=tmp_path, settings={
-        'agent_timeout': 17, 'agent_response_limits': {'max_bytes': 2000, 'max_files': 10}})
-    assert isinstance(managed.session, DirectoryAgentSession)
-    assert managed.session.timeout == 17
-    assert managed.session.response_limits.max_bytes == 2000
-    assert managed.session.response_limits.max_files == 10
-    with pytest.raises(ValueError):
-        asyncio.run(managed.invoke(request(1), tmp_path.parent / 'outside-output', Sink()))
-    assert managed.session.sequence == 0
+def test_local_session_runs_agent_in_process_with_one_native_session(tmp_path):
+    calls = []
+
+    async def worker(root, request_path, output, *, session):
+        envelope = json.loads(request_path.read_text())
+        calls.append((root, envelope['input'], session))
+        (output / 'result.json').write_text(json.dumps(
+            {'run_id': envelope['run_id'], 'status': 'succeeded', 'output': envelope['input']}))
+
+    local = LocalAgentSession(tmp_path / 'unit', capture_directory=tmp_path / 'otel', invoke=worker)
+
+    async def execute():
+        async with ManagedAgentSession(output=tmp_path, session=local) as managed:
+            for index in (1, 2):
+                folder = tmp_path / 'inputs' / str(index)
+                result = await managed.invoke(request(index), folder)
+                assert result['output'] == f'current {index}'
+                assert sorted(path.name for path in folder.iterdir()) == ['request.json', 'result.json']
+            with pytest.raises(ValueError):
+                await managed.invoke(request(3), tmp_path.parent / 'outside-output')
+
+    asyncio.run(execute())
+    assert [call[1] for call in calls] == ['current 1', 'current 2']
+    assert calls[0][0] == tmp_path / 'unit'
+    assert calls[0][2] is calls[1][2]  # One native Agent session serves the whole Case.
+    assert local.session.capture_directory == tmp_path / 'otel'
+    assert local.closed
+
+
+def test_local_session_rejects_a_result_from_another_invocation(tmp_path):
+    async def worker(root, request_path, output, *, session):
+        (output / 'result.json').write_text(json.dumps({'run_id': 'someone-else', 'status': 'succeeded'}))
+
+    async def execute():
+        async with ManagedAgentSession(output=tmp_path, session=LocalAgentSession(
+                tmp_path / 'unit', invoke=worker)) as managed:
+            await managed.invoke(request(1), tmp_path / 'inputs' / '1')
+
+    with pytest.raises(ValueError, match='different invocation'):
+        asyncio.run(execute())
 
 
 def test_invocation_artifacts_and_returned_outputs_are_redacted(tmp_path, monkeypatch):
@@ -125,7 +143,7 @@ def test_invocation_artifacts_and_returned_outputs_are_redacted(tmp_path, monkey
 
     async def execute():
         async with ManagedAgentSession(output=tmp_path, session=session) as managed:
-            result = await managed.invoke(envelope, tmp_path / 'inputs' / '1', Sink())
+            result = await managed.invoke(envelope, tmp_path / 'inputs' / '1')
             assert secret not in json.dumps(result)
 
     asyncio.run(execute())
@@ -133,15 +151,20 @@ def test_invocation_artifacts_and_returned_outputs_are_redacted(tmp_path, monkey
     assert secret not in (tmp_path / 'inputs' / '1' / 'request.json').read_text()
 
 
-def test_production_worker_requires_isolation_before_session_creation(tmp_path, monkeypatch):
+def test_production_worker_executes_the_agent_in_its_own_container(tmp_path, monkeypatch):
     from agentbench.sdk.plugin.kuma import worker
 
     settings = tmp_path / 'evaluation.json'
-    settings.write_text(json.dumps({'mode': 'execute', 'isolated_agent': False}))
+    settings.write_text(json.dumps({'mode': 'execute'}))
+    modes = []
+
+    async def execute(root, output, settings, **kwargs):
+        modes.append(settings['mode'])
+        return 0
+
     monkeypatch.setattr(worker, 'share_output', lambda path: None)
-    monkeypatch.setattr(worker, 'execute', lambda *args, **kwargs: pytest.fail('No local fallback'))
+    monkeypatch.setattr(worker, 'execute', execute)
     monkeypatch.setattr('sys.argv', ['worker', '--settings', str(settings), '--output', str(tmp_path)])
-    assert worker.main() == 1
-    error = json.loads((tmp_path / 'error.json').read_text())
-    assert error['phase'] == 'startup'
-    assert 'requires the isolated Agent channel' in error['message']
+    assert worker.main() == 0
+    assert modes == ['execute']
+    assert not (tmp_path / 'error.json').exists()

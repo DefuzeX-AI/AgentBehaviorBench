@@ -43,6 +43,9 @@ def assemble_atif(bundle, graph, provenance):
     clocks = SpanTimes(bundle, issues)
 
     def operation_time(record):
+        native = [r for r in record.get("agent_otel", []) if r.get("start_time") and r.get("unix_nano")]
+        if len(native) == 1:
+            return {**native[0], "unix_nano": int(native[0]["unix_nano"])}
         span = bundle.spans.get(record.get("span")) or {}
         native = span.get("native_id")
         return clocks.start(record, native) if native else None
@@ -153,9 +156,11 @@ def assemble_atif(bundle, graph, provenance):
         if nid != graph.root_id:
             extra["version_missing_reason"] = "No independent child Agent revision was recorded"
         if nid == graph.root_id:
-            extra.update(provenance=provenance, invocations=bundle.inputs,
+            extra.update(source=bundle.source, provenance=provenance, invocations=bundle.inputs,
                 unassigned_records=[unassigned(r) for r in bundle.models + bundle.tools if graph.owners[r["id"]] is None],
                 native_events=bundle.native_events, issues=[asdict(i) for i in issues])
+            if bundle.unassigned_agent_spans:
+                extra["unassigned_agent_spans"] = bundle.unassigned_agent_spans
             extra["raw_records"] = bundle.raw_records
             extra["auxiliary_artifacts"] = bundle.auxiliary_artifacts
             extra["delegation_facts"] = graph.delegation_facts

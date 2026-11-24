@@ -6,7 +6,7 @@ from argparse import ArgumentParser, ArgumentTypeError, Namespace
 import os
 from pathlib import Path
 
-from agentbench.cli.viewer import DEFAULT_HOST, DEFAULT_PORT, serve_result_log, ViewerUnavailable
+from agentbench.cli.viewer.server import DEFAULT_HOST, DEFAULT_PORT, serve_result_log, ViewerUnavailable
 
 from .base import CommandFeature
 

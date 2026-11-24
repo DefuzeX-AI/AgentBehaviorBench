@@ -10,7 +10,10 @@ from agentbench.runtime.interception.provider_catalog import load_provider_catal
 from agentbench.runtime.interception.providers import resolve_model_provider
 from agentbench.runtime.interception.target_routing import resolve_target_routing
 from agentbench.sdk.plugin.local.relay import judge_model
-from scripts.check_biomedical_reasoning import MODEL, check, contract_summary, list_models, native_prompt
+from tests.registered_agents import unit_scripts
+
+unit_scripts('biomedical-aiq-research-agent')
+from check_biomedical_reasoning import MODEL, check, contract_summary, list_models, native_prompt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 QUERY = [{"query": "CFTR evidence", "report_section": "Evidence", "rationale": "Relevant"}]
@@ -27,14 +30,14 @@ class BiomedicalReasoningTests(unittest.TestCase):
             'import unavailable_agent_dependency\n'
             'query_writer_instructions = "Generate {number_of_queries} search queries for {topic}. {report_organization}"\n',
             encoding='utf-8')
-        patcher = patch('scripts.check_biomedical_reasoning.UNIT', unit)
+        patcher = patch('check_biomedical_reasoning.UNIT', unit)
         patcher.start()
         self.addCleanup(patcher.stop)
 
     def test_pinned_native_prompt_contract(self):
         from tests.registered_agents import unit, require_source
         require_source('biomedical-aiq-research-agent', 'aira/src/aiq_aira/prompts.py')
-        with patch('scripts.check_biomedical_reasoning.UNIT', unit('biomedical-aiq-research-agent')):
+        with patch('check_biomedical_reasoning.UNIT', unit('biomedical-aiq-research-agent')):
             prompt = native_prompt()
         self.assertIn('Generate 1 search queries', prompt)
         self.assertIn('CFTR cystic fibrosis treatment', prompt)

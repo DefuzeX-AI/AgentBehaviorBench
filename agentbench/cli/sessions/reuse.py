@@ -119,10 +119,11 @@ def create_reuse(inputs, *, environ, root=None, suite_id=None):
     source, plan, snapshot = inputs.source, inputs.plan, inputs.snapshot
     selected, originals = inputs.registrations, inputs.originals
     configuration, runner = inputs.configuration, inputs.runner
-    identifier = suite_id or SuiteRunner.new_suite_id()
+    destination = Path(root).resolve() if root is not None else source.parent
+    from agentbench.harness.runner.suite_runner import unused_suite_id
+    identifier = suite_id or unused_suite_id(SuiteRunner.new_suite_id, destination)
     if identifier == plan['suite_id']:
         raise ValueError('Case reuse requires a new Suite identity')
-    destination = Path(root).resolve() if root is not None else source.parent
     with history_guard(PROJECT_ROOT):
         register_suite_reference(source, project_root=PROJECT_ROOT)
         with SuiteStore.begin(destination, identifier, selected, configuration=configuration,

@@ -47,7 +47,7 @@ def test_agent_add_help_explains_local_sources_and_destination(capsys):
     assert raised.value.code == 0
     help_text = capsys.readouterr().out
     assert "Local directories are detected automatically; do not use -d" in help_text
-    assert "agentbench agent add C:\\path\\to\\agent" in help_text
+    assert "agentbench agent add /path/to/agent" in help_text
     assert "--agents-dir DIRECTORY" in help_text
 
 
@@ -109,7 +109,7 @@ def test_cli_downloads_numbered_source_and_prints_json_array(repository, tmp_pat
 
 
 def test_default_destination_follows_cli_registry_location(repository, tmp_path, monkeypatch, capsys):
-    from agentbench.cli.features import agent as feature
+    from agentbench.cli.features.agent import add as feature
 
     registry = tmp_path / "project/resources/registry.toml"
     monkeypatch.setattr(feature, "DEFAULT_REGISTRY_PATH", registry)

@@ -6,7 +6,6 @@ from types import SimpleNamespace
 import pytest
 from kuma import to_json
 
-from agentbench import trajectory
 from agentbench.sdk.plugin.kuma.judge_bundle import export_context, restore_context, save_context, read_context
 from agentbench.sdk.plugin.kuma.judge_tasks import prepare_task, judge_task
 from agentbench.sdk.plugin.kuma.compatibility import run_case
@@ -96,7 +95,8 @@ def stage_task(root, *, native_failure=False, stop_early=False):
         'case_id': prepared.case_id, 'attempt_id': 'original-attempt', 'status': 'succeeded',
         'cleanup_status': 'succeeded', 'host_trace_validation': 'succeeded',
         'acceptance_fixture': 'offline isolated execution; no external model or tool traffic'})
-    trajectory.write(directory, environ={})
+    # Earlier runs left a derived trajectory.json; the Judge queue must not depend on it.
+    (directory / 'trajectory.json').write_text('{}', encoding='utf-8')
     ticket = prepare_task(directory, prepared, environ={})
     runner = KumaContainerRunner(environ={'KUMA_API_KEY': 'dfx_offline_fixture_only'}, control=RunControl())
     return runner, registration, prepared, ticket, summary

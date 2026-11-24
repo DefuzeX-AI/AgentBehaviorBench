@@ -66,9 +66,7 @@ real acceptance before readiness.
 
 The unit stays disabled/adapting pending integration review. The later two-input
 Local Smoke passed with stdout 20 then 26, exit 0, native ACP approvals and a
-local Judge pass/high. See the [acceptance record](../../../docs/validation/issue493-synergy/README.md)
-for the explicit container-boundary deployment, Judge transport, retained
-failure and evidence scope; see `requirement.md` for deployed behavior.
+local Judge pass/high. See `requirement.md` for deployed behavior.
 
 ## Earlier failed acceptance
 

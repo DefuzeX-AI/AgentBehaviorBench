@@ -20,11 +20,11 @@ ground_truth/
 
 Case 中原有的对话、工具输入输出、生成文件、错误、日志及其他流程文件都按原
 目录结构保留。每个目录只新增小型 `gt.json`，schema 为
-`abb.agent.ground_truth.case.v1`，包含 `agent_id`、`id`、`summary`、
-`explanation` 和 `reference_attempts`。最后一项指定该 Case 的 `attempts/`
-下哪些真实执行用于参考。完整字段示例见英文文档。
+`abb.agent.ground_truth.case.v2`，包含 `agent_id`、`id`、`summary` 和
+`explanation`。完整字段示例见英文文档。
 
-ABB 第一阶段仅读问题说明，总结匹配后才打开本地参考 attempt 读取 trace；
+ABB 只比对 Judge 的问题摘要和 GT 说明。基于旧 `trajectory.json` 的逐步归因
+已随该格式删除，之后会基于 ATIF 轨迹重做；在此之前，摘要匹配的结果保持待定。
 不依赖原结果目录的位置。组件探针可放在独立 `evidence/` 内，必须明确区分
 组件验证和 Agent 执行。单独的对照 Case 不另算一个缺陷 GT。
 

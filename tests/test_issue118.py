@@ -3,10 +3,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentbench.cli import execution, viewer
+from agentbench.cli import execution
+from agentbench.cli.viewer import server as viewer
 from agentbench.cli.features import evaluate, run, certify
 from agentbench.cli.main import build_parser
-from agentbench.cli.result_paths import validate_results_dir
+from agentbench.cli.result.paths import validate_results_dir
 from agentbench.cli.sessions import configuration, fresh
 from agentbench.harness import SuiteRunner
 from agentbench.harness.session import SuiteStore, read_snapshot

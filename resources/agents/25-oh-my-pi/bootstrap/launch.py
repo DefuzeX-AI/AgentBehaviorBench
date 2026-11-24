@@ -89,7 +89,7 @@ def prepare(environ: dict[str, str], builtin: list[str]) -> tuple[list[str], dic
         **environ,
         # omp's own OTLP exporter only starts when an OTEL_* endpoint is set;
         # keep it off explicitly so no exporter traffic leaves the container.
-        "OTEL_SDK_DISABLED": "true",
+        "OTEL_SDK_DISABLED": "false" if environ.get("ABB_OTEL_PROFILE") else "true",
         # npm's own update check is noise. npm itself stays online for the bash
         # tool: the registry is on ABB's egress-observer allowlist.
         "npm_config_update_notifier": "false",

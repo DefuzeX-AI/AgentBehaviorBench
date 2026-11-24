@@ -59,10 +59,9 @@ class LocalProvider:
                 gaps.append('Execution failure requires separate infrastructure/Agent attribution.')
             prefix = step['evidence_prefix']
             traces = {}
-            for name in ('spans.jsonl', 'framework.jsonl'):
-                relative = prefix + '/' + name
-                if relative in request['attachments']:
-                    traces[name] = (directory / relative).read_text(encoding='utf-8')
+            relative = prefix + '/framework.jsonl'
+            if relative in request['attachments']:
+                traces['framework.jsonl'] = (directory / relative).read_text(encoding='utf-8')
             steps.append({'input_id': step['input']['input_id'],
                           'input': step['input']['payload'], 'output': step['result'],
                           'traces': traces})

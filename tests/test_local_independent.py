@@ -36,7 +36,7 @@ def test_local_complete_workflow_blocks_kuma(tmp_path, unit, monkeypatch):
     cases = runner.prepare_cases(unit)
     result = runner.run_case(unit, cases[0])
     assert result.passed and result.judge_delivery_status == 'received'
-    assert seen and 'spans.jsonl' in seen[0][0]['traces']
+    assert seen and list(seen[0][0]['traces']) == ['framework.jsonl']
     assert len(cases) == unit.case_count
 
 

@@ -2,10 +2,183 @@
 
 ## Scope and implementation
 
-This is an explicit host-side experiment. It leaves `trajectory/builder.py`,
-`trajectory/schema.py`, default run export hooks, Judge/GT contracts, collectors,
-Agent definitions, and the desktop application unchanged. Harbor is installed only
-in `cache/atif/venv`, not ABB's default environment or any Agent image.
+This started as an explicit host-side experiment. It leaves `trajectory/builder.py`,
+`trajectory/schema.py`, Judge/GT contracts, collectors and the desktop application
+unchanged. The run flow now also derives the document for every attempt; see
+[Automatic derivation](#automatic-derivation). Harbor is never installed into an
+Agent image.
+
+## Automatic derivation
+
+After the container stops, `run_evaluation` and `observe` call
+`agentbench.trajectory.atif.attempt.write`. It saves `trajectory.atif.json` in the
+attempt directory and returns the `atif` entry of `run.json`:
+
+| `status` | Meaning | File written |
+| --- | --- | --- |
+| `complete` | Converted without evidence issues. | yes |
+| `partial` | Converted; `issues` counts the gaps listed inside the document. | yes |
+| `failed` | Conversion raised; `error_type` and `error` say why. | no |
+| `unavailable` | Harbor is not installed. | no |
+
+None of these changes the execution outcome.
+
+Only `harbor.models.trajectories` is imported, and it needs pydantic alone.
+Install Harbor without its own dependency tree (Python 3.12 or newer):
+
+```bash
+python -m pip install --no-deps -r agentbench/trajectory/atif/requirements.txt
+```
+
+A full Harbor install adds about ninety packages and can downgrade ones ABB
+already uses. The pinned commit must equal `HARBOR_COMMIT` in
+`agentbench/trajectory/atif/__init__.py`; `provenance.py` rejects any other.
+
+Delegation adapters remain an explicit choice. An Agent unit selects them in
+`agent.toml`, and the choice is frozen into `request/target.json`:
+
+```toml
+[atif]
+adapters = ["openclaw"]
+```
+
+A unit that declares nothing gets a root trajectory without embedded subagents.
+
+### Step sources
+
+Which recorded evidence becomes the model and tool steps is decided by one step
+source per attempt (`agentbench/trajectory/atif/sources/`). The source is chosen
+from the unit frozen in `request/target.json`, never from an Agent's name:
+
+| `[adapter] type` | Source | Model steps | Tool results | Reply |
+| --- | --- | --- | --- | --- |
+| `langgraph` | `langgraph` | LangChain callbacks in `framework.jsonl` | LangChain callbacks | The delivered result is its own `invocation_result` step unless a model step carries it by provider response id. |
+| `acp` | `acp_otel` | Inference spans the Agent exported to `otel/spans.jsonl` | Tool spans the Agent exported | The last model step of the turn; the delivered result is not repeated. |
+
+A unit overrides the default with `[atif] source = "<name>"`. An adapter type
+without a source, or an unknown source name, fails the derivation with that
+reason. Without a frozen adapter type (a standalone observe run) the
+`framework` recorded in the invocation requests decides; an attempt that
+recorded neither is read with `langgraph`. A format that needs its own reading adds a module to `sources/`
+and registers it in `sources/__init__.py`; the shared reader, ownership,
+assembly, validation and stored form do not change. Interceptor records in
+`logs/network.jsonl` are not converted by either source.
+
+`acp_otel` reads nothing ABB wrote while relaying ACP: the tool spans and ACP
+message copies in `framework.jsonl` are not a step source.
+
+- An inference span qualifies when `gen_ai.operation.name` marks an inference
+  and `gen_ai.output.messages` holds an assistant message. The step takes its
+  message, reasoning, tool calls, model name, token metrics and timestamp from
+  that span. A span without an assistant message stays in
+  `unassigned_agent_spans`: an aggregate usage span, or any call captured with
+  content capture switched off.
+- A tool result takes its content, status and clock from the tool span with the
+  same `tool_call_id` as the model's call.
+- Without any qualifying inference span the trajectory holds the user message
+  only and reports `agent_otel_models_missing`.
+- A span is exported when it ends, a run's own span last. An operation whose
+  parent span never arrived reports `agent_otel_export_incomplete`: the export
+  stopped before the run did, so later operations of that run, such as its
+  final reply, may be absent from the trajectory.
+- An exported span names no session and no Input. The Agent's ACP messages in
+  `steps/NNNN/acp-events.jsonl` name the session that reported a tool call id;
+  that is the only use of ACP records. An inference takes the session of the
+  tool calls it emitted, and an operation without one takes the only session
+  known among the operations exported under the same parent span. The session
+  and the folder of those messages place the step in its turn.
+- The root execution owns a record that names a root session, or names none
+  when no delegation was proposed. A delegation adapter may claim records for
+  a child (see below). Any other record is listed under `unassigned_records`
+  with an `unassigned_record` issue.
+- A record with neither session nor Input joins the turn only when the attempt
+  has one Input and the unit declares `evaluation.single_input_model_scope =
+  true`; the step then records `turn_evidence: isolated_single_input_case`.
+  Otherwise it follows the turns instead of sitting inside one.
+
+### OpenClaw child runs
+
+The `openclaw` delegation adapter recognizes an accepted `sessions_spawn`
+receipt and embeds a child trajectory. It attributes the child's operations in
+one of two ways, both from recorded identifiers:
+
+1. **Session.** An operation names the child session key of exactly one
+   accepted receipt.
+2. **Run structure**, for exports whose spans name no session
+   (`diagnostics-otel` 2026.9.5), using span parent ids only:
+   - every model call and tool execution is a child span of the
+     `openclaw.run` it ran in;
+   - a run is a child span of its `openclaw.harness.run`;
+   - the harness span of a spawned run is a child span of the spawning run's
+     harness span;
+   - a nested run whose inference input carries the id of a tool call made in
+     the spawning run continues that run's own conversation. OpenClaw starts
+     such a run to tell the requester that its child finished. It is a
+     further step of the spawning execution, not a child. OpenClaw replays
+     history with tool call ids reduced to letters and digits, so ids are
+     compared in that spelling, and only an unambiguous one counts. The rule
+     applies only when every spawn of that run was `context: isolated`; a
+     child that inherits the conversation would carry the same ids.
+
+   When one run executed exactly one accepted spawn and exactly one other run
+   is nested under its harness span, that nested run is the spawned child and its
+   operations form the child trajectory. The delegation fact records
+   `attribution: run_structure` and cites the child's run and harness spans.
+   Any other count pairs nothing: the children keep their task step only, the
+   operations stay under `unassigned_records`, and the document reports
+   `openclaw_child_run_ambiguous`. A child run that spawns again is resolved
+   the same way, one level down.
+
+Rule 2 was derived from recorded runs with one isolated spawn each, with and
+without a completion notice; several spawns in one run, nested spawns and
+inherited context are covered by synthetic tests only.
+
+### Stored form
+
+The converter builds and validates a complete document that embeds every record
+it used. Before saving, `agentbench/trajectory/atif/slim.py` reduces it to the
+stored form: the official ATIF fields unchanged and, under `extra.abb`, small
+annotations plus pointers into the attempt directory, which keeps the complete
+evidence.
+
+A pointer is `{"file": "otel/spans.jsonl", "line": 19}`: the artifact path
+relative to the attempt directory and a 1-based line, or `null` for a whole
+JSON file. Every pointer must open an existing file and line, or the export
+fails.
+
+| Position | Stored under `extra.abb` | Not stored (read the attempt directory) |
+| --- | --- | --- |
+| Trajectory | `source`, `execution` (key and status), `provenance` (builder and Harbor versions), `issues`, `unassigned_records` (summary), `delegation_facts`, `version_missing_reason` | `raw_records`, `invocations`, `native_events`, `unassigned_agent_spans`, `auxiliary_artifacts` |
+| Step | `evidence`, `input_id`, `kind`, `association`, `turn_evidence`, `result_source`, `execution_started_at` | `model_record`, `invocation`, `record_ids` |
+| Observation result | `evidence`, `execution_status`, `started_at`, `ended_at` | `tool_execution`, `record_ids` |
+| Metrics | nothing | `recorded_usage` |
+| Final metrics | `metrics_scope`, `unknown_model_usage` | |
+
+The table mirrors the rule tables at the top of `slim.py`. Each `extra.abb` key
+must have a rule there; a key without one fails the export, so storing new
+data is a deliberate change to that file. Record conservation and ownership are
+validated on the complete document before it is reduced.
+
+Known gaps of the automatic document:
+
+- User and `invocation_result` steps have no timestamp, and neither does a
+  callback step without one linked Agent-exported span. The per-Input OTel
+  files that used to supply those clocks are no longer written.
+- With `acp_otel`, an ACP Agent that exports no OTel has no model or tool
+  step. Several OpenClaw children spawned by one run cannot be told apart.
+- OpenClaw's last export batch was lost in one recorded run when the Agent
+  process group was killed after the default 3 s `cleanup_timeout`; the unit
+  now sets 10 s. A lost batch removes the root run's final reply and its run
+  spans, leaving run-structure attribution nothing to follow;
+  `agent_otel_export_incomplete` reports it.
+- With a completion notice, the last model step of the turn is OpenClaw's
+  `NO_REPLY` to that notice, after the step that answered the user.
+- ABB ends an Input at the ACP prompt response. After `sessions_yield`,
+  OpenClaw's requester answers in a later run (about 12 s later in one
+  recorded run) that is not sent over ACP; ABB has stopped the Agent by then,
+  so neither the delivered result nor the trajectory holds that answer.
+- Host redaction replaces `childSessionKey` in a recorded receipt, so the
+  session rule cannot use it; the run ID survives.
 
 The official [Harbor Trajectory model at the pinned commit](https://github.com/harbor-framework/harbor/blob/ec6aeab7fe0eb51df52b4e72c524daf5ea9cc5f4/src/harbor/models/trajectories/trajectory.py)
 provides schema validation and embedded child trajectories. The converter uses
@@ -15,7 +188,10 @@ its actual `Agent`, `Step`, `ToolCall`, `ObservationResult`, and
 | File | Responsibility |
 | --- | --- |
 | `agentbench/trajectory/atif/contracts.py` | Internal evidence, execution identity, delegation proposals, issues, and export result dataclasses. |
-| `reader.py` | Guarded source reads, three ABB layouts, exact model/framework merging, interrupted streams, chain records, ACP events, and auxiliary OTel/runtime evidence. |
+| `reader.py` | Guarded source reads, three ABB layouts, Inputs, ACP events, session binding, and auxiliary OTel/runtime evidence. |
+| `sources/__init__.py`, `sources/base.py` | Step-source factory, contract, and the record builders for exported spans. |
+| `sources/langgraph.py` | Callback step records: exact model/framework merging, interrupted streams, chain records. |
+| `sources/acp_otel.py` | Exported-span step records for ACP Agents and session inheritance. |
 | `adapters/base.py`, `adapters/__init__.py` | Delegation protocol and explicitly selected Strategy registry. |
 | `adapters/deepagents.py` | Tool-to-named-agent graph boundaries using parent spans, actual entry metadata, and delegation arguments. |
 | `adapters/opencode.py` | Structured task/session metadata; optional explicit native turn/provider-response identity. Missing internals remain a reported gap. |
@@ -24,11 +200,11 @@ its actual `Agent`, `Step`, `ToolCall`, `ObservationResult`, and
 | `provenance.py` | Historical source digests, frozen target revision, unavailable provenance, converter source digests, and installed Harbor commit verification. |
 | `validation.py` | Official validation, record conservation, reference integrity, ownership agreement, and raw evidence inventory. |
 | `export.py` | Offline pipeline, source immutability checks, UTF-8, atomic final publication, and failure reports. |
+| `slim.py` | Stored form: one rule table per position, evidence pointers, and pointer checks. |
 | `agentbench/observe/tool_links.py` | Adds optional `scope_keys`; callers omitting it retain the original behavior. |
 | `agentbench/experiments/atif/__main__.py` | Thin explicit `export`, `run`, and `verify` command dispatch. |
 | `runner.py` | Existing ABB runtime/adapter orchestration, configured workspace, read-only native configuration overrides, and controlled cancellation. |
 | `acceptance.py` | Rebuild comparison, source-content checks, actual file outcomes, and configured acceptance conditions. |
-| `experiments/atif/` | Pinned dependency input/lock, declarative Agent/model references, prompts, and reproducible instructions. |
 | `tests/atif_fixtures.py`, `tests/test_atif_*.py` | Synthetic edge cases and the historical two-child acceptance case. |
 | `tests/test_emitted_tool_links.py` | Default-scope regression and unknown-candidate preservation. |
 

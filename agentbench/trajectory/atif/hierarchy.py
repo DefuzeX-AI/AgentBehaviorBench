@@ -15,7 +15,7 @@ def resolve_hierarchy(bundle, *, adapters=()):
     key = execution_key(bundle, None, "runtime", "root")
     root = ExecutionNode(key, bundle.run.get("agent_id") or "unknown", status=bundle.run.get("status", "unknown"))
     nodes, links, issues = {key.id: root}, [], list(bundle.issues)
-    facts = []
+    facts, continues = [], {}
     for adapter in selected(adapters):
         found = adapter.identify(bundle)
         for node in found.nodes:
@@ -26,6 +26,16 @@ def resolve_hierarchy(bundle, *, adapters=()):
         links.extend(found.links)
         issues.extend(found.issues)
         facts.extend(found.facts)
+        continues.update(found.same_execution)
+    # A record an adapter found to continue another record's execution shares
+    # that record's session, and with it the turn the session was reported in.
+    recorded = {r["id"]: r for r in bundle.models + bundle.tools}
+    for rid, anchor in continues.items():
+        record, source = recorded.get(rid), recorded.get(anchor)
+        if (record and source and source.get("native_session_id") and not record.get("native_session_id")
+                and not record.get("identity_conflicts")):
+            record["native_session_id"] = source["native_session_id"]
+            record["session_evidence"] = list(source.get("session_evidence", []))
     boundaries = {n.boundary_id: n.key.id for n in nodes.values() if n.boundary_id}
     blocked_boundaries = set()
     bad = set()
@@ -60,11 +70,30 @@ def resolve_hierarchy(bundle, *, adapters=()):
             cursor = span["parent"]
         return nearest or key.id
 
+    def exported_root(record):
+        """An Agent-exported step record has no ABB span to walk. The root owns it
+        when it names a root session, or names none and no delegation was
+        proposed. Where callbacks are the step record, an exported span that
+        matched none stays unowned unless a delegation adapter claims it."""
+        if (not bundle.exported_steps or record.get("span") or record.get("identity_conflicts")
+                or record.get("source") not in ("agent_native", "auto_instrumented")):
+            return False
+        session = record.get("native_session_id")
+        return session in root_sessions if session else not links
+
     tools = {t["id"]: t for t in bundle.tools}
     accepted = []
     for link in links:
         tool = tools.get(link.tool_id)
         parent = owner(tool["span"]) if tool and tool.get("span") and not tool.get("identity_conflicts") else None
+        if tool and parent is None and exported_root(tool):
+            parent = key.id
+        # An exported spawn inside a child run has no span to walk either; the
+        # adapter's parent stands only when that execution owns the tool.
+        proposed = nodes.get(link.parent_id)
+        if (tool and parent is None and bundle.exported_steps and not tool.get("span")
+                and not tool.get("identity_conflicts") and proposed and tool["id"] in proposed.record_ids):
+            parent = link.parent_id
         if tool and tool.get("native_session_id") and tool["native_session_id"] not in root_sessions:
             proposed = nodes.get(link.parent_id)
             # Nested native spawns share the framework root span. Accept a
@@ -111,6 +140,8 @@ def resolve_hierarchy(bundle, *, adapters=()):
     owners = {}
     for record in bundle.models + bundle.tools:
         owners[record["id"]] = None if record.get("identity_conflicts") else owner(record["span"]) if record.get("span") else None
+        if exported_root(record):
+            owners[record["id"]] = key.id
         if record.get("native_session_id") and record["native_session_id"] not in root_sessions and owners[record["id"]] == key.id:
             owners[record["id"]] = None
         proposals = native_owners.get(record["id"], set())
@@ -120,6 +151,10 @@ def resolve_hierarchy(bundle, *, adapters=()):
             owners[record["id"]] = next(iter(proposals)) if len(proposals) == 1 and not record.get("identity_conflicts") else None
             if owners[record["id"]] is None:
                 issues.append(EvidenceIssue("conflicting_native_ownership", "Native and framework ownership cannot be reconciled", [record["id"]]))
+    # Without a session to share, the continuing record follows the owner directly.
+    for rid, anchor in continues.items():
+        if rid in owners and owners[rid] is None and owners.get(anchor) and not recorded[rid].get("identity_conflicts"):
+            owners[rid] = owners[anchor]
     nodes = {nid: node for nid, node in nodes.items() if nid in valid}
     for code, sid in sorted(bad):
         issues.append(EvidenceIssue(code, "Framework ancestry cannot be verified", [sid]))

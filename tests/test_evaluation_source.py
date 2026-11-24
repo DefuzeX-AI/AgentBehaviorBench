@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from agentbench.cli import viewer
-from agentbench.cli.viewer_catalog import ViewerSuiteCatalog
+from agentbench.cli.viewer import server as viewer
+from agentbench.cli.viewer.catalog import ViewerSuiteCatalog
 from agentbench.harness.session import SuiteStore
 from agentbench.observe.evaluation_source import evaluation_source
 from tests.test_suite_resume import make_agent

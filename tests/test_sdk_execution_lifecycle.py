@@ -35,7 +35,7 @@ def test_generation_without_prespecified_slots_uses_preparation_storage(tmp_path
     assert directory.is_relative_to(store.directory)
     assert 'preparation' in directory.parts
     assert [call['role'] for call in calls] == ['controller']
-    assert calls[0]['settings']['isolated_agent'] is False
+    assert 'isolated_agent' not in calls[0]['settings']
     assert calls[0]['closed'] == 1 and calls[0]['validated'] == []
     assert not (directory / 'sdk-source').exists()
 
@@ -71,10 +71,10 @@ def test_private_sdk_configuration_does_not_implicitly_require_case_replay(tmp_p
     else:
         directory = run_evaluation(agent, **arguments)
         assert (directory / 'sdk-repo/rubric.json').read_bytes() == source.read_bytes()
-        assert len(calls) == 2
+        assert len(calls) == 1
 
 
-def test_controller_cleanup_failure_still_closes_agent_and_records_outcome(tmp_path):
+def test_container_cleanup_failure_records_outcome(tmp_path):
     services, calls = fake_services()
     original = services.create_docker_runtime
 
@@ -84,14 +84,13 @@ def test_controller_cleanup_failure_still_closes_agent_and_records_outcome(tmp_p
 
         def start_with_cleanup_failure(*args, **kwargs):
             session = start(*args, **kwargs)
-            if not options['run_id'].endswith('-agent'):
-                close = session.close
+            close = session.close
 
-                def fail_close():
-                    close()
-                    raise DockerCleanupError('controller cleanup failed')
+            def fail_close():
+                close()
+                raise DockerCleanupError('controller cleanup failed')
 
-                session.close = fail_close
+            session.close = fail_close
             return session
 
         runtime.start = start_with_cleanup_failure
@@ -113,14 +112,14 @@ def test_source_removed_after_artifact_collection_even_when_collection_fails(tmp
     def collect(directory, status, **kwargs):
         assert all(call['closed'] == 1 for call in calls)
         assert (directory / 'sdk-source/echo.py').is_file()
-        assert (directory / 'trajectory.json').is_file()
+        assert status['atif']['path'] == 'trajectory.atif.json'
         raise RuntimeError('artifact collection failed')
     with pytest.raises(RuntimeError, match='artifact collection failed'):
         run_evaluation(source_agent(tmp_path), context=context(services), output=tmp_path / 'runs',
                        stage_agent=unchanged_stage, collect_artifacts=collect)
     directory = next((tmp_path / 'runs').iterdir())
     assert not (directory / 'sdk-source').exists()
-    assert (directory / 'trajectory.json').is_file()
+    assert 'atif' in json.loads((directory / 'run.json').read_text())
     assert (directory / 'judge/report.json').is_file()
 
 

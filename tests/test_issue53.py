@@ -15,7 +15,8 @@ PROBE = '''
 import json, agentbench
 from agentbench.cli.features.run import DEFAULT_REGISTRY_PATH
 from agentbench.cli.environment import DEFAULT_ENV_FILE
-from agentbench.cli import history, viewer
+from agentbench.cli import history
+from agentbench.cli.viewer import server as viewer
 try:
     viewer.require_viewer_assets()
     message = None

@@ -14,8 +14,12 @@ class ManifestOptions:
     observe: bool = False
     adapter_context: dict | None = None
     evaluation: dict | None = None
+    otel_profile: str | None = None
+    otel_file: str | None = None
 
     def __post_init__(self):
+        if self.otel_file is not None and self.otel_profile != "file-export":
+            raise BuildError("--otel-file requires --otel-profile file-export")
         if self.evaluation is not None:
             from agentbench.sdk.common.workspace import workspace_policy
             workspace_policy({'evaluation': self.evaluation})
@@ -43,4 +47,5 @@ def options_from_cli(args):
         context = json.loads(path.read_text(encoding="utf-8"))
     timeout = getattr(args, "agent_timeout", None)
     return ManifestOptions(timeout_sec=300 if timeout is None else timeout,
+                           otel_profile=getattr(args, "otel_profile", None), otel_file=getattr(args, "otel_file", None),
                            observe=getattr(args, "with_observe", False), adapter_context=context)

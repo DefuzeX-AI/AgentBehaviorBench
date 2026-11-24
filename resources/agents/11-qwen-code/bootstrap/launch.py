@@ -55,7 +55,11 @@ def main() -> int:
         # whichever unprivileged uid the runtime selects, and isolated per Case.
         home = Path(tempfile.mkdtemp(prefix="abb-qwen-home-"))
         (home / ".qwen").mkdir()
-        (home / ".qwen/settings.json").write_text(json.dumps(SETTINGS, indent=2))
+        settings = dict(SETTINGS)
+        if environ.get("ABB_OTEL_PROFILE"):
+            settings["telemetry"] = {"enabled": True, "target": "local",
+                                     "otlpEndpoint": environ["OTEL_EXPORTER_OTLP_ENDPOINT"]}
+        (home / ".qwen/settings.json").write_text(json.dumps(settings, indent=2))
         environ["HOME"] = str(home)
         os.execvpe(command[0], command, environ)
     except (OSError, ValueError) as exc:

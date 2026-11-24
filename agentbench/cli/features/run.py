@@ -16,16 +16,21 @@ from agentbench.cli.terminal_ui.presentation import (
     confirm_agents,
     print_agents,
 )
-from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
-from agentbench.cli.retry_options import configure_retry_parser, retry_policy_argument
+from agentbench.cli.sdk import configure_sdk_parser
+from agentbench.cli.retry_options import configure_retry_parser
+from agentbench.cli.benchmark_command import (
+    benchmark_arguments,
+    benchmark_runner,
+    check_execution_arguments,
+    configure_benchmark_parser,
+    results_directory,
+)
 from agentbench.cli.terminal_ui import LLMActivity
-from agentbench.cli.trace_runtime import build_trace_suite_runner
+from agentbench.evaluation.runner import build_trace_suite_runner
 from agentbench.harness import ProviderSelectionError
 from agentbench.harness.registry import load_registry
 from agentbench.project import project_root
-from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 from .base import CommandFeature
-from agentbench.cli.result_paths import configure_result_paths, legacy_result_notice, validate_results_dir
 
 # A checkout keeps its bundled registry; an installed CLI uses the project it runs in.
 DEFAULT_REGISTRY_PATH = project_root() / "resources" / "registry.toml"
@@ -37,55 +42,20 @@ def configure_parser(parser: ArgumentParser) -> None:
     parser.add_argument('--agent', action='append', default=[], metavar='ID',
                         help='Run only this enabled ready Agent; repeat to select several.')
     parser.add_argument('-y', '--yes', action='store_true', help='Confirm this execution without prompting.')
-    parser.add_argument(
-        "--env-file",
-        metavar="PATH",
-        help="Load host secrets and defaults from PATH instead of .env.",
-    )
-    configure_result_paths(parser, legacy_option='--output')
-    parser.add_argument('--no-view', action='store_true',
-                        help='Save results without starting the local live viewer.')
-    parser.add_argument(
-        "--model",
-        metavar="MODEL",
-        help="Target model ID; defaults to the selected provider model environment variable.",
-    )
-    parser.add_argument(
-        "--llm-trace-max-bytes",
-        type=int,
-        default=DEFAULT_TRACE_MAX_BYTES,
-        metavar="BYTES",
-        help="Legacy option: streaming memory spool threshold; payloads are never truncated.",
-    )
+    configure_benchmark_parser(parser, viewer_help='Save results without starting the local live viewer.')
 
 
 def execute(args: Namespace) -> int:
     try:
-        directory = validate_results_dir(args.output, getattr(args, 'results_dir', None))
-        if args.output is None and directory is None:
-            directory = Path('results').resolve()
-        if args.output is not None:
-            legacy_result_notice('--output', args.output, print)
+        directory = results_directory(args, lambda: Path('results').resolve())
         load_project_environment(args.env_file)
         loaded = execution_environment_snapshot()
-        kwargs: dict[str, object] = {"output_path": args.output, "assume_yes": args.yes, "concurrency": loaded.concurrency,
-                                     "environ": loaded.environ, **sdk_arguments(args)}
-        if directory is not None:
-            kwargs['results_dir'] = directory
+        kwargs = benchmark_arguments(args, loaded, directory)
         if getattr(args, 'agent', None):
             kwargs['agent_ids'] = tuple(args.agent)
-        policy = retry_policy_argument(args)
-        if policy is not None:
-            kwargs['retry_policy'] = policy
     except (ProviderSelectionError, ValueError) as exc:
         print(f"SDK configuration error: {exc}")
         return 2
-    if args.model is not None:
-        kwargs["model"] = args.model
-    if args.no_view:
-        kwargs['viewer_starter'] = None
-    if args.llm_trace_max_bytes != DEFAULT_TRACE_MAX_BYTES:
-        kwargs["llm_trace_max_bytes"] = args.llm_trace_max_bytes
     try:
         return run(RunConfiguration(**kwargs))
     except (OSError, ProviderSelectionError, ValueError, KeyError) as exc:
@@ -97,21 +67,11 @@ def run(configuration: RunConfiguration | None = None) -> int:
     """Confirm ready Agents, run the suite, and return a shell exit code."""
 
     config = configuration or RunConfiguration()
-    validate_results_dir(config.output_path, config.results_dir)
-    if config.sdk is not None and config.sdk_selection is not None:
-        raise ValueError("Pass sdk or sdk_selection, not both")
-
-    
-    if config.suite_runner is not None and (
-        config.sdk is not None
-        or config.sdk_selection is not None
-        or config.sdk_options is not None
-        or config.concurrency is not None
-        or config.environ is not None
-    ):
-        raise ValueError(
-            "Configure sdk on the supplied suite_runner, or omit suite_runner"
-        )
+    check_execution_arguments(
+        output_path=config.output_path, results_dir=config.results_dir,
+        suite_runner=config.suite_runner, sdk=config.sdk, sdk_selection=config.sdk_selection,
+        sdk_options=config.sdk_options, concurrency=config.concurrency, environ=config.environ,
+    )
 
     print_logo(config.output_fn)
     with loading_line("Loading agents", config.output_fn):
@@ -155,18 +115,13 @@ def run(configuration: RunConfiguration | None = None) -> int:
 
     with loading_line("Preparing benchmark", config.output_fn):
         llm_activity = LLMActivity(config.output_fn)
-        suite_runner = config.suite_runner or build_trace_suite_runner(
-            max_bytes=config.llm_trace_max_bytes,
-            model=config.model,
-            activity_sink=llm_activity,
-            sdk=config.sdk,
-            sdk_selection=config.sdk_selection,
-            sdk_options=config.sdk_options,
-            concurrency=config.concurrency,
-            environ=config.environ,
+        suite_runner = benchmark_runner(
+            build_trace_suite_runner, suite_runner=config.suite_runner,
+            retry_policy=config.retry_policy, llm_trace_max_bytes=config.llm_trace_max_bytes,
+            model=config.model, activity=llm_activity, sdk=config.sdk,
+            sdk_selection=config.sdk_selection, sdk_options=config.sdk_options,
+            concurrency=config.concurrency, environ=config.environ,
         )
-        if config.retry_policy is not None:
-            suite_runner.retry_policy = config.retry_policy
 
     def match_ground_truth(directory):
         from agentbench.evaluation import EvaluationService

@@ -9,6 +9,7 @@ from agentbench.project import project_root
 # Results and the history trash belong to the project, never to site-packages.
 PROJECT_ROOT = project_root()
 
+# we just move to cache/history-trash
 
 def history_entries(root=PROJECT_ROOT):
     root = root.resolve()

@@ -41,6 +41,5 @@ browser executables and remote credentials are not provisioned. The
 and network limits. The committed registry stays disabled and `adapting`
 pending maintainer review.
 
-Local acceptance artifacts belong under `docs/validation/issue471-dirac/`,
-outside the Agent's build context. Official KUMA evaluation and phase-two GT
-testing are separate from this integration.
+Local acceptance artifacts stay outside the Agent's build context. Official
+KUMA evaluation and phase-two GT testing are separate from this integration.

@@ -142,12 +142,9 @@ python -m agentbench --help
 python -m agentbench sdk list
 kuma --help
 python -c "from kuma import KumaClient; from kuma.evidence.runtime_contract import derive_casegen_evidence_capabilities; print('KUMA dependencies OK')"
-python -m examples.offline_demo --output results/offline-demo.json
 ```
 
 第一条命令应显示本次使用的 `.venv` 里的 Python 路径。`sdk list` 应列出 `kuma` 和 `local`，但仅列出插件名称不能证明 KUMA 依赖已安装，因此还要完成 KUMA 导入检查。
-
-离线示例无需 Docker、模型服务或 KUMA API Key。预期显示 `Case execution: 1/1 completed | Judge: pass=1` 和 `exit_code=0`。保存 `OFFLINE_RESULT=` 后打印的实际结果路径；文件名会自动添加时间戳。这个示例只验证本地运行流程，后面仍需验证账号、模型和 Docker Agent。
 
 开始 Docker Agent 的认证或评测前，在同一终端执行 `docker info`，确认 Docker 已启动且当前用户可访问。
 
@@ -162,7 +159,7 @@ npm run build
 cd ..
 ```
 
-然后运行 `python -m agentbench view <OFFLINE_RESULT 实际路径>`，打开终端输出的完整 `View:` 地址，并保持命令运行。只使用命令行时可以跳过网页构建，在支持该选项的运行命令中使用 `--no-view`。
+之后运行 `python -m agentbench view results/suites/SUITE_ID/events.json`（把 SUITE_ID 换成运行或评测时打印的实际 Suite），打开终端输出的完整 `View:` 地址，并保持命令运行。只使用命令行时可以跳过网页构建，在支持该选项的运行命令中使用 `--no-view`。
 
 ## 第 1 步：注册 DefuzeX 账号
 
@@ -218,12 +215,6 @@ kuma quickstart
 ```bash
 python -m agentbench --help
 python -m agentbench sdk list
-```
-
-如果仓库提供 Offline Demo，可以运行：
-
-```bash
-python -m examples.offline_demo --output results/offline-demo.json
 ```
 
 ### 配置模型服务

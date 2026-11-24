@@ -184,14 +184,12 @@ it. Current observation code snapshots dictionary entries before recursively
 converting values. Run with the current ABB container build; this historical
 observer failure is not evidence of an Agent defect.
 
-`Agent response exceeds transport byte limit` concerns the whole per-Input
-response directory, including framework traces and OTel payloads. It does not
-refer only to the final answer or to an API token quota. The default is 1 GiB;
-set `ABB_AGENT_RESPONSE_MAX_BYTES` to a positive byte count in the host environment
-or `.env` if a different budget is needed. `ABB_AGENT_RESPONSE_MAX_FILES` defaults
-to 20,000. Effective limits are saved in `request/evaluation.json`. Copies remain
-streamed, bounded and checked for links/special files. An over-limit response
-fails explicitly; partial copies must not be treated as complete evidence.
+`Agent response exceeds transport byte limit` can only come from `observe`, which
+copies the Agent's OTel spool with a 1 GiB / 20,000-entry budget. `run` and
+`evaluate` no longer copy per-Input responses, because KUMA and the Agent share one
+container, so `ABB_AGENT_RESPONSE_MAX_BYTES` and `ABB_AGENT_RESPONSE_MAX_FILES` have
+no effect on them. An over-limit copy fails explicitly; partial copies must not be
+treated as complete evidence.
 
 Case generation makes at most five total attempts per rejected candidate slot.
 Successfully saved Cases keep their original indices. Each attempt is recorded in

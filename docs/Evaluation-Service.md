@@ -1,9 +1,5 @@
 # Shared evaluation service
 
-For Issue-level detection from an absolute-path JSON Case collection, see
-[Experiment 1](Experiment1.md). Its `exp1` command reuses this execution service
-and assesses trajectories directly without a Judge report.
-
 `agentbench.evaluation.EvaluationService` owns the application operations used by
 Python and `agentbench api`. The CLI parses arguments and emits JSON; it does not
 implement another executor, Judge protocol, or GT matcher. MCP is not included.
@@ -102,7 +98,7 @@ agentbench api agent my-agent
 agentbench api execute my-agent --case-file cases.json --results-dir results
 agentbench api result --suite SUITE_DIRECTORY
 agentbench api evidence --suite SUITE_DIRECTORY --run-id RUN_ID
-agentbench api attachment --suite SUITE_DIRECTORY --run-id RUN_ID --path evaluation/inputs/0001/spans.jsonl
+agentbench api attachment --suite SUITE_DIRECTORY --run-id RUN_ID --path evaluation/inputs/0001/framework.jsonl
 agentbench api submit-judge --suite SUITE_DIRECTORY --run-id RUN_ID --report report.json
 agentbench api gt --suite SUITE_DIRECTORY
 ```

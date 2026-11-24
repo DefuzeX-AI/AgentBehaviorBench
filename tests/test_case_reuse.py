@@ -138,7 +138,7 @@ def test_same_viewer_request_survives_controller_restart_without_second_executio
 
 
 def test_viewer_completed_case_reuse_is_queued_once_and_links_to_same_viewer(tmp_path, monkeypatch):
-    from agentbench.cli import viewer
+    from agentbench.cli.viewer import server as viewer
     source, _ = original_suite(tmp_path)
     runner, factory = runner_for(tmp_path)
     monkeypatch.setattr(reuse, 'build_saved_runner', lambda *_: runner)
@@ -168,7 +168,7 @@ def test_viewer_completed_case_reuse_is_queued_once_and_links_to_same_viewer(tmp
 
 
 def test_viewer_reuses_running_case_despite_source_progress_and_writer_lock(tmp_path, monkeypatch):
-    from agentbench.cli import viewer
+    from agentbench.cli.viewer import server as viewer
     source, _ = original_suite(tmp_path)
     runner, factory = runner_for(tmp_path)
     monkeypatch.setattr(reuse, 'build_saved_runner', lambda *_: runner)

@@ -8,12 +8,13 @@ from agentbench.cli.sessions.recovery import execute_recovery
 from agentbench.cli.terminal_ui.presentation import print_suite_summary, case_event_status
 from agentbench.harness.session import SuiteLockedError
 from .base import CommandFeature
+from agentbench.cli.options import configure_env_file
 
 
 def configure_parser(parser: ArgumentParser):
     parser.add_argument('suite', help='Saved Suite ID, directory, or events.json path.')
     parser.add_argument('--suite-root', help='Directory containing saved Suites; defaults to results/suites.')
-    parser.add_argument('--env-file', help='Credential/default file; secrets are never read from saved plans.')
+    configure_env_file(parser, help='Credential/default file; secrets are never read from saved plans.')
 
 
 def configure_retry(parser: ArgumentParser):

@@ -104,3 +104,36 @@ def test_bare_receipt_can_record_a_fact_without_a_child_step(tmp_path):
 def test_no_delegation_from_unconfirmed_receipts(tmp_path, tool):
     out = export(tmp_path, tool)
     assert not out.association["delegation_facts"] and not out.document.subagent_trajectories
+
+
+def test_native_child_read_and_gateway_notice_have_separate_provenance(tmp_path):
+    from agentbench.trajectory.atif.reader import read_evidence
+    from agentbench.trajectory.atif.hierarchy import resolve_hierarchy
+    from tests.atif_fixtures import response
+    folder = fixture(tmp_path)
+    rows, notification = spawn("spawn", "run-1", child="child-session")
+    lines(folder / "framework.jsonl", [span("root"), *rows])
+    save(folder / "acp-summary.json", {"session": {"sessionId": "root-session"}})
+    lines(folder / "acp-events.jsonl", [notification])
+    lines(tmp_path / "network.jsonl", [event("llm_request", call_id="parent-answer",
+          payload={"messages": [{"role": "user", "content": "Completion: read 77"}]}),
+          event("llm_response", call_id="parent-answer", payload=response("77"))])
+    attrs = {"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": "read",
+             "gen_ai.conversation.id": "child-session", "gen_ai.tool.call.id": "child-read",
+             "gen_ai.tool.call.result": "77"}
+    native = {"schema": "abb.agent-otel.v1", "origin": "agent_native", "resource": {},
+              "scope": {"name": "openclaw"}, "span": {"traceId": "aa" * 16, "spanId": "bb" * 8,
+              "name": "openclaw.tool.execution", "startTimeUnixNano": "1234567890123456789",
+              "endTimeUnixNano": "1234567890123456799",
+              "attributes": [{"key": k, "value": {"stringValue": v}} for k, v in attrs.items()]}}
+    lines(tmp_path / "otel/spans.jsonl", [native])
+    bundle = read_evidence(tmp_path)
+    graph = resolve_hierarchy(bundle, adapters=["openclaw"])
+    read = next(t for t in bundle.tools if t["tool_call_id"] == "child-read")
+    assert read["outputs"] == "77" and graph.owners[read["id"]] != graph.root_id
+    assert graph.owners[read["id"]] is not None
+    assert {r["file"] for r in read["evidence"]} == {"otel/spans.jsonl"}
+    parent = next(m for m in bundle.models if m.get("call_id") == "parent-answer")
+    assert {r["file"] for r in parent["evidence"]} == {"network.jsonl"}
+    assert [f["status"] for f in graph.delegation_facts] == ["accepted"]
+    assert all(row.get("event") != "message_delivered" for row in bundle.native_events)

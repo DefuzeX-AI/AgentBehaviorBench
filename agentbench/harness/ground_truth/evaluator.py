@@ -1,4 +1,9 @@
-"""Compare saved Judge summaries, then both trajectories, without executing an Agent."""
+"""Compare saved Judge summaries with GT descriptions, without executing an Agent.
+
+Step-level attribution compared legacy trajectory.json documents. It was removed
+with that format and will be rebuilt on the ATIF trajectory; until then a
+summary match stays pending instead of counting as a discovery.
+"""
 import json
 import os
 from pathlib import Path
@@ -11,13 +16,11 @@ from agentbench.observe.store import environment_secrets, redact
 from agentbench.sdk.common.artifacts import Artifacts
 from .files import read_json, within
 from .manifests import registered_units, load_manifest
-from .matching import SUMMARY_SYSTEM, TRAJECTORY_SYSTEM, validate_match, summarize
-from .trajectories import (cited_steps, judge_cited_steps, matcher_payload, read_candidate, read_reference,
-                           reference_step_id)
+from .matching import SUMMARY_SYSTEM, validate_match, summarize
 from .transport import model_config, ask_once
 
 SCHEMA = 'abb.gt.evaluation.v3'
-PROTOCOL = 'summary-trajectory-attribution-v3'
+PROTOCOL = 'summary-v4'
 
 
 def input_state(directory, root, agent_ids):
@@ -61,7 +64,7 @@ def read_evaluation(directory, plan, events):
             return None
         value = read_json(path, limit=64 * 1024 * 1024)
     if value.get('schema') != SCHEMA:
-        return {'status': 'legacy', 'provisional': True, 'reason': 'Re-evaluate with summary/trace matching'}
+        return {'status': 'legacy', 'provisional': True, 'reason': 'Re-evaluate with summary matching'}
     if value.get('suite_id') != plan['suite_id']:
         raise ValueError('GT result belongs to another Suite')
     if (value.get('protocol') != PROTOCOL or value.get('input_state') !=
@@ -76,7 +79,8 @@ def evaluate_suite(directory, project_root, *, environ=None, output=print, ask=N
     directory, project_root = Path(directory).resolve(), Path(project_root).resolve()
     environ = dict(os.environ if environ is None else environ)
     plan, _ = read_suite(directory)
-    gt_root = directory if plan.get('artifact_layout') == 'agent-attempts-v1' else within(directory, directory / 'ground_truth')
+    from agentbench.harness.session.layout import is_managed
+    gt_root = directory if is_managed(plan) else within(directory, directory / 'ground_truth')
     gt_root.mkdir(exist_ok=True)
     with FileLock(str(gt_root / '.evaluation.lock'), timeout=0):
         return _evaluate(directory, project_root, environ, output, ask or ask_once,
@@ -92,7 +96,7 @@ def _evaluate(directory, root, environ, output, ask, snapshot_reader, catalog_ty
     settings = {k: v for k, v in environ.items() if k in
                 ('ABB_GT_MODEL', 'ABB_GT_BASE_URL', 'ABB_GT_MAX_BYTES', 'ABB_GT_MAX_CALLS')}
     if previous and previous.get('status') in ('completed', 'partial') and previous.get('settings') == settings:
-        output('GT: reused saved summary/trace assessment; no new requests')
+        output('GT: reused saved summary assessment; no new requests')
         return {**previous, 'cache_reused': True, 'new_calls': 0}
     units, _, warnings = registered_units(root)
     catalog = catalog_type(directory / 'events.json').entries(snapshot=snapshot)
@@ -129,7 +133,7 @@ def _evaluate(directory, root, environ, output, ask, snapshot_reader, catalog_ty
 
     def call(stage, payload):
         nonlocal model
-        system = SUMMARY_SYSTEM if stage == 'summary' else TRAJECTORY_SYSTEM
+        system = SUMMARY_SYSTEM
         payload = redact(payload, secrets)
         if len(json.dumps(payload, ensure_ascii=False).encode()) > limit:
             raise ValueError('Matcher context too large; decision remains pending')
@@ -224,35 +228,7 @@ def _evaluate(directory, root, environ, output, ask, snapshot_reader, catalog_ty
                         if first['match'] is not True:
                             row.update(score=0 if first['match'] is False else None, reason=first['reason'])
                             continue
-                        if api is None:
-                            raise ValueError('No unambiguous saved execution trace')
-                        states = (attempt, result, result.get('artifacts') or {})
-                        if any(s.get('evidence_status') in ('missing', 'invalid', 'failed') for s in states):
-                            raise ValueError('Captured trace unavailable or invalid')
-                        candidate = read_candidate(api, environ=environ)
-                        reference = read_reference(defect)
-                        reference_ids = {reference_step_id(t['attempt'], s['step_id']) for t in reference for s in t['steps']}
-                        candidate_ids = {s['step_id'] for s in candidate['steps']}
-                        second_payload, mode = matcher_payload(reference, candidate, defect, text, limit=limit)
-                        evidence_path = f'tasks/{len(rows):06d}/trajectories.json'
-                        files.save(evidence_path, redact({'reference': reference, 'candidate': candidate,
-                                                          'render_mode': mode, 'decisive_step': defect['decisive_step']}, secrets))
-                        row['trajectory_evidence_path'] = os.path.relpath(destination / evidence_path, directory).replace('\\', '/')
-                        row['render_mode'] = mode
-                        second = validate_match(call('trajectory', second_payload), reference_ids, candidate_ids)
-                        row['trajectory_match'] = second
-                        row['trajectory_evidence'] = redact({
-                            'reference': cited_steps(reference, set(second['reference_step_ids'])),
-                            'candidate': cited_steps([candidate], set(second['candidate_step_ids']))}, secrets)
-                        judge_steps = judge_cited_steps(finding)
-                        decisive = second.get('candidate_decisive_step')
-                        row['localization'] = {
-                            'reference_decisive_step': reference_step_id(defect['decisive_step']['attempt'],
-                                                                         defect['decisive_step']['step_id']),
-                            'candidate_decisive_step': decisive, 'judge_cited_steps': judge_steps,
-                            # Only reports that name steps can be scored on localization.
-                            'step_match': None if judge_steps is None or decisive is None else decisive in judge_steps}
-                        row.update(score=None if second['match'] is None else int(second['match']), reason=second['reason'])
+                        row.update(score=None, reason='Summary matched; step attribution awaits the ATIF trajectory')
                     except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
                         row.update(score=None, reason=str(redact(str(exc), secrets)))
                     finally:
@@ -262,5 +238,5 @@ def _evaluate(directory, root, environ, output, ask, snapshot_reader, catalog_ty
     if summary['input_state'] != input_state(directory, root, [a['agent_id'] for a in plan['agents']]):
         summary['status'] = 'stale'
     publish()
-    output(f'GT: summary/trace results saved to {destination}; calls={summary["calls"]}')
+    output(f'GT: summary results saved to {destination}; calls={summary["calls"]}')
     return summary

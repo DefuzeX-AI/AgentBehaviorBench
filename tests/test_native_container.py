@@ -57,8 +57,8 @@ def test_real_native_containers(tmp_path, monkeypatch):
         result = runner.run_case(registration, case)
         assert result.execution_only and result.report is None
         assert [step.invocation.output for step in result.steps] == ['first:1', 'second:2']
-        spans = runner.directory / 'evaluation/inputs/0001/spans.jsonl'
-        assert spans.read_text().strip()
+        records = runner.directory / 'evaluation/inputs/0001/framework.jsonl'
+        assert records.read_text().strip()
         request = json.loads((runner.directory / 'evaluation/judge/request.json').read_bytes())
         from agentbench.sdk.judges import execute_judge
         class Judge:

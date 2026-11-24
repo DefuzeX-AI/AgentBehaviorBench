@@ -14,6 +14,7 @@ class ACPAdapter:
         self.config = config
         self._loop = self._thread = self._session = None
         self._closed = False
+        self.trace_environment = {}
         self._lock = threading.RLock()
 
     @classmethod
@@ -32,7 +33,7 @@ class ACPAdapter:
             if self._loop is None:
                 from .session import ACPSession
                 self._loop = asyncio.new_event_loop()
-                self._session = ACPSession(self.config)
+                self._session = ACPSession(self.config, trace_environment=self.trace_environment)
                 self._thread = threading.Thread(target=self._serve, name='abb-acp', daemon=True)
                 self._thread.start()
         return self

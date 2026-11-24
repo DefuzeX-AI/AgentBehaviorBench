@@ -1,4 +1,7 @@
-"""Trusted KUMA controller; production Agents execute in a separate container."""
+"""Official KUMA and the Agent worker, in one container process.
+
+KUMA requires the SDK to start inside the same Docker container as the Agent.
+"""
 import argparse
 from agentbench.observe.timing import span, timing_session
 import asyncio
@@ -17,9 +20,8 @@ from .runner import drive_run
 from .error_artifacts import exception_record
 from .configuration import SDK_REPOSITORY, request_options, api_key
 from .compatibility import run_case
-from agentbench.runtime.agentcontainer.session import AgentSession
 from agentbench.sdk.integration.agent import (
-    InProcessAgentSession, ManagedAgentSession, capture_workspace_replay,
+    LocalAgentSession, ManagedAgentSession, capture_workspace_replay,
 )
 
 
@@ -84,11 +86,9 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
         run = None
         exporter = None
         settings = dict(settings or {})
-        # The production entrypoint requires the isolated channel. Direct
-        # in-process callers explicitly retain the native worker test path.
-        local_session = None if settings.get('isolated_agent') else InProcessAgentSession(
-            root, provider=provider, session=AgentSession(), invoke=invoke_agent)
-        agent_session = ManagedAgentSession(output=output, settings=settings, session=local_session)
+        # The Agent runs in this process; its native OTel lands in the attempt's otel/.
+        agent_session = ManagedAgentSession(output=output, session=LocalAgentSession(
+            root, capture_directory=output / 'otel', invoke=invoke_agent))
     try:
         # Pass each current input directly to the adapter. The Agent owns history
         # and memory, so no per-Agent input contract is required.
@@ -198,8 +198,6 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
         # ledger, Submission, and trace provider. Only ABB's viewer reads it.
         agent_session.replay = capture_workspace_replay(
             workspace.path or manifest.get('adapter', {}).get('cwd') or Path.cwd(), secrets=files.secrets)
-        from .integration import KumaEvidenceSink
-        evidence = KumaEvidenceSink(capture)
 
         async def invoke(payload, folder, _shared_provider):
             # Reuse one Agent session for every turn and pass only the current input.
@@ -211,7 +209,7 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
                 'schema': 'abb.invocation.v1', 'run_id': invocation_id, 'session_id': run.run_id,
                 'observation_context': {key: observed_input[key] for key in ('case_id', 'input_id') if isinstance(observed_input.get(key), str)},
                 'agent_id': manifest['agent_id'], 'framework': manifest['framework'], 'input': payload},
-                folder, evidence)
+                folder)
         # Drive the Case by receiving inputs, invoking the Agent, submitting
         # outputs, and collecting the Judge report.
         summary = await drive_run(run, invoke, output, provider=provider,
@@ -298,8 +296,6 @@ def main(providers=None):
     # Read generation or execution settings from the host-mounted evaluation.json.
     try:
         settings = read_settings(args.settings)
-        if settings.get('mode') != 'generate' and not settings.get('isolated_agent'):
-            raise EvaluationSettingsError('Execution requires the isolated Agent channel')
         from agentbench.runtime.contracts.environment import ENVIRONMENT_FILE
         environment_path = args.settings.parent / ENVIRONMENT_FILE
         if environment_path.exists():

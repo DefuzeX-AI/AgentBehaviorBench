@@ -1,41 +1,8 @@
 """Normalize provider request/response bodies into complete step content.
 
-Streaming chunks are merged into one message; nothing is summarized. Values
-larger than the hard cap are replaced by a labelled digest, never silently cut.
+Streaming chunks are merged into one message; nothing is summarized.
 """
-import hashlib
 import json
-import os
-
-DEFAULT_MAX_VALUE_BYTES = 1024 * 1024
-HEAD_BYTES = 64 * 1024
-
-
-def max_value_bytes(environ=None):
-    raw = (environ if environ is not None else os.environ).get('ABB_TRAJECTORY_MAX_VALUE_BYTES')
-    try:
-        return max(HEAD_BYTES, int(raw)) if raw else DEFAULT_MAX_VALUE_BYTES
-    except ValueError:
-        return DEFAULT_MAX_VALUE_BYTES
-
-
-def digest(value):
-    return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
-
-
-def bounded(value, limit):
-    """Replace oversized strings with an explicit marker; structure is kept."""
-    if isinstance(value, str):
-        raw = value.encode('utf-8', 'surrogatepass')
-        if len(raw) <= limit:
-            return value
-        return {'truncated': True, 'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
-                'head': raw[:HEAD_BYTES].decode('utf-8', 'replace')}
-    if isinstance(value, dict):
-        return {key: bounded(item, limit) for key, item in value.items()}
-    if isinstance(value, list):
-        return [bounded(item, limit) for item in value]
-    return value
 
 
 def _objects(value):

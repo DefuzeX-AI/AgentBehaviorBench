@@ -88,5 +88,5 @@ Native tools remain registered with their normal capability gates. No external
 MCP servers, custom skills/plugins or service accounts are provisioned. The
 [Agent Profile](requirement.md) describes the task surface and network limits.
 The registry stays disabled and `adapting` pending maintainer review. Acceptance
-records belong in `docs/validation/issue513-blade-code/`, outside the build
-context. Official KUMA evaluation and phase-two GT are separate tasks.
+records belong outside the build context. Official KUMA evaluation and
+phase-two GT are separate tasks.

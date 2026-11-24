@@ -18,7 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 acp = ["agent-client-protocol==0.12.1"]
-otel = ["opentelemetry-sdk>=1.30,<2"]
+otel = ["opentelemetry-sdk>=1.30,<2", "opentelemetry-proto>=1.30,<2", "grpcio>=1.60,<2"]
 
 [project.scripts]
 agentbench = "agentbench.cli.main:cli"
@@ -38,6 +38,7 @@ where = ["."]
 include = ["agentbench*"]
 
 [tool.setuptools.package-data]
+"agentbench.harness.otel" = ["README.md", "assets/*/*"]
 "agentbench.onboarding.build_agent_env.common" = ["assets/*.md", "assets/*.json"]
 "agentbench.runtime.interception" = ["model-providers.toml"]
 "agentbench.observe" = ["failure_rules.json"]

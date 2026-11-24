@@ -8,7 +8,7 @@ from urllib.request import urlopen
 
 import pytest
 
-from agentbench.cli import viewer
+from agentbench.cli.viewer import server as viewer
 
 ROOT = Path(__file__).resolve().parents[1]
 READMES = [ROOT / 'README.md', *sorted((ROOT / 'docs' / 'otherLanguages').glob('README.*.md'))]

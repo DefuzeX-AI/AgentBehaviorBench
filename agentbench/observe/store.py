@@ -148,6 +148,14 @@ def summarize(directory: Path):
     for path in sorted(directory.rglob("*.jsonl")):
         if path.is_symlink():
             continue
+        if path.parent.name == "otel" and path.name == "spans.jsonl":
+            # Single-invocation transport spools and the published Case artifact
+            # contain the same spans. Count the published copy only.
+            if path.parent.parent == directory:
+                with path.open(encoding="utf-8") as stream:
+                    counts["agent_otel:span"] = sum(1 for line in stream if line.strip() and
+                                                    json.loads(line).get("origin") in ("agent_native", "auto_instrumented"))
+            continue
         for line in path.read_text(encoding="utf-8").split("\n"):
             if not line:
                 continue

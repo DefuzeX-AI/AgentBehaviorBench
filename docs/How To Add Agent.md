@@ -263,3 +263,7 @@ If the viewer reports Trace UI not built, build `web/`. For Docker errors, run `
 [CLI reference](cli.md) · [Detailed troubleshooting](Troubleshooting.md)
 
 Model selection defaults to OpenRouter -> DeepSeek -> GLM; omit `[model]` for ordinary Agents. An explicit `[model] provider="..."` fixes the provider and overrides global selection. Configurable ACP launchers must consume runtime model settings. Constrained native integrations additionally declare `source="native"`, a reason and dedicated credentials. Do not generate redundant default declarations or repeated setup comments. See [model selection](Model-Selection.md).
+
+## Agent trace configuration
+
+During onboarding, use `agentbench agent add -b --otel-profile PROFILE` to select the exporter or instrumentation for the actual target process. Record the selection in the unit's outer `[otel]` table. Check the pinned launcher for environment overrides. Verify a real run's Case-level `otel/status.json`, then cite an exported span before declaring model or tool coverage. [Profiles, example manifests and verification](../agentbench/harness/otel/README.md)

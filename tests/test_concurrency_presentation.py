@@ -9,12 +9,12 @@ import pytest
 
 from agentbench.adapter import AdapterInvocation
 from agentbench.cli.execution import run_benchmark_once
-from agentbench.cli.result_export import start_result_log
+from agentbench.cli.result.export import start_result_log
 from agentbench.cli.terminal_ui.llm_activity import LLMActivity
 from agentbench.cli.terminal_ui.live_cases import LiveCases
 from agentbench.cli.terminal_ui.progress import ProgressPrinter
 from agentbench.cli.terminal_ui.presentation import format_case_event, print_agent_complete
-from agentbench.cli.viewer import parse_result_log
+from agentbench.cli.viewer.server import parse_result_log
 from agentbench.harness.progress import BenchmarkProgress
 from agentbench.harness.concurrency import ConcurrencySettings
 from agentbench.harness.result import EvaluationFailure, CaseResult, BenchmarkStepResult, BenchmarkSuiteResult, SuiteAgentResult

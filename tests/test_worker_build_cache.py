@@ -38,3 +38,30 @@ def test_host_tools_do_not_invalidate_worker_but_runtime_changes_do(tmp_path, mo
     assert fingerprint() == baseline
     (package / 'runtime/agentcontainer/worker.py').write_text('# changed runtime')
     assert fingerprint() != baseline
+
+
+def test_selected_otel_asset_changes_image_digest(tmp_path, monkeypatch):
+    from agentbench.harness.otel.config import CaptureConfig
+    package = tmp_path / "agentbench"
+    requirements = package / "runtime/docker/requirements.txt"
+    requirements.parent.mkdir(parents=True)
+    requirements.touch()
+    asset = package / "harness/otel/assets/python/requirements.txt"
+    asset.parent.mkdir(parents=True)
+    asset.write_text("instrumentation==1")
+    monkeypatch.setattr(worker_build, "__file__", str(requirements.with_name("worker_build.py")))
+    monkeypatch.setattr(worker_build, "stage_adapter_dependencies", lambda *args: None)
+    root = tmp_path / "unit"
+    root.mkdir()
+    (root / "Dockerfile").write_text("FROM scratch\nUSER agent\n")
+    config = SimpleNamespace(agent_root=root, build_context=root, dockerfile=root / "Dockerfile",
+                             otel=CaptureConfig("python-auto"))
+
+    def digest():
+        with worker_build.worker_build_context(config) as (context, dockerfile):
+            assert "COPY .abb-runtime/agentbench/harness/otel/assets/python/requirements.txt" in dockerfile.read_text()
+            return _content_digest(context)
+
+    before = digest()
+    asset.write_text("instrumentation==2")
+    assert digest() != before

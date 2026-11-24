@@ -3,30 +3,30 @@ import math
 from dataclasses import replace
 from agentbench.cli.execution import run_benchmark_session
 from agentbench.cli.retry_options import configure_retry_parser, retry_policy_argument
-from agentbench.cli.trace_runtime import build_trace_suite_runner
+from agentbench.evaluation.runner import build_trace_suite_runner
 from agentbench.cli.terminal_ui import LLMActivity
 from agentbench.cli.terminal_ui.presentation import confirm_agents
-from agentbench.cli.viewer import start_viewer_server
+from agentbench.cli.viewer.server import start_viewer_server
 from agentbench.cli.features.certify import _default_output_path
 from pathlib import Path
 from .base import CommandFeature
+from agentbench.cli.options import configure_env_file, configure_model
 from .run import DEFAULT_REGISTRY_PATH
-from .observe import model_name
 from ..environment import load_project_environment, execution_environment_snapshot
 from agentbench.harness.concurrency import ConcurrencyConfigurationError
 from ..sdk import configure_sdk_parser, sdk_arguments
 from agentbench.observe.catalog import enabled_agents, select_agent, resolve_agent
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 from agentbench.sdk import evaluation_plan
-from agentbench.cli.result_paths import configure_result_paths, legacy_result_notice, validate_results_dir
+from agentbench.cli.result.paths import configure_result_paths, legacy_result_notice, validate_results_dir
 
 
 def configure_parser(parser):
     parser.add_argument('-y', '--yes', action='store_true', help='Confirm this execution without prompting.')
     parser.add_argument('selection', nargs='?', help='Enabled Agent number or ID')
     parser.add_argument('--registry', type=Path, default=DEFAULT_REGISTRY_PATH)
-    parser.add_argument('--env-file', type=Path)
-    parser.add_argument('--model', type=model_name)
+    configure_env_file(parser)
+    configure_model(parser)
     configure_sdk_parser(parser)
     configure_retry_parser(parser)
     parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')

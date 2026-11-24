@@ -79,9 +79,9 @@ class EvaluationService:
         from agentbench.sdk.plugin.native.backend import validate_case
         if not isinstance(cases, list) or not cases:
             raise ValueError('Cases must be a non-empty list')
-        context = self.agent(agent_id, target=target)['context']
-        cases = [validate_case({**case, 'abb_agent_context': context}) for case in cases]
         registration = self._registration(agent_id, target)
+        context = load_agent_context(registration.path / 'requirement.md', agent_id=agent_id)
+        cases = [validate_case({**case, 'abb_agent_context': context}) for case in cases]
         registration = replace(registration, case_count=len(cases))
         options = {'cases': cases, 'timeout': timeout}
         if max_steps is not None:
@@ -91,8 +91,9 @@ class EvaluationService:
         runner = build_trace_suite_runner(max_bytes=DEFAULT_TRACE_MAX_BYTES, model=model,
             sdk_selection=resolve_sdk('native'), sdk_options=options,
             concurrency=concurrency, environ=self.environ, retry_policy=retry_policy)
-        suite_id = runner.new_suite_id()
+        from agentbench.harness.runner.suite_runner import unused_suite_id
         parent = Path(results_dir) if results_dir is not None else self.root / 'results'
+        suite_id = unused_suite_id(runner.new_suite_id, parent / 'suites')
         with history_guard(self.root):
             store = SuiteStore.begin(parent / 'suites', suite_id, (registration,),
                 configuration=runner_configuration(runner, (registration,)), environ=self.environ)
@@ -139,14 +140,8 @@ class EvaluationService:
         if request is None:
             raise ValueError('Run has no retained Judge request')
         validate_evidence(request, api.directory)
-        from agentbench import trajectory
-        try:
-            derived = trajectory.load(api.directory)
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            derived = {'schema': trajectory.SCHEMA, 'status': 'failed', 'run_id': run_id,
-                       'agent_id': metadata.get('agent'), 'error_type': type(exc).__name__, 'error': str(exc)}
         return {'schema': 'abb.evaluation.evidence.v2', 'run': metadata, 'request': request,
-                'trajectory': derived, 'spans': api.spans(), 'evaluation': api.evaluation()}
+                'spans': api.spans(), 'evaluation': api.evaluation()}
 
     def attachment(self, suite, run_id, path):
         api, _ = self._run(suite, run_id)

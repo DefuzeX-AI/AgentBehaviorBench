@@ -5,7 +5,7 @@ import threading
 import pytest
 
 from agentbench.cli.sessions import control as module
-from agentbench.cli.viewer_control import controlled_snapshot
+from agentbench.cli.viewer.control import controlled_snapshot
 from agentbench.harness.registry import AgentRegistration
 from agentbench.harness.session import SuiteStore, read_snapshot
 
@@ -63,7 +63,7 @@ def test_controller_errors_overlay_without_case_revision_change(suite_path, monk
 
     monkeypatch.setattr(module, 'execute_recovery', reject)
     controller = module.SuiteControl(suite_path, {})
-    from agentbench.cli import viewer_control
+    from agentbench.cli.viewer import control as viewer_control
     monkeypatch.setattr(viewer_control, 'bound_controller', lambda path: controller)
     try:
         before = read_snapshot(suite_path.parent)

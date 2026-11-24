@@ -41,11 +41,11 @@ DEEPSEEK_MODEL=deepseek-flash
 ```
 
 The committed registry entry stays disabled/adapting. Enable it in a local
-registry and run the published smoke Case:
+registry and run a smoke Case from your own Case file:
 
 ```bash
 agentbench evaluate autohand --sdk local --registry resources/registry.toml \
-  --case-file docs/validation/issue508-autohand/case.json \
+  --case-file /path/to/case.json \
   --cases 1 --max-steps 2 --case-retries 0 --no-view
 ```
 
@@ -57,14 +57,11 @@ This unit does not fix that generic ABB ownership issue or relax directory
 permissions. An ordinary-user host with a different UID is not demonstrated
 working; independent acceptance must account for this prerequisite.
 
-The two-turn Case creates and executes `total.py`, then modifies the same file,
+The validated two-turn Case creates and executes `total.py`, then modifies the same file,
 reads it, executes it again and checks retained conversation context. Local
 Smoke uses the selected model and Local Judge; it does not use KUMA backend
 Credit or establish a GT defect. Only DeepSeek is selected for this acceptance;
 static provider mapping does not demonstrate every provider/model combination.
-
-See [acceptance records](../../../docs/validation/issue508-autohand/README.md)
-for the exact execution outcome and the limits of the public evidence package.
 
 ## Deployment limits
 

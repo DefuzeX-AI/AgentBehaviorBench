@@ -14,11 +14,12 @@ results/
     agent.json
     records/<sha256>.json       immutable results referenced by Suite events
     preparations/<id>/         generation diagnostics and SDK recovery state
-    cases/<storage-id>/
+    cases/<storage-id>/        8 hex digits (32 in Suites saved as agent-attempts-v1)
+      slot.json                owner of this Case slot (agent-attempts-v2)
       case.json                published prepared Case
-      attempts/<id>/
-        run.json               host execution, cleanup, trace acceptance and trajectory status
-        trajectory.json        derived step sequence (abb.agent-trajectory.v1)
+      attempts/<id>/           attempt number + 6 hex digits, e.g. 01a3f9c2
+        run.json               host execution, cleanup, trace acceptance and ATIF status
+        trajectory.atif.json   ATIF-v1.8 document derived from native evidence, pointing into this directory; needs Harbor's models
         manifest.json          SDK execution summary and step index
         case.json              exact SDK-loaded Case with execution identities
         process.json           execution configuration/provenance
@@ -27,10 +28,8 @@ results/
           request.json         Agent invocation contract
           result.json          native Agent result
           submission.json      SDK-committed submission and evidence
-          otel-status.json     capture validation; other capture metadata stays here
-          spans.jsonl          step traces, alongside OTel/live traces when present
-          otel-payloads/       ordinary file paths sharing immutable blob bytes
-        blobs/<sha256>         content-addressed payload storage
+          framework.jsonl      adapter callbacks and ACP tool events of this step
+        otel/                  spans the Agent itself exported, with collection status
         judge/
           context.json         checked references to Case, Inputs and submissions
           report.json
@@ -41,6 +40,13 @@ results/
         recovery/              recovery records, when present
     gt/<suite-id>/             GT calls and evaluations for this Agent
 ```
+
+Short names keep paths below the Windows 260-character limit. New Suites record
+`artifact_layout = "agent-attempts-v2"`: a Case slot name is derived from the
+Suite, Agent and Case index, and a name owned by another Case moves on to the
+next candidate, so lookups stay stable without collisions. Suite IDs are
+`suite_` plus 8 hex digits; a taken ID is redrawn. Saved v1 Suites keep their
+32-digit names.
 
 SDK-specific private files are retained under their native names. Optional
 workspace/replay evidence and diagnostics are retained when produced. Input,
@@ -60,19 +66,23 @@ must not be collapsed just because some fields coincide.
    Case, Inputs and submissions. The Judge verifies and expands those references
    in memory. SDK request ledgers remain in place for cancellation and retry.
 5. Stop containers and validate host trace evidence. Then derive
-   `trajectory.json` from the committed records and record its status in
-   `run.json`; a derivation failure writes the file with `status: failed`.
+   `trajectory.atif.json` from the committed records and record `atif` in
+   `run.json`; a failed conversion or a missing Harbor install writes no file.
    Only then remove temporary `channel`, `agent-request` and `agent-output`
    communication directories. Failed cleanup or unaccepted traces retain
    transport files for diagnosis. No execution artifact is moved or repacked
    at completion.
 
-`trajectory.json` is self-contained: every step keeps the full model input and
-output and its tool logs, and `sources` records the digests of the files it was
-derived from. Historical attempts without the file are derived on read by the
-viewer and evaluation API, or persistently with
-`agentbench trajectory build DIR --write`. See
-[agentbench/trajectory/README.md](../agentbench/trajectory/README.md).
+`trajectory.atif.json` is the [ATIF](https://docs.harborframework.com/agents/atif)
+trajectory of the attempt, and the only one ABB writes: one step per user message and per Agent reply,
+with tool calls and their observations. Its `extra.abb` holds pointers into
+this directory instead of copies of the evidence. `run.json` records
+`atif: {status, path, sha256, steps, issues}`; `status` is `complete`,
+`partial`, `failed` or `unavailable`. See
+[Automatic derivation](ATIF-Experiment.md#automatic-derivation) for the
+Harbor install and the per-Agent adapter declaration, and
+[agentbench/trajectory/README.md](../agentbench/trajectory/README.md). Attempts
+written earlier may still hold a `trajectory.json`; nothing reads it.
 
 Running, failed, completed and resumed attempts use the same paths. A Judge
 retry updates its task/report and native ledger without copying the execution

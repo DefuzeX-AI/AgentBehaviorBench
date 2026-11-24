@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
 from agentbench.observe.tool_links import compatible
+from agentbench.harness.otel.evidence import legacy_origin
 from .contracts import EvidenceIssue
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -61,7 +62,8 @@ class SpanTimes:
         for saved, identity, (when, ns), ref in self.by_operation.get((scope.get("invocation_id"), framework), []):
             if compatible(saved, scope, scope_keys=("run_id", "case_id", "input_id", "agent_id")):
                 matches.setdefault((*identity, ns), {"start_time": when, "unix_nano": ns,
-                                                     "file": ref["file"], "line": ref["line"]})
+                                                     "file": ref["file"], "line": ref["line"],
+                                                     "origin": legacy_origin(ref["raw"]["data"])})
         if len(matches) == 1:
             return next(iter(matches.values()))
         if matches:

@@ -197,7 +197,6 @@ class ContainerSDKRunner:
         return result
 
     def _read_result(self, directory, registration, case, document):
-        from agentbench.observe.artifact_paths import resolve_artifact_path
         host = accepted(directory, execution=True)
         root = directory
         manifest = read(root / 'manifest.json')
@@ -228,9 +227,7 @@ class ContainerSDKRunner:
                     or request.get('agent_id') != registration.agent_id
                     or request.get('framework') != registration.framework
                     or request.get('observation_context') != {'case_id': case.case_id, 'input_id': item['input_id']}
-                    or not request.get('run_id') or output.get('run_id') != request['run_id']
-                    or read(root / relative / 'otel-status.json').get('status') != 'complete'
-                    or not resolve_artifact_path(root / relative / 'spans.jsonl').is_file()):
+                    or not request.get('run_id') or output.get('run_id') != request['run_id']):
                 raise ValueError('SDK input, output, submission or evidence mismatch')
             seen.add(item['input_id'])
             if output['status'] == 'succeeded':
@@ -244,17 +241,6 @@ class ContainerSDKRunner:
                 raise ValueError('Unknown Agent result status')
         if not seen:
             raise ValueError('SDK result has no executed inputs')
-        from agentbench import trajectory
-        try:
-            if trajectory.read(root) is None:
-                raise FileNotFoundError('Execution package has no trajectory.json')
-        except (OSError, ValueError) as exc:
-            # trajectory.json is derived evidence: report it as incomplete in run.json,
-            # never turn an accepted execution into a failure.
-            status = read(directory / 'run.json')
-            status['trajectory'] = {**(status.get('trajectory') or {}), 'status': 'failed', 'path': 'trajectory.json',
-                                    'error_type': type(exc).__name__, 'error': str(exc)}
-            Artifacts(directory, environ=self.context.environ).save('run.json', status)
         normalized = None if unjudged else Report(report['status'], report.get('confidence'),
                             tuple(report['issues']), tuple(report['evidence_gaps']))
         return BenchmarkResult(registration.agent_id, registration.framework, manifest['run_id'],

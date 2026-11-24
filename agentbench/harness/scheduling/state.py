@@ -78,7 +78,9 @@ class AgentState:
         self.attempts[index] = number
         self.identities[index] = MappingProxyType({**self.identities[index],
             'job_id': self.identities[index]['job_id'] if number == 1 and not previous else f'case_{uuid4().hex}',
-            'attempt_id': previous.attempt_id if previous else uuid4().hex,
+            # The attempt number is unique within a Case, so this short ID cannot
+            # repeat there; recovery deliberately keeps the previous attempt's ID.
+            'attempt_id': previous.attempt_id if previous else f'{number:02d}{uuid4().hex[:6]}',
             'attempt_number': number, 'case_id': case.case_id,
             'recovery_action': 'resume_request' if previous else 'execute'})
         return self.identities[index]

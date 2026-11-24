@@ -41,7 +41,7 @@ def prepare(unit: Path, environ: dict[str, str]) -> tuple[list[str], dict[str, s
         "ANTHROPIC_BASE_URL": anthropic_base,
         "ANTHROPIC_MODEL": model,
         "ANTHROPIC_CUSTOM_MODEL_OPTION": model,
-        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "0" if environ.get("ABB_OTEL_PROFILE") else "1",
         "DISABLE_AUTOUPDATER": "1",
         "NO_BROWSER": "1",
     }

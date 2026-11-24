@@ -43,13 +43,16 @@ def observe(agent, value, *, output: Path, environ, timeout=None):
         try:
             adapter.close()
         finally:
+            from agentbench.harness.otel.evidence import publish_capture
+            spools = list(directory.glob("invocation-*/output/otel"))
+            if len(spools) == 1:
+                try:
+                    publish_capture(spools[0], directory / "otel")
+                except (OSError, ValueError) as exc:
+                    result["agent_otel_error"] = type(exc).__name__
             result["trace_summary"] = summarize(directory)
-            try:
-                from agentbench import trajectory
-                result["trajectory"] = trajectory.write(directory, environ=environ)
-            except Exception as exc:  # noqa: BLE001 - the observed run outcome stands
-                result["trajectory"] = {"status": "failed", "path": "trajectory.json",
-                                        "error_type": type(exc).__name__, "error": str(exc)}
+            from agentbench.trajectory.atif import attempt
+            result["atif"] = attempt.write(directory, run=result, environ=environ)
             if result["status"] == "succeeded" and (
                 result["trace_summary"].get("framework:span_error", 0)
                 or result["trace_summary"].get("framework:tool_incomplete", 0)

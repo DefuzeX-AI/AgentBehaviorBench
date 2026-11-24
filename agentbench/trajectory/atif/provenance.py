@@ -6,7 +6,7 @@ import json
 
 from agentbench.observe.interactions import _files
 from agentbench.observe.view_api import RunViewAPI
-from agentbench.observe.evidence_inventory import payload_paths
+from agentbench.observe.evidence_inventory import agent_trace_files, payload_paths
 from . import BUILDER_VERSION, HARBOR_COMMIT, SCHEMA_VERSION
 
 
@@ -18,6 +18,7 @@ def snapshot(root):
         names.update(f"{folder}/{name}" for name in ("acp-events.jsonl", "acp-summary.json", "otel-status.json", "otel.jsonl", "otel-live.jsonl"))
         parent = Path(folder).parent
         names.add((parent / "input/execution-environment.json").as_posix())
+    names.update(agent_trace_files(api.directory))
     names.update(payload_paths(api.directory))
     for path in (api.directory / "request").glob("native-config-*.yaml"):
         names.add(path.relative_to(api.directory).as_posix())
@@ -56,6 +57,8 @@ def provenance(bundle):
     code_root = Path(__file__).parent
     code = {p.relative_to(code_root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(code_root.rglob("*.py"))}
+    native_reader = code_root.parent / "agent_otel.py"
+    code["trajectory/agent_otel.py"] = hashlib.sha256(native_reader.read_bytes()).hexdigest()
     return {
         "schema_version": SCHEMA_VERSION, "builder_version": BUILDER_VERSION,
         "harbor": official_dependency(), "sources": bundle.snapshot,

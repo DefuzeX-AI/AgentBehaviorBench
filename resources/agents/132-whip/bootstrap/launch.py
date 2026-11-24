@@ -69,6 +69,11 @@ def main() -> int:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
+            session_file = child_env.get("ABB_OTEL_SESSION_FILE")
+            if session_file and Path(session_file).is_file():
+                sid = Path(session_file).read_text(encoding="utf-8").strip()
+                subprocess.run([BINARY, "sessions", "export", sid, "-o", child_env["ABB_OTEL_FILE"]],
+                               env=child_env, stdin=subprocess.DEVNULL, stdout=sys.stderr, stderr=sys.stderr)
             subprocess.run([BINARY, "daemon", "stop", "--timeout", "10s", "--force"], env=child_env,
                            stdin=subprocess.DEVNULL, stdout=sys.stderr, stderr=sys.stderr, timeout=20)
 

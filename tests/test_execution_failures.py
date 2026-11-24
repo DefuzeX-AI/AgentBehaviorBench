@@ -5,7 +5,7 @@ from types import MappingProxyType, SimpleNamespace
 
 import pytest
 
-from agentbench.cli import result_export
+from agentbench.cli.result import export as result_export
 from agentbench.cli.execution import run_benchmark_once
 from agentbench.harness.concurrency import ConcurrencySettings
 from agentbench.harness.result import EvaluationFailure, CaseResult, SuiteAgentResult

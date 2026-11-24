@@ -12,7 +12,7 @@ cd web
 npm ci
 npm run build
 cd ..
-# Use the actual result path printed by an evaluation or offline demo.
+# Use the actual result path printed by a run or evaluation.
 agentbench view results/suites/<suite-id>/events.json
 ```
 

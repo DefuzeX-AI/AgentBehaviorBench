@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict
+from pathlib import Path
 import threading
 from types import MappingProxyType
 from uuid import uuid4
@@ -19,6 +20,19 @@ from ..registry import AgentRegistration
 from ..result import BenchmarkSuiteResult
 from ..scheduler import CaseScheduler
 from ..scheduling import RetryPolicy
+
+
+def unused_suite_id(new_id, suites_root, *, attempts=100) -> str:
+    """Draw IDs from ``new_id`` until one has no directory under ``suites_root``.
+
+    A taken short ID is simply redrawn. SuiteStore.begin still refuses an
+    existing plan, so a concurrent writer can never overwrite a Suite.
+    """
+    for _ in range(attempts):
+        suite_id = new_id()
+        if suites_root is None or not (Path(suites_root) / suite_id).exists():
+            return suite_id
+    raise RuntimeError(f"No unused Suite ID after {attempts} attempts in {suites_root}")
 
 
 class SuiteRunner:
@@ -60,7 +74,10 @@ class SuiteRunner:
 
     @staticmethod
     def new_suite_id() -> str:
-        return f"suite_{uuid4().hex}"
+        # Eight random hex digits keep result paths short on Windows (MAX_PATH).
+        # Callers that know the Suite root use unused_suite_id() to skip taken
+        # IDs. Older 32-digit IDs remain valid.
+        return f"suite_{uuid4().hex[:8]}"
 
     def cancel(self, *, force: bool = False) -> None:
         control = self._active_control

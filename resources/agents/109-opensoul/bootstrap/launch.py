@@ -119,7 +119,10 @@ def prepare(environ, home):
     state_dir = home / ".opensoul"
     state_dir.mkdir(parents=True, exist_ok=True)
     config_path = state_dir / "opensoul.json"
-    config_path.write_text(render_config(base_url, model), encoding="utf-8")
+    config = json.loads(render_config(base_url, model))
+    if environ.get('ABB_OTEL_PROFILE') == 'opensoul':
+        config.update(json.loads(environ['ABB_OTEL_GATEWAY_CONFIG']))
+    config_path.write_text(json.dumps(config, indent=2), encoding='utf-8')
     config_path.chmod(0o600)
 
     # The Gateway defaults to token auth even on loopback. Both the Gateway and
@@ -150,7 +153,8 @@ def prepare(environ, home):
     })
     for name in ("OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_PROTOCOL",
                  "OTEL_SDK_DISABLED"):
-        child.pop(name, None)
+        if environ.get('ABB_OTEL_PROFILE') != 'opensoul':
+            child.pop(name, None)
 
     gateway_cmd = [
         "node", str(OPENSOUL_ENTRY), "gateway",
@@ -172,7 +176,7 @@ def main() -> int:
         environ = {**os.environ, "HOME": str(home)}
         gateway_cmd, acp_cmd, child, config_path = prepare(environ, home)
 
-        log_path = home / "gateway.log"
+        log_path = Path(environ.get("ABB_OTEL_GATEWAY_LOG", home / "gateway.log"))
         print(
             f"abb-opensoul: base_url={child[BASE_URL_ENV]} model={child[MODEL_ENV]} "
             f"config={config_path} gateway_log={log_path}",
@@ -190,7 +194,9 @@ def main() -> int:
                 stderr=subprocess.STDOUT,
             )
 
-        if not wait_for_port(GATEWAY_HOST, GATEWAY_PORT, timeout=60.0):
+        # Loading the diagnostics plugin on a cold image can exceed one minute.
+        startup_timeout = 120.0 if child.get("ABB_OTEL_PROFILE") == "opensoul" else 60.0
+        if not wait_for_port(GATEWAY_HOST, GATEWAY_PORT, timeout=startup_timeout):
             print("abb-opensoul: gateway did not listen in time", file=sys.stderr, flush=True)
             if proc.poll() is not None:
                 print(f"abb-opensoul: gateway exited early (code={proc.returncode})",

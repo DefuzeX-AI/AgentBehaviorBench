@@ -29,16 +29,20 @@ def agent_build_ignore(agent_root):
     return ignore
 
 
-def runtime_build_ignore(package):
+def runtime_build_ignore(package, profile="unconfigured"):
     """Do not ship host command-line and onboarding tools to worker images.
 
     Keep shared SDK/harness/observe modules: workers import them too. Excluding
     them only from the fingerprint would silently reuse stale executable code.
     """
     root = Path(package).resolve()
+    asset_root = root / "harness/otel/assets"
+    asset = {"python-auto": "python", "node-auto": "node", "java-auto": "java", "openclaw": "openclaw"}.get(profile)
 
     def ignore(directory, names):
         excluded = source_build_ignore(directory, names)
+        if Path(directory).resolve() == asset_root:
+            excluded.extend(name for name in names if name != asset)
         if Path(directory).resolve() == root:
             excluded.extend(name for name in names if name in {'cli', 'onboarding', '__main__.py'})
         return excluded
@@ -77,7 +81,8 @@ def worker_build_context(config, *, control: RunControl | None = None,
                             symlinks=True, copy_function=copy)
             package = Path(__file__).resolve().parents[2]
             shutil.copytree(package, context / ".abb-runtime" / "agentbench",
-                            ignore=runtime_build_ignore(package), symlinks=True, copy_function=copy)
+                            ignore=runtime_build_ignore(package, getattr(getattr(config, "otel", None), "profile", None)),
+                            symlinks=True, copy_function=copy)
             materialize_file_links(context, check)
             for path in context.rglob("*"):
                 check()
@@ -86,4 +91,6 @@ def worker_build_context(config, *, control: RunControl | None = None,
             dockerfile = context / config.dockerfile.relative_to(config.build_context)
             stage_adapter_dependencies(config, context, dockerfile)
             stage_runtime_dependencies(context, dockerfile)
+            from .runtime_build import stage_otel_dependencies
+            stage_otel_dependencies(dockerfile, config)
         yield context, dockerfile

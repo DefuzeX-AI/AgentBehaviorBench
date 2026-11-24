@@ -406,9 +406,9 @@ def test_service_retains_identity_trace_and_diagnostics_on_cleanup_failure(
     diagnostics = json.loads((directory / 'diagnostics.json').read_text())
     assert diagnostics['stdout'] == 'stdout evidence'
     assert runtime_options[0]['control'] is control
-    assert len(closed) == 2
+    assert len(closed) == 1  # KUMA and the Agent share one container.
     traces = [json.loads(line) for line in (directory / 'logs/network.jsonl').read_text().splitlines()]
-    assert len(traces) == 2
+    assert len(traces) == 1
     trace = traces[0]
     assert trace['data']['agent_id'] == echo_agent.agent_id
     assert trace['data']['payload']['output_text'].endswith('x' * 2000)

@@ -5,10 +5,11 @@ import json
 
 def verify(directory, exported):
     from agentbench.trajectory.atif.export import build_export
+    from agentbench.trajectory.atif.slim import stored_document
     root = Path(exported)
     manifest = json.loads((root / "export-manifest.json").read_text(encoding="utf-8"))
     result, bundle = build_export(directory, adapters=manifest["adapters"], allow_incomplete=manifest["allow_incomplete"])
-    checks = {"trajectory_matches_rebuild": result.document.to_json_dict() == json.loads((root / "trajectory.atif.json").read_text(encoding="utf-8")),
+    checks = {"trajectory_matches_rebuild": stored_document(result.document, directory) == json.loads((root / "trajectory.atif.json").read_text(encoding="utf-8")),
         "source_digests_match": result.manifest["sources"] == manifest["sources"],
         "association_matches_rebuild": result.association == json.loads((root / "association-report.json").read_text(encoding="utf-8"))}
     content = content_checks(bundle, result.document)

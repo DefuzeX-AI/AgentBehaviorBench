@@ -289,3 +289,16 @@ def test_acp_delivered_chunks_survive_missing_final_result(tmp_path):
     exported = export_bundle(tmp_path / "source", tmp_path / "out")
     doc = json.loads((Path(exported["path"]) / "trajectory.json").read_text(encoding="utf-8"))
     assert [(s["source"], s["message"]) for s in doc["steps"]] == [("user", "你好 ¡España!"), ("agent", "¡Hola!")]
+
+
+def test_bundle_replays_agent_otlp_evidence(tmp_path):
+    source = tmp_path / "source"
+    fixture(source)
+    save(source / "otel/status.json", {"profile": "native-otlp", "span_count": 1, "status": "received"})
+    entry = {"schema": "abb.agent-otel.v1", "origin": "agent_native", "scope": {"name": "target"},
+             "resource": {}, "span": {"name": "unassigned", "traceId": "ab" * 16, "spanId": "cd" * 8}}
+    (source / "otel/spans.jsonl").write_text(json.dumps(entry) + "\n", encoding="utf-8")
+    bundle = Path(export_bundle(source, tmp_path / "archives")["path"])
+    files = {s["original_path"] for s in json.loads((bundle / "manifest.json").read_text())["sources"]}
+    assert {"otel/spans.jsonl", "otel/status.json"} <= files
+    assert verify_bundle(bundle)["passed"]

@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from agentbench.cli import viewer, viewer_control
+from agentbench.cli.viewer import server as viewer, control as viewer_control
 from agentbench.harness.registry import AgentRegistration
 from agentbench.harness.session import SuiteStore
 from agentbench.observe.view_api import SuiteRunCatalogAPI

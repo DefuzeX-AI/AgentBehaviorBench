@@ -211,38 +211,18 @@ class RunViewAPI:
         return folders
 
     def spans(self):
-        spans, statuses, warnings = [], [], []
-        for folder in self.outputs():
-            status = self.read(f'{folder}/otel-status.json') or {'status': 'running_or_unavailable'}
-            statuses.append({'invocation': folder, **status})
-            try:
-                with self.file(f'{folder}/otel.jsonl').open(encoding='utf-8') as stream:
-                    for line in stream:
-                        if not line.strip():
-                            continue
-                        try:
-                            row = json.loads(line)
-                            if row.get('source') == 'otel' and row.get('event') == 'span':
-                                spans.append({**row['data'], 'invocation': folder, 'output_directory': folder})
-                        except (ValueError, KeyError):
-                            warnings.append(f'{folder}: incomplete OTel line')
-            except FileNotFoundError:
-                pass
-        latest = {}
-        for folder in self.outputs():
-            try:
-                with self.file(f'{folder}/otel-live.jsonl').open(encoding='utf-8') as stream:
-                    for line in stream:
-                        try:
-                            row = json.loads(line)
-                            s = {**row['data'], 'invocation': folder, 'output_directory': folder}
-                            latest[(s.get('trace_id'), s['span_id'])] = s
-                        except (ValueError, KeyError):
-                            continue
-            except FileNotFoundError:
-                pass
-        latest.update({(s.get('trace_id'), s['span_id']): s for s in spans})
-        return {'spans': list(latest.values()), 'statuses': statuses, 'warnings': warnings}
+        """Agent-exported spans of this attempt; nothing is derived from other records."""
+        from agentbench.harness.otel.evidence import display_span
+        from agentbench.trajectory.agent_otel import rows
+        spans, statuses = {}, []
+        agent_status = self.read('otel/status.json')
+        if agent_status:
+            statuses.append({'invocation': 'Agent', **agent_status})
+            for ref in rows(self):
+                span = {**display_span(ref['raw']), 'invocation': 'Agent',
+                        'output_directory': 'otel', 'record_line': ref['line']}
+                spans[(span.get('trace_id'), span['span_id'])] = span
+        return {'spans': list(spans.values()), 'statuses': statuses, 'warnings': []}
 
     def evaluation(self):
         from .failures import tool_failures
@@ -255,32 +235,6 @@ class RunViewAPI:
                        for key, name in {'input': 'input', 'result': 'result',
                                          'submission': 'submission', 'evidence': 'evidence'}.items()}}
                        for folder in self.outputs() if folder.startswith(('evaluation/', 'steps/'))]}
-
-    def trajectory(self):
-        """The saved trajectory.json; pending while the attempt still runs.
-
-        trajectory.json is written once after both containers stop, so a running
-        attempt has none yet. Historical packages that never had one are derived
-        on read; a running attempt is not, so the viewer never shows a partial
-        sequence that the saved file later contradicts.
-        """
-        from agentbench import trajectory
-        saved = trajectory.read(self.directory)
-
-        
-        if saved is not None:
-            return saved
-        metadata = self.read('run.json') or {}
-        identity = {'schema': trajectory.SCHEMA, 'run_id': metadata.get('run_id') or self.run_id,
-                    'agent_id': metadata.get('agent_id') or 'unknown'}
-        if metadata.get('status') == 'running':
-            return {**identity, 'status': 'pending',
-                    'reason': 'The attempt is still running; trajectory.json is written when it finishes.'}
-        try:
-            return trajectory.load(self.directory)
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            return {**identity, 'status': 'failed', 'derived_on_read': True,
-                    'error_type': type(exc).__name__, 'error': str(exc)}
 
     def events(self, offset):
         if offset < 0:
@@ -342,18 +296,6 @@ class RunViewAPI:
         if route == 'timeline':
             from .timeline import timeline
             return timeline(self)
-        if route == 'trajectory':
-            return self.trajectory()
-        match = re.fullmatch(r'otel/([0-9a-f]{16})/payload/(input|output|error|metadata|events)', route)
-        if match:
-            span = next(s for s in self.spans()['spans'] if s['span_id'] == match[1])
-            ref = span['attributes'][f'abb.{match[2]}_ref']
-            if Path(ref).is_absolute() or '..' in Path(ref).parts:
-                raise ValueError('Payload outside output')
-            target = self.file(span['output_directory'] + '/' + ref)
-            with target.open(encoding='utf-8') as stream:
-                payload = [json.loads(line) for line in stream if line.strip()] if match[2] == 'events' else json.load(stream)
-            return {'payload': payload}
         raise ValueError('Unknown route')
 
 

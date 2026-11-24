@@ -2,7 +2,7 @@
 import json
 from types import SimpleNamespace
 
-from agentbench.cli import viewer
+from agentbench.cli.viewer import server as viewer
 
 
 def test_startup_flushes_before_serve_forever(monkeypatch, tmp_path):

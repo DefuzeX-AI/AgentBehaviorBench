@@ -33,20 +33,11 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 agentbench --help
 agentbench sdk list
-python -m examples.offline_demo --output results/offline-demo.json
 ```
 
 如果你尚未接入自己的测试 Agent，默认 SDK 列表应出现 KUMA（CLI 中显示为 `kuma`）和 `local`。
 KUMA 是我们为 Benchmark 提供的基线测试 Agent，通过 `kuma` SDK 插件接入；`local` 则是
 用于最低限度离线验证的测试 Agent，通过 `local` SDK 插件提供。
-
-离线示例使用本地 echo Agent 和确定性 Judge，无需 Docker、API key 或模型调用。成功时预期显示
-`Case execution: 1/1 completed | Judge: pass=1`，表示本地测试流程已跑通。
-记录 `OFFLINE_RESULT=` 后的真实路径：程序会给输出文件加时间戳。
-
-如果 demo 提示 `Agent requirement.md is missing`，说明 echo 示例缺少接入文件。
-这是示例问题，不是 API key 错误；请使用包含该示例修复的版本。
-CLI 帮助与 SDK 列表仍可用于不需要凭据的安装检查。
 
 ## 网页构建
 
@@ -67,8 +58,8 @@ cd web
 npm ci
 npm run build
 cd ..
-# 替换为刚才打印的实际文件路径。
-agentbench view results/offline-demo-YYYYMMDD-HHMMSS.json
+# 把 SUITE_ID 替换为运行或评测时打印的实际 Suite。
+agentbench view results/suites/SUITE_ID/events.json
 ```
 
 首次 clone 后需先完成上述网页构建。打开终端输出的 `View:` 完整地址，

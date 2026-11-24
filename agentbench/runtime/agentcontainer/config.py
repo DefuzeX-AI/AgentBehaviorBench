@@ -18,6 +18,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
     import tomli as tomllib  # type: ignore[no-redef]
 
 from agentbench.runtime.contracts import SecretResolver
+from agentbench.harness.otel.config import CaptureConfig, parse_config
 
 
 class ContainerConfigurationError(ValueError):
@@ -37,6 +38,8 @@ class AgentContainerConfig:
     model_target: ModelTargetConfig | None = None
     model_metadata_paths: tuple[str, ...] = ()
     replacement_model_provider: ModelTargetProvider | None = None
+
+    otel: CaptureConfig = CaptureConfig()
 
     @classmethod
     def from_agent_dir(
@@ -85,6 +88,7 @@ class AgentContainerConfig:
 
         return cls(
             agent_root=root,
+            otel=parse_config(manifest),
             agent_id=_required_string(manifest, "agent_id"),
             build_context=context,
             dockerfile=dockerfile,
