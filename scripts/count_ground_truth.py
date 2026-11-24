@@ -1,6 +1,8 @@
-"""Count Ground Truth issues with a Case and saved run trajectories.
+"""Count Ground Truth issues and the Agents that carry them.
 
-This checks file presence and layout, not whether a run reproduced the issue.
+An issue is a ``resources/agents/<unit>/ground_truth/issue_<number>/`` directory;
+it is usable when it holds ``verify.case.json``. This checks file presence and
+layout, not whether a run reproduces the issue.
 Run from any directory: python scripts/count_ground_truth.py
 """
 
@@ -18,37 +20,14 @@ def inspect(root: Path) -> dict:
         raise ValueError(f"Agent directory does not exist: {agents}")
 
     issues = sorted(path for path in agents.glob("*/ground_truth/issue_*") if path.is_dir())
-    rows = []
-    for issue in issues:
-        runs = issue / "runs"
-        canonical = sorted(runs.glob("*/trajectory/*/trajectory.json"))
-        other = sorted(runs.glob("*/trajectory.json"))
-        rows.append({
-            "agent": issue.parent.parent.name,
-            "issue": issue.name,
-            "verify_case": (issue / "verify.case.json").is_file(),
-            "runs_directory": runs.is_dir(),
-            "canonical_trajectories": len(canonical),
-            "other_trajectories": len(other),
-        })
-
+    rows = [{"agent": issue.parent.parent.name, "issue": issue.name,
+             "verify_case": (issue / "verify.case.json").is_file()} for issue in issues]
     with_case = [row for row in rows if row["verify_case"]]
-    with_runs = [row for row in with_case if row["runs_directory"]]
-    with_trajectory = [row for row in with_runs
-                       if row["canonical_trajectories"] or row["other_trajectories"]]
-    loadable_layout = [row for row in with_runs if row["canonical_trajectories"]]
     return {
         "issue_directories": len(rows),
         "with_verify_case": len(with_case),
-        "with_verify_case_and_runs_directory": len(with_runs),
-        "with_verify_case_and_trajectory": len(with_trajectory),
-        "with_loader_trajectory_layout": len(loadable_layout),
-        "agents_with_trajectory": len({row["agent"] for row in with_trajectory}),
-        "nonstandard_trajectory_layout": [row for row in with_trajectory
-                                          if not row["canonical_trajectories"]],
-        "runs_directory_without_trajectory": [row for row in with_runs
-                                             if not row["canonical_trajectories"]
-                                             and not row["other_trajectories"]],
+        "agents_with_issues": len({row["agent"] for row in with_case}),
+        "missing_verify_case": [row for row in rows if not row["verify_case"]],
         "issues": rows,
     }
 
@@ -58,26 +37,21 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=REPOSITORY,
                         help="ABB repository root (default: this script's repository)")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON")
-    parser.add_argument("--details", action="store_true", help="List issues with trajectories")
+    parser.add_argument("--details", action="store_true", help="List every issue with a verify Case")
     args = parser.parse_args()
     result = inspect(args.root.resolve())
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
 
-    for key in ("issue_directories", "with_verify_case",
-                "with_verify_case_and_runs_directory", "with_verify_case_and_trajectory",
-                "with_loader_trajectory_layout", "agents_with_trajectory"):
+    for key in ("issue_directories", "with_verify_case", "agents_with_issues"):
         print(f"{key}: {result[key]}")
-    for key in ("nonstandard_trajectory_layout", "runs_directory_without_trajectory"):
-        for row in result[key]:
-            print(f"{key}: {row['agent']}/{row['issue']}")
+    for row in result["missing_verify_case"]:
+        print(f"missing_verify_case: {row['agent']}/{row['issue']}")
     if args.details:
         for row in result["issues"]:
-            if row["verify_case"] and (row["canonical_trajectories"] or row["other_trajectories"]):
-                print(f"{row['agent']}/{row['issue']}: "
-                      f"{row['canonical_trajectories']} canonical, "
-                      f"{row['other_trajectories']} other")
+            if row["verify_case"]:
+                print(f"{row['agent']}/{row['issue']}")
 
 
 if __name__ == "__main__":

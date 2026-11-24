@@ -120,6 +120,8 @@ def content_checks(bundle, document):
 def validate_replies(bundle, document):
     from .replies import reply_text, result_matches
 
+    if not bundle.reply_steps:
+        return
     expected = {item["folder"] + "/result.json": reply_text(item) for item in bundle.inputs
                 if reply_text(item) is not None and result_matches(item)}
     seen = set()

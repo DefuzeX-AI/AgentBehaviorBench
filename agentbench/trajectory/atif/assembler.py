@@ -156,7 +156,7 @@ def assemble_atif(bundle, graph, provenance):
         if nid != graph.root_id:
             extra["version_missing_reason"] = "No independent child Agent revision was recorded"
         if nid == graph.root_id:
-            extra.update(provenance=provenance, invocations=bundle.inputs,
+            extra.update(source=bundle.source, provenance=provenance, invocations=bundle.inputs,
                 unassigned_records=[unassigned(r) for r in bundle.models + bundle.tools if graph.owners[r["id"]] is None],
                 native_events=bundle.native_events, issues=[asdict(i) for i in issues])
             if bundle.unassigned_agent_spans:

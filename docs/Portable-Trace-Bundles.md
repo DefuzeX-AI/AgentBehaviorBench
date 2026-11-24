@@ -2,22 +2,22 @@
 
 This opt-in ABB export preserves recorded evidence without exporting desktop replay
 state, accumulated UI snapshots, credentials or an entire runtime directory.
-The original collectors, ownership resolver, Agent behavior, Judge/GT contracts
-and the legacy `abb.agent-trajectory.v1` contract are unchanged.
+The original collectors, ownership resolver, Agent behavior and Judge/GT
+contracts are unchanged.
 Application integration is a separate, approval-gated stage.
 
 ## Commands and APIs
 
-Use the existing isolated Python 3.12+ Harbor environment described in
-[the ATIF experiment](ATIF-Experiment.md). Harbor remains pinned to
-`ec6aeab7fe0eb51df52b4e72c524daf5ea9cc5f4`, producing `ATIF-v1.8`.
+Install Harbor's models as described under
+[Automatic derivation](ATIF-Experiment.md#automatic-derivation). Harbor remains
+pinned to `ec6aeab7fe0eb51df52b4e72c524daf5ea9cc5f4`, producing `ATIF-v1.8`.
 
 ```sh
-cache/atif/venv/bin/python -m agentbench.experiments.atif export --bundle \
+python -m agentbench.experiments.atif export --bundle \
   --input <completed-run> --output <export-parent> --adapter deepagents
-cache/atif/venv/bin/python -m agentbench.experiments.atif verify-bundle \
+python -m agentbench.experiments.atif verify-bundle \
   --input <export-parent>/run-xxxxxxxx
-cache/atif/venv/bin/python -m agentbench.experiments.atif run --bundle \
+python -m agentbench.experiments.atif run --bundle \
   --config <experiment.toml> --case <case-name> \
   --output <new-experiment-directory>
 ```

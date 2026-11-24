@@ -260,15 +260,11 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     status['cleanup_status'] = 'succeeded' if session else 'not_started'
             finally:
                 if execute_agent:
-                    # The container is closed and traces validated: derive the
-                    # trajectory contract now, before SDK diagnostics read the package.
+                    # The container is closed and traces validated: derive the ATIF
+                    # trajectory now, before SDK diagnostics read the package.
                     # Agent-native OTel was written directly to otel/ by the worker.
-                    try:
-                        from agentbench import trajectory
-                        status['trajectory'] = trajectory.write(directory, environ=environ)
-                    except Exception as exc:  # noqa: BLE001 - never alter the execution outcome
-                        status['trajectory'] = {'status': 'failed', 'path': 'trajectory.json',
-                                                'error_type': type(exc).__name__, 'error': str(exc)}
+                    from agentbench.trajectory.atif import attempt
+                    status['atif'] = attempt.write(directory, run=status, environ=environ)
                 try:
                     status['artifacts'] = (collect_artifacts(directory, status, environ=environ)
                                            if collect_artifacts is not None else {'directory': str(directory)})

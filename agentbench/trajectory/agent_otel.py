@@ -1,6 +1,5 @@
 """Join Agent-exported operations only through recorded, unique identifiers."""
 from collections import Counter, defaultdict
-from .content import bounded
 import json
 from agentbench.harness.otel.evidence import display_span
 from agentbench.observe.tool_links import SCOPE_KEYS, compatible
@@ -66,6 +65,46 @@ def content(item):
     return {}
 
 
+def _count(value):
+    if type(value) is int:
+        return value if value >= 0 else None
+    return int(value) if isinstance(value, str) and value.isdigit() else None
+
+
+def inference(item):
+    """Step content of a model span that recorded GenAI messages, else None.
+
+    An aggregate usage span, or a call captured without content, records no
+    assistant message and cannot be represented as a step.
+    """
+    attrs = item["attributes"]
+    messages = _decoded(attrs.get("gen_ai.output.messages"))
+    if not isinstance(messages, list):
+        return None
+    replies = [m for m in messages if isinstance(m, dict) and m.get("role") == "assistant"]
+    if not replies:
+        return None
+    text, reasoning, calls = [], [], []
+    for part in (p for m in replies for p in (m.get("parts") or []) if isinstance(p, dict)):
+        if part.get("type") == "tool_call":
+            calls.append({"id": part.get("id"), "name": part.get("name"), "arguments": _decoded(part.get("arguments"))})
+        elif part.get("type") in ("text", "reasoning") and isinstance(part.get("content"), str):
+            (text if part["type"] == "text" else reasoning).append(part["content"])
+    usage = {target: count for target, source in (("prompt_tokens", "gen_ai.usage.input_tokens"),
+                                                  ("completion_tokens", "gen_ai.usage.output_tokens"))
+             if (count := _count(attrs.get(source))) is not None}
+    cached = _count(attrs.get("gen_ai.usage.cache_read.input_tokens"))
+    if cached is not None:
+        usage["prompt_tokens_details"] = {"cached_tokens": cached}
+    request = {"messages": _decoded(attrs.get("gen_ai.input.messages")), "model": attrs.get("gen_ai.request.model")}
+    if attrs.get("gen_ai.tool.definitions") is not None:
+        request["tools"] = _decoded(attrs["gen_ai.tool.definitions"])
+    return {"input": request,
+            "output": {"text": "".join(text), "reasoning": "".join(reasoning) or None, "tool_calls": calls,
+                       "finish_reason": replies[-1].get("finish_reason"), "usage": usage or None,
+                       "model": attrs.get("gen_ai.response.model") or attrs.get("gen_ai.request.model")}}
+
+
 def emitted_ids(item):
     messages = content(item).get("output")
     if not isinstance(messages, list):
@@ -102,31 +141,3 @@ def correlate(records, operations):
         selected.append((item, match))
     for item, match in selected:
         yield item, match if match is not None and counts[id(match)] == 1 else None
-
-
-def flat_evidence(api, steps, indexed_rows, limit):
-    scopes = {row["id"]: {key: row.get(key) for key in (*SCOPE_KEYS, "identity_conflicts")} for row in indexed_rows}
-    records = []
-    for step in steps:
-        if step["kind"] == "model":
-            records.append({**scopes.get(step["evidence"].get("interaction_id"), {}), "kind": "model", **step["evidence"], "output": step.get("output") or {}, "target": step["evidence"]})
-        for log in step["tool_logs"]:
-            records.append({**scopes.get(log["evidence"].get("interaction_id") or step.get("evidence", {}).get("interaction_id"), {}),
-                            "kind": "tool", "log": log, "tool_call_id": log.get("tool_call_id"), "target": log["evidence"]})
-    remaining = []
-    for item, match in correlate(records, operations(rows(api))):
-        ref = {k: item["ref"][k] for k in ("file", "line")}
-        ref.update(trace_id=item["trace_id"], span_id=item["span_id"], origin=item["origin"])
-        if match:
-            match["target"].setdefault("agent_otel", []).append(ref)
-            log = match.get("log")
-            if log is not None and log.get("execution_status") == "not_observed" and log.get("link") != "ambiguous":
-                values = content(item)
-                if item.get("end_time") and values["outputs"] is not None:
-                    failed = item["status"].get("code") == 2 or isinstance(values["outputs"], dict) and values["outputs"].get("isError") is True
-                    log.update(outputs=bounded(values["outputs"], limit), execution_status="error" if failed else "succeeded",
-                               link="exact", source=item["origin"], started_at=item.get("start_time"), ended_at=item.get("end_time"))
-        else:
-            remaining.append({**ref, "operation": item["kind"], "name": item["name"], "parent_span_id": item["parent_span_id"],
-                              "native_session_id": item["native_session_id"], **bounded(content(item), limit)})
-    return remaining

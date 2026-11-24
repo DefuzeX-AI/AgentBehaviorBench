@@ -112,14 +112,14 @@ def test_source_removed_after_artifact_collection_even_when_collection_fails(tmp
     def collect(directory, status, **kwargs):
         assert all(call['closed'] == 1 for call in calls)
         assert (directory / 'sdk-source/echo.py').is_file()
-        assert (directory / 'trajectory.json').is_file()
+        assert status['atif']['path'] == 'trajectory.atif.json'
         raise RuntimeError('artifact collection failed')
     with pytest.raises(RuntimeError, match='artifact collection failed'):
         run_evaluation(source_agent(tmp_path), context=context(services), output=tmp_path / 'runs',
                        stage_agent=unchanged_stage, collect_artifacts=collect)
     directory = next((tmp_path / 'runs').iterdir())
     assert not (directory / 'sdk-source').exists()
-    assert (directory / 'trajectory.json').is_file()
+    assert 'atif' in json.loads((directory / 'run.json').read_text())
     assert (directory / 'judge/report.json').is_file()
 
 

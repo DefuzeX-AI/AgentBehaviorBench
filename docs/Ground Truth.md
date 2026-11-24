@@ -2,20 +2,15 @@
 
 [Guide](Guide.md) · [简体中文](otherLanguages/Ground%20Truth.zh-CN.md)
 
-ABB compares **saved Judge problem summaries first**, then both the GT
-reference trajectory and the matching execution's trajectory, step by step. It
-scores discovery of known defects, not task completion, and records where in
-the trajectory the defect became inevitable. Agent recovery does not erase an
-observed defect.
+ABB compares **saved Judge problem summaries** with each GT description. It
+scores discovery of known defects, not task completion. Step-level attribution
+against reference trajectories was removed with the legacy `trajectory.json`
+format and will be rebuilt on the ATIF trajectory.
 
 ## Reference Case directories
 
-Keep a complete saved ABB Case directory for each GT, beside a human-readable
-`README.md`. Copy the native `cases/<agent-key>/<case-index>/` tree, including
-`case.json`, generation/publication records when present, and all `attempts/`
-files. Preserve conversations, tool payloads, produced files, errors and logs
-in their original layout. Beside those raw records every reference attempt
-carries its derived `trajectory.json`; the raw records are never replaced by it.
+Keep a saved ABB Case directory for each GT, beside a human-readable
+`README.md`: the native `case.json` plus a small `gt.json` description.
 
 ```text
 ground_truth/
@@ -23,26 +18,7 @@ ground_truth/
   path-truncation/
     gt.json
     case.json
-    publication.json
-    attempts/
-      <attempt-id>/
-        run.json
-        trajectory.json        derived step sequence (abb.agent-trajectory.v1)
-        steps/...
-        logs/...
-        replay/...
-        ...
 ```
-
-Generate the trajectory after copying the attempt:
-
-```bash
-python -m agentbench trajectory build resources/agents/<unit>/ground_truth/path-truncation/attempts/<attempt-id> --write
-```
-
-`agentbench trajectory show DIR` prints the numbered steps so the decisive step
-can be chosen. Each Case adds a small `gt.json` description, selects its
-reference attempts and annotates the decisive step:
 
 ```json
 {
@@ -53,38 +29,21 @@ reference attempts and annotates the decisive step:
   "explanation": "The registry loses the suffix of a quoted artifact path.",
   "expected_behavior": "The full quoted path is registered and readable.",
   "observed_behavior": "The registered path stops at the first space.",
-  "reference_attempts": ["actual-retained-attempt-id"],
-  "decisive_step": {
-    "attempt": "actual-retained-attempt-id",
-    "step_id": 4,
-    "agent_name": "example",
-    "reason": "The read_file call at step 4 uses the truncated path; every later step only retries it."
-  },
   "provenance": {"issue_url": "https://example.com/issue"}
 }
 ```
 
-`decisive_step` follows TraceElephant's definition: the earliest step at which
-failure became inevitable, attributed with a role-aware and recoverability-aware
-rule. If an upstream slip could still have been caught by a later verification
-step, the decisive step is the step that missed that opportunity.
-`decisive_step.attempt` must be one of `reference_attempts`, `step_id` must
-exist in that attempt's `trajectory.json`, and `agent_name` (optional) must
-equal the acting component recorded for that step. `expected_behavior`,
-`observed_behavior`, `task_outcome` and `agent_recovery` are optional text.
+`expected_behavior`, `observed_behavior`, `task_outcome` and `agent_recovery`
+are optional text. Write `explanation` in English, preserving the defect
+mechanism, evidence requirements, and exclusions. Paths are resolved locally,
+so the GT does not depend on the original Suite. Explicitly distinguish
+separate control Cases from defect GTs.
 
-The README explains each Case and its evidence; `gt.json` supplies the short
-machine-readable description without duplicating trajectory content. Write
-`explanation` in English, preserving the defect mechanism, evidence
-requirements, and exclusions. `reference_attempts` selects directories under
-that Case's `attempts/`. Paths are resolved locally, so retained historical
-absolute paths do not make the GT depend on the original Suite. Keep
-supplemental component probes separate from Agent executions and label their
-scope. Explicitly distinguish separate control Cases from defect GTs.
+Issue reproductions under `ground_truth/issue_<number>/verify.case.json` are
+Cases, not GT descriptions; `python scripts/count_ground_truth.py` counts them.
 
 No archives, file hashes, minimum repetition count or exact source-hash equality
-are required. Version metadata describes provenance; it does not bypass content
-comparison. Basic JSON structure, safe paths and bounded file reads remain
+are required. Basic JSON structure, safe paths and bounded file reads remain
 checked. GT material remains host-only and excluded from Agent runtime staging.
 
 ## Evaluation
@@ -100,24 +59,13 @@ This command does not generate Cases, execute Agents, or submit to KUMA.
 It uses the ABB matcher model: `ABB_GT_BASE_URL`, `ABB_GT_MODEL`,
 `ABB_GT_API_KEY`, with the configured model provider as fallback.
 
-1. Compare each saved Judge finding with each GT summary/explanation. The first
-   model request contains no trajectories. A different topic or generic failure
-   is insufficient to match a concrete defect.
-2. Only a positive summary match loads the reference trajectories and the
-   candidate execution's trajectory (derived on read for historical packages
-   without one). Both are rendered step by step with complete model inputs and
-   outputs; requests over 3000 characters are shortened to head and tail only
-   when the full rendering exceeds `ABB_GT_MAX_BYTES`. The comparison must cite
-   actual reference (`<attempt>/<step_id>`) and candidate step IDs and name the
-   candidate step at which the defect became inevitable. Context that still
-   does not fit remains pending rather than losing inputs.
-3. Score 1 for a confirmed discovery, 0 for a resolved mismatch, null for pending.
+1. Compare each saved Judge finding with each GT summary/explanation. A
+   different topic or generic failure is insufficient to match a concrete defect.
+2. Score 0 for a resolved mismatch, null for pending. A summary match stays
+   pending until step attribution is rebuilt on the ATIF trajectory.
    Missing/rejected/incomplete reports and unavailable evidence remain pending.
-   A complete pass report with no findings is 0. A failed execution may still
-   contain sufficient evidence of a defect. Each decision also records
-   `localization` (reference and candidate decisive steps, Judge-cited steps,
-   `step_match`); it is reported beside the score, not folded into it.
-4. Deduplicate by GT: any 1 wins, otherwise any pending keeps the GT pending,
+   A complete pass report with no findings is 0.
+3. Deduplicate by GT: any 1 wins, otherwise any pending keeps the GT pending,
    otherwise 0. The final discovery fraction is unavailable while any GT is
    pending. Show matched, unmatched and pending counts and possible score bounds.
 
@@ -139,13 +87,10 @@ Original Suite events, Agent traces and Judge reports are never rewritten.
 Legacy `manifest.json`, `matching.json` and ZIP observations must be explicitly
 migrated to complete native Case directories with short descriptions. The former
 inline `ground_truth.json` format also requires migration. `gt.json` files still
-on `abb.agent.ground_truth.case.v1` are rejected until they carry a
-`decisive_step` and their reference attempts carry `trajectory.json`. Legacy
-result files remain historical and are not counted under this protocol. Do not
-label a component probe as an Agent run or fabricate missing steps.
+on `abb.agent.ground_truth.case.v1` are rejected until regenerated. Legacy result
+files remain historical and are not counted under this protocol.
 
 Relevant checks: `tests/test_ground_truth.py`, `tests/test_gt_matching.py`,
-`tests/test_ground_truth_isolation.py`, `tests/test_benchmark_evaluators.py`,
-`tests/test_trajectory_*.py` and the Suite viewer tests. They cover summary
-gating, two-trajectory step citations, decisive-step validation, failure/unknown
+`tests/test_ground_truth_isolation.py`, `tests/test_benchmark_evaluators.py`
+and the Suite viewer tests. They cover summary matching, failure/unknown
 handling, cache behavior, SDK-scoped counts and runtime isolation.

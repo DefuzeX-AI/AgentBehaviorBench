@@ -49,7 +49,10 @@ def result_matches(item):
 
 def record_turn(record, inputs, scopes):
     matches = []
-    files = {PurePosixPath(ref["file"]).parent.as_posix() for ref in record.get("evidence", [])}
+    # An exported span lives in the Case-level otel/ file; the ACP messages that
+    # reported its tool call id were recorded in the Input's own folder.
+    files = {PurePosixPath(ref["file"]).parent.as_posix()
+             for ref in [*record.get("evidence", []), *record.get("session_evidence", [])]}
     for index, (item, scope) in enumerate(zip(inputs, scopes)):
         if not compatible(record, scope):
             continue
@@ -129,16 +132,24 @@ def root_steps(bundle, rows, issues, clocks):
     records = {r["id"]: r for r in [*bundle.models, *bundle.tools]}
     groups = [[] for _ in inputs]
     other = []
+    # The unit declares that its Agent makes no model call outside a prompt, so
+    # the sole Input of the attempt owns an inference that names no Input.
+    evaluation = (bundle.target.get("runtime") or {}).get("evaluation") or {}
+    sole_input = len(inputs) == 1 and evaluation.get("single_input_model_scope") is True
     for when, rid, step in sorted(rows, key=lambda row: row[:2]):
         record = records.get(rid)
         turn = record_turn(record, inputs, scopes) if record else None
+        if (turn is None and sole_input and record and bundle.exported_steps and not record.get("span")
+                and record.get("source") in ("agent_native", "auto_instrumented") and compatible(record, scopes[0])):
+            turn = 0
+            step.extra["abb"]["turn_evidence"] = "isolated_single_input_case"
         if turn is None:
             other.append((when, rid, [step]))
         else:
             groups[turn].append((when, rid, step))
 
     # Numbered benchmark folders encode execution order. UUID folder names do not.
-    acp = recorded_acp_replies(bundle)
+    acp = recorded_acp_replies(bundle) if bundle.reply_steps else {}
     blocks = []
     for index, item in enumerate(inputs):
         group = groups[index]
@@ -158,7 +169,8 @@ def root_steps(bundle, rows, issues, clocks):
             steps.append(Step(step_id=1, source="user", message=prompt,
                               extra={"abb": {"invocation": item, **({"execution_start": timing} if timing else {})}}))
         steps.extend(step for _, _, step in group)
-        message = reply_text(item)
+        # Without reply steps the source's last model step of the turn is the reply.
+        message = reply_text(item) if bundle.reply_steps else None
         if message is not None and not result_matches(item):
             issues.append(EvidenceIssue("result_identity_conflict", "Result identity conflicts with its input", [item["folder"]]))
         elif message is not None:

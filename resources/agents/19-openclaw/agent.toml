@@ -46,6 +46,9 @@ transport = "stdio"
 command = ["python", "/opt/agent/bootstrap/launch.py"]
 # The launcher starts a local OpenClaw Gateway before the ACP bridge answers.
 handshake_timeout = 180
+# The Gateway exports its last span batch while it shuts down, and the launcher
+# allows it 10 s. The default 3 s kills the process group before that export ends.
+cleanup_timeout = 10
 cwd = "/home/agent/workspace"
 permission_policy = "allow_once"
 
@@ -58,3 +61,7 @@ tool_routes = []
 
 [otel]
 profile = "openclaw"
+
+# sessions_spawn receipts identify child sessions; ATIF embeds them as subagent trajectories.
+[atif]
+adapters = ["openclaw"]

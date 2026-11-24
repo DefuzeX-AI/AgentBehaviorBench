@@ -236,32 +236,6 @@ class RunViewAPI:
                                          'submission': 'submission', 'evidence': 'evidence'}.items()}}
                        for folder in self.outputs() if folder.startswith(('evaluation/', 'steps/'))]}
 
-    def trajectory(self):
-        """The saved trajectory.json; pending while the attempt still runs.
-
-        trajectory.json is written once after both containers stop, so a running
-        attempt has none yet. Historical packages that never had one are derived
-        on read; a running attempt is not, so the viewer never shows a partial
-        sequence that the saved file later contradicts.
-        """
-        from agentbench import trajectory
-        saved = trajectory.read(self.directory)
-
-        
-        if saved is not None:
-            return saved
-        metadata = self.read('run.json') or {}
-        identity = {'schema': trajectory.SCHEMA, 'run_id': metadata.get('run_id') or self.run_id,
-                    'agent_id': metadata.get('agent_id') or 'unknown'}
-        if metadata.get('status') == 'running':
-            return {**identity, 'status': 'pending',
-                    'reason': 'The attempt is still running; trajectory.json is written when it finishes.'}
-        try:
-            return trajectory.load(self.directory)
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            return {**identity, 'status': 'failed', 'derived_on_read': True,
-                    'error_type': type(exc).__name__, 'error': str(exc)}
-
     def events(self, offset):
         if offset < 0:
             raise ValueError('Invalid cursor')
@@ -322,8 +296,6 @@ class RunViewAPI:
         if route == 'timeline':
             from .timeline import timeline
             return timeline(self)
-        if route == 'trajectory':
-            return self.trajectory()
         raise ValueError('Unknown route')
 
 

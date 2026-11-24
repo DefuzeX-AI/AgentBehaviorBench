@@ -13,8 +13,9 @@ from .validation import validate_export
 from .contracts import ExportResult
 
 
-def build_export(directory, *, adapters=(), allow_incomplete=False):
-    bundle = read_evidence(directory, allow_incomplete=allow_incomplete, include_network=False)
+def build_export(directory, *, adapters=(), allow_incomplete=False, run=None, source=None):
+    bundle = read_evidence(directory, allow_incomplete=allow_incomplete, include_network=False, run=run,
+                           source=source)
     graph = resolve_hierarchy(bundle, adapters=adapters)
     metadata = provenance(bundle)
     document = assemble_atif(bundle, graph, metadata)
@@ -58,7 +59,8 @@ def export_run(directory, output, *, adapters=(), allow_incomplete=False):
         save_json(destination / "validation-report.json", result.validation)
         ensure_unchanged(bundle)
         # Publish the ATIF document last. Reports alone never signify success.
-        save_json(destination / "trajectory.atif.json", result.document.to_json_dict())
+        from .slim import stored_document
+        save_json(destination / "trajectory.atif.json", stored_document(result.document, source))
         return result
     except Exception as exc:
         from agentbench.observe.store import redact, environment_secrets

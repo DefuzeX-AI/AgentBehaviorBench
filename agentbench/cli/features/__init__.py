@@ -13,9 +13,6 @@ from .resume import FEATURE as RESUME_FEATURE, RETRY_FEATURE
 from .reuse import FEATURE as REUSE_FEATURE
 from .gt import FEATURE as GT_FEATURE
 from .api import FEATURE as API_FEATURE
-from .trajectory import FEATURE as TRAJECTORY_FEATURE
-from .exp1 import FEATURE as EXP1_FEATURE
-from .exp3 import FEATURE as EXP3_FEATURE
 
 FEATURES: tuple[CommandFeature, ...] = (
     RUN_FEATURE,
@@ -31,9 +28,6 @@ FEATURES: tuple[CommandFeature, ...] = (
     REUSE_FEATURE,
     GT_FEATURE,
     API_FEATURE,
-    TRAJECTORY_FEATURE,
-    EXP1_FEATURE,
-    EXP3_FEATURE,
 )
 
 __all__ = ["FEATURES", "CommandFeature"]

@@ -136,7 +136,7 @@ def test_independent_sdk_uses_shared_host_and_private_case_storage(tmp_path):
     assert status['source_cleanup_status'] == 'succeeded'
     assert not (runner.directory / 'sdk-source').exists()
     assert (agent.path / 'agent/echo.py').is_file()
-    assert (runner.directory / 'trajectory.json').is_file()
+    assert status['atif']['path'] == 'trajectory.atif.json' and 'trajectory' not in status
 
 
 def test_shared_host_cleans_the_container_when_agent_evidence_is_rejected(tmp_path):
@@ -233,7 +233,7 @@ def test_independent_sdk_real_container_retains_case_output_and_judge(tmp_path, 
         assert json.loads((runner.directory / 'run.json').read_text())['source_cleanup_status'] == 'succeeded'
         assert not (evaluation / 'sdk-source').exists()
         assert (evaluation / 'sdk-repo/independent/case.json').is_file()
-        assert (evaluation / 'trajectory.json').is_file()
+        assert 'atif' in json.loads((evaluation / 'run.json').read_text())
         assert (root / 'agent.toml').read_bytes() == original_manifest
         assert (root / 'Dockerfile').read_bytes() == original_dockerfile
         print('Independent SDK acceptance:', runner.directory)

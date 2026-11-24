@@ -19,55 +19,28 @@ python -m agentbench gt --suite C:/path/to/results/suites/suite_example
 The separate `gt` command creates a new evaluation; it does not resume or reuse
 prior model answers. It uses all saved attempts, including retries.
 
-## Protocol `summary-trajectory-attribution-v3`
+## Protocol `summary-v4`
 
-Each GT Case is a `gt.json` (`abb.agent.ground_truth.case.v2`) beside the
-complete retained reference attempt(s). Every reference attempt carries its
-derived `trajectory.json`; its `decisive_step` names the reference attempt and
-the step at which the known defect made failure inevitable (the earliest such
-step, judged with the role-aware and recoverability-aware rule of
-TraceElephant: a missed verification opportunity is the decisive step, not the
-earlier upstream slip). See [Ground Truth](Ground%20Truth.md) for the file
-layout and [the trajectory contract](../agentbench/trajectory/README.md) for
-what a step contains.
+Each GT Case is a `gt.json` (`abb.agent.ground_truth.case.v2`) beside its
+original `case.json`. See [Ground Truth](Ground%20Truth.md) for the file layout.
 
 1. **Summary stage.** Each saved Judge finding is compared with the GT summary
-   and explanation. No trajectory travels with this request. A different topic
-   or a generic failure is not a match.
-2. **Trajectory stage.** Only a positive summary match loads the reference
-   trajectories and the candidate execution's trajectory. Historical packages
-   without a saved `trajectory.json` are derived on read and flagged
-   `derived_on_read`. Both sides are rendered in the same mode: `full` first;
-   `truncate_middle` when the request would exceed `ABB_GT_MAX_BYTES` (model
-   inputs over 3000 characters keep their head and tail, outputs stay whole).
-   Nothing is rendered without inputs: a comparison that still does not fit
-   stays pending. The matcher must cite `reference_step_ids`
-   (`<attempt>/<step_id>`), `candidate_step_ids` and the
-   `candidate_decisive_step`; citations are validated against the steps that
-   were actually supplied.
-3. **Score.** 1 for a confirmed discovery, 0 for a resolved mismatch, null for
-   pending. Missing, rejected or incomplete reports, unavailable evidence and
-   oversized context remain pending. A complete `pass` report with no findings
-   is 0. A failed execution may still contain sufficient evidence of a defect.
-4. **Localization.** Each decision records `localization`: the reference
-   decisive step, the candidate decisive step the matcher identified, the steps
-   the Judge finding cited (when its report names `step_ids`) and `step_match`.
-   `step_localized` counts defects whose Judge citation contains the candidate
-   decisive step. It is reported beside, never inside, the discovery score;
-   reports that cite no steps are `not scored`, not wrong.
-5. Deduplicate by GT: any 1 wins, otherwise any pending keeps the GT pending,
+   and explanation. A different topic or a generic failure is not a match.
+2. **Score.** 0 for a resolved mismatch, null for pending. A positive summary
+   match also stays pending: step-level attribution compared legacy
+   `trajectory.json` documents, was removed with that format, and will be
+   rebuilt on the ATIF trajectory. Missing, rejected or incomplete reports and
+   unavailable evidence remain pending. A complete `pass` report with no
+   findings is 0.
+3. Deduplicate by GT: any 1 wins, otherwise any pending keeps the GT pending,
    otherwise 0. The discovery fraction is unavailable while any GT is pending;
    bounds `[confirmed/N, (confirmed+unknown)/N]` are shown instead.
 
 Each matcher request is journaled before dispatch. There are no automatic
 transport retries. Existing completed or failed/interrupted requests are not
-resent. Evaluations saved under the previous protocol report `legacy` and must
-be re-run. GT units whose `gt.json` is still v1 or whose reference attempts have
-no `trajectory.json` are reported as warnings and left unassessed:
-
-```bash
-python -m agentbench trajectory build resources/agents/<unit>/ground_truth/<case>/attempts/<id> --write
-```
+resent. Evaluations saved under an earlier protocol report `stale` or `legacy`
+and must be re-run. GT units whose `gt.json` is still v1 are reported as
+warnings and left unassessed.
 
 ## Provider and artifacts
 
@@ -80,9 +53,7 @@ and budget exhaustion remain pending. Raw model replies and sanitized requests
 are saved even when response validation fails.
 
 Results are saved under `<suite>/ground_truth/evaluations/<id>/` (or beside
-the Agent's results for managed layouts), with `tasks/NNNNNN/trajectories.json`
-holding both trajectories as supplied, the render mode and the decisive step,
-and a live `latest.json` for the Suite view. New Suite events or changed GT files
+the Agent's results for managed layouts), with a live a live `latest.json` for the Suite view. New Suite events or changed GT files
 mark an old evaluation stale.
 
 ## Review

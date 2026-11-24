@@ -13,7 +13,7 @@ This file guides contributors and coding assistants. User setup belongs in
 | `agentbench/onboarding/build_agent_env/` | Planning, per-file generation, validation, persistence and registration. |
 | `agentbench/adapter/` | Framework loading and native input/output invocation. |
 | `agentbench/harness/` | Agent registry, suite scheduling, Case concurrency, recovery and results. |
-| `agentbench/trajectory/` | The `trajectory.json` evidence contract: deriving the step sequence from raw traces, its schema version, and the reader renderings. |
+| `agentbench/trajectory/` | The ATIF trajectory (`trajectory.atif.json`): reading raw records, assembling official ATIF steps and the stored form. |
 | `agentbench/runtime/` | Generic Docker execution, runtime services and interception integration. |
 | `agentbench/runtime/source/` | Source checks and missing-file restoration before SDK startup; see its README. |
 | `agentbench/services/model-interceptor/` | Model protocol recognition, authentication, routing and traffic evidence. |
@@ -29,26 +29,31 @@ Check nearby code and module documentation before changing an interface.
 
 ## Keep the trajectory contract whole
 
-Every execute-phase result package (`attempts/<id>/`) carries `trajectory.json`
-(`abb.agent-trajectory.v1`): a flat step sequence derived from the raw records
-after the container stops and host trace validation ran. The raw OTel,
-framework, interceptor and file evidence stay the source of truth; the
-trajectory is a versioned derivation that must be readable on its own.
+The ATIF document `trajectory.atif.json` (ATIF-v1.8, `trajectory/atif/`) is the
+only trajectory. The run flow derives it after the container stops and host
+trace validation ran, and records its status as `atif` in `run.json`. The raw
+OTel, framework, interceptor and file evidence stay the source of truth.
 
-- A derivation failure still writes the file with `status: failed` and the error;
-  it never changes the execution outcome. Missing files are reported as
-  incomplete evidence, separately from any Judge verdict.
-- Store every step's complete input, output and tool logs plus the run
-  metadata. Do not deduplicate or shorten them in the stored file; compress only
-  when rendering for a reader (`trajectory/render.py`).
+- Derivation never changes the execution outcome. Without Harbor's models
+  (`agentbench/trajectory/atif/requirements.txt`) the status is `unavailable`;
+  a conversion error is `failed`. Neither writes a file.
+- The document keeps the official ATIF fields and, under `extra.abb`, only small
+  annotations and `{file, line}` pointers into the attempt directory, which keeps
+  the complete evidence. Do not embed copies of recorded evidence.
+  `trajectory/atif/slim.py` holds one rule per stored key; a key without a rule
+  fails the export.
+- One step source per attempt decides which records become steps
+  (`trajectory/atif/sources/`), chosen from the frozen `[adapter] type` or an
+  explicit `[atif] source`: `langgraph` reads callbacks; `acp_otel` reads only
+  the spans the Agent exported, never the records ABB writes while relaying
+  ACP. Add a source module for a new format instead of branching the reader.
 - Pair records by recorded identifiers (interceptor call id, framework span id,
   emitted tool call id). Never infer relationships from timestamps.
 - Generic code produces the trajectory; whether a Judge consumes it is the SDK
-  plugin's decision. Ground-truth references must carry one
-  (`agentbench trajectory build DIR --write`).
+  plugin's decision. Native Judge requests attach `trajectory.atif.json`.
 - Reuse `observe/interactions.py` and `observe/tool_links.py` for grouping and
   pairing instead of parsing traces again. See
-  [the contract](agentbench/trajectory/README.md).
+  [the ATIF document](docs/ATIF-Experiment.md#automatic-derivation).
 
 ## Preserve the onboarding flow
 

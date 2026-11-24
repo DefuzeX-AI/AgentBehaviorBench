@@ -6,7 +6,6 @@ import pytest
 
 from agentbench.harness.registry import AgentRegistration, tomllib
 from agentbench.evaluation.targets import prepare_target
-from agentbench.trajectory.metadata import build_metadata, capture_target
 from tests.test_runtime_source import unit, git
 
 
@@ -81,17 +80,3 @@ def test_failed_fetch_is_not_published(unit, tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match='offline'):
         prepare_target(registration(root), first, cache_dir=tmp_path / 'prepared')
     assert not [p for p in (tmp_path / 'prepared').iterdir() if p.is_dir()]
-
-
-def test_trajectory_uses_frozen_target_even_when_default_manifest_changes(unit, tmp_path, monkeypatch):
-    root, first, _ = unit
-    frozen = capture_target(root)
-    (root / 'agent.toml').write_text('source={revision="changed"}')
-    class API:
-        def read(self, name):
-            return {'request/target.json': frozen, 'case.json': {'inputs': [{'payload': 'test'}]}}.get(name)
-    monkeypatch.setattr('agentbench.trajectory.metadata._unit', lambda *a: pytest.fail('No registry lookup'))
-    metadata, warnings = build_metadata(API(), agent_id='test', framework='langgraph',
-                                        first_input={}, actors=[], project_root=tmp_path)
-    assert metadata['system_architecture']['source_revision'] == first
-    assert warnings == []

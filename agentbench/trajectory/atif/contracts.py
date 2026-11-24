@@ -75,6 +75,8 @@ class DelegationEvidence:
     links: list[DelegationLink] = field(default_factory=list)
     issues: list[EvidenceIssue] = field(default_factory=list)
     facts: list[dict] = field(default_factory=list)
+    # record id -> id of a record whose execution it continues
+    same_execution: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -92,6 +94,11 @@ class EvidenceBundle:
     raw_records: list[dict] = field(default_factory=list)
     auxiliary_artifacts: dict = field(default_factory=dict)
     unassigned_agent_spans: list[dict] = field(default_factory=list)
+    # The step source that read the records; whether it projects the delivered
+    # result as a step of its own; whether Agent-exported spans are its steps.
+    source: str = "langgraph"
+    reply_steps: bool = True
+    exported_steps: bool = False
 
 
 @dataclass
