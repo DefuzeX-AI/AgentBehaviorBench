@@ -6,10 +6,12 @@ built-in ACP server (`easycode --acp`). ABB invokes it over ACP stdio and keeps 
 Case in a separate empty workspace. No upstream source is vendored or modified.
 Easy Code is a fork of Google's Gemini CLI.
 
-The recorded revision `3e7d8e89` is the `gitHead` npm records for 1.1.91 (also in the
-package's `bundle/build-info.json`). That commit is not on the public repository:
-its `opensource` branch ends at `887b8bb4` (2026-06-18, CLI 1.1.14) while npm
-releases continue. The installed artifact is the integrity-pinned npm tarball.
+The recorded revision is `npm:easycode-ai@1.1.91`, identifying the installed
+release. The publisher's `gitHead`, `3e7d8e89b5ca96c649240ebaa5d4c08f87afb7b6`,
+is retained separately as `npm_git_head` in the source metadata (also recorded
+in the package's `bundle/build-info.json`). GitHub did not resolve that commit
+during the 2026-11-25 audit. The installed artifact is the integrity-pinned npm
+tarball in `install/package-lock.json`; no Git checkout of that SHA is required.
 
 ## Licence
 
