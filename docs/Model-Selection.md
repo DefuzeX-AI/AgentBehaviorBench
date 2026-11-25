@@ -66,20 +66,31 @@ routing file. These settings do not modify SDK/judge model selection.
 Hermes has `[model] metadata_paths = ["/models"]` solely to permit its model-list
 request. Without `provider`, it still inherits default selection.
 
-The runtime resolves the selected service on the host and passes only its credential,
-model, base URL and provider ID to the launcher using internal `ABB_AGENT_MODEL_*`
-variables. Do not fill or declare those variables in `.env` or runtime input lists.
-The launcher maps them to the upstream Agent's supported configuration. Upstream code
-and Agent tools remain unchanged. ACP remains in **observe mode**: the proxy records
-native model calls without substituting the provider or credential.
+Shared ACP interception is controlled by one host-side constant:
+`ACP_MODEL_MODE` in `agentbench/runtime/interception/policy.py`. Its default is
+`"replace"`; change it to `"observe"` and restart the host process to restore
+native forwarding. This is not an Agent manifest field or a per-Agent option.
+Explicit `model.source="native"` integrations retain observe mode in either case.
+
+The runtime resolves the selected service on the host and passes the model, base
+URL and provider ID through internal `ABB_AGENT_MODEL_*` variables. In replace
+mode the launcher receives a fresh proxy token in `ABB_AGENT_MODEL_API_KEY`;
+only the interceptor receives the real key and replaces outgoing model requests.
+In observe mode the launcher receives the selected real key and the proxy records
+native requests and responses without substitution. Do not declare these internal
+variables in `.env` or runtime input lists. Upstream code and Agent tools remain
+unchanged. Run provenance includes the effective mode; switching modes requires a
+new run instead of resuming results collected under the other policy.
 
 The runtime derives the exact HTTPS host, port and `/chat/completions` path from the
 selected base URL. It does not admit all provider hosts or wildcard paths. Hermes also
-opts into `GET <base>/models`; its other tool routes remain separate.
+opts into `GET <base>/models`; replacement mode authenticates this exact catalog
+endpoint with the selected service key. Its other tool routes remain separate.
 
 Current shared ACP profiles support one OpenAI-compatible Chat Completions model.
 Custom provider headers, nonstandard endpoint suffixes and multi-target routing are
-rejected explicitly; those richer routing options remain available in replacement mode.
+rejected explicitly for shared ACP profiles; generic replacement integrations
+retain their richer routing options.
 
 Cline selects its native OpenRouter, DeepSeek or ZhipuAI provider and validates model IDs
 against the catalog bundled with CLI 3.0.62 / `@cline/llms` 0.0.83. Unknown IDs fail instead

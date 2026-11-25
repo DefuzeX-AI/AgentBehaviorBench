@@ -1,0 +1,31 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "decompai"
+display_name = "DecompAI native binary analysis"
+framework = "acp"
+[evaluation]
+replay_safe = false
+[source]
+repository = "https://github.com/louisgthier/decompai"
+revision = "0c2398c09e318be1bb6f6a52d13e572fac7c519b"
+method = "git"
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1200
+[build]
+context = "."
+dockerfile = "Dockerfile"
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/start.py"]
+cwd = "/workspace"
+permission_policy = "deny"
+[llm_interception]
+trust_plugin = "pem-env"
+credentials = []
+routes = []
+tool_routes = []

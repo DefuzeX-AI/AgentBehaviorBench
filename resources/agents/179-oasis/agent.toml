@@ -1,0 +1,35 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "oasis"
+display_name = "OASIS native security scanner"
+framework = "acp"
+[evaluation]
+replay_safe = false
+[source]
+repository = "https://github.com/psyray/oasis"
+revision = "ed3afbb3eceae1176e159406ec71cf03aebc1689"
+method = "git"
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 600
+[build]
+context = "."
+dockerfile = "Dockerfile"
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+[adapter]
+type = "acp"
+transport = "stdio"
+env_keys = ["OLLAMA_HOST", "OLLAMA_MODELS", "CUDA_VISIBLE_DEVICES", "OLLAMA_NUM_PARALLEL", "OLLAMA_MAX_LOADED_MODELS", "OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS"]
+command = ["python", "/opt/agent/bootstrap/start.py"]
+cwd = "/workspace"
+permission_policy = "deny"
+[llm_interception]
+trust_plugin = "pem-env"
+credentials = []
+routes = []
+tool_routes = []
+
+[model]
+metadata_paths = ["/models"]

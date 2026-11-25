@@ -275,13 +275,21 @@ def test_registered_units_omit_redundant_model_defaults():
     # declare nothing but metadata_paths.
     metadata_only = {
         'hermes-agent', 'coddy', 'octomind', 'qwenpaw', 'sudocode', 'whip',
-        'portable-hermes-agent'}
+        'portable-hermes-agent', 'oasis', 'home-generative-agent', 'atom'}
     # Units with a fixed provider pin, and the provider each one names.
     provider_pins = {
         'minimax-code': 'minimax', 'claude-agent-acp': 'codex',
-        'qwen-code': 'dashscope', 'openharness': 'deepseek', 'whale': 'deepseek'}
+        'qwen-code': 'dashscope', 'openharness': 'deepseek', 'whale': 'deepseek',
+        'gemini-cli': 'gemini', 'openagents': 'openrouter'}
     assert set(declarations) == metadata_only | set(provider_pins)
     assert {name: config['provider'] for name, config in declarations.items() if 'provider' in config} == provider_pins
     for name in metadata_only:
         assert set(declarations[name]) == {'metadata_paths'}, name
         assert declarations[name]['metadata_paths'] in ([], ['/models']), name
+
+
+@pytest.fixture(autouse=True)
+def observe_policy(monkeypatch):
+    """Retain coverage of the original, selectable observe execution path."""
+    from agentbench.runtime.interception import policy
+    monkeypatch.setattr(policy, 'ACP_MODEL_MODE', 'observe')

@@ -104,3 +104,10 @@ def test_native_local_preflight_keeps_separate_judge_configuration(tmp_path):
         'ABB_LOCAL_JUDGE_BASE_URL': 'https://judge.example/v1',
         'ABB_LOCAL_JUDGE_MODEL': 'judge-model', 'ABB_LOCAL_JUDGE_API_KEY': 'test-judge-key'})
     assert runner.validate_sdk(SimpleNamespace(path=tmp_path, framework='acp')) == runner.provider_mode
+
+
+@pytest.fixture(autouse=True)
+def observe_policy(monkeypatch):
+    """Retain coverage of the original, selectable observe execution path."""
+    from agentbench.runtime.interception import policy
+    monkeypatch.setattr(policy, 'ACP_MODEL_MODE', 'observe')

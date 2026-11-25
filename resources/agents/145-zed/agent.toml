@@ -1,0 +1,44 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "zed"
+display_name = "Zed native eval-cli (single-turn ACP bridge)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "git"
+repository = "https://github.com/zed-industries/zed"
+revision = "2f808b3c2de049ecfdbad0fdb26763cebfcaa3b4"
+downloaded_on = "2026-11-21"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 720
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/acp_bridge.py"]
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []

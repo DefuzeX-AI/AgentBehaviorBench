@@ -1,0 +1,57 @@
+# Integration of the complete upstream research workflow.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "datagen"
+display_name = "DATAGEN native research workflow"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/zi-yue-1129/DATAGEN"
+revision = "b24e72010d443d909e24584b0754bb1aea4425ff"
+downloaded_on = "2026-11-22"
+method = "git"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 300
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "message"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.tool_routes]]
+host_patterns = ["export.arxiv.org"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/api/query*"]
+purpose = "tool"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
