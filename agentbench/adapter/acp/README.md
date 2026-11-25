@@ -37,6 +37,13 @@ execution limits do not become successful results. A lost response is not eviden
 that replay is safe. Protocol callbacks use the local `on_acp_event(name, data)`
 observer seam; callback objects never cross the ACP wire.
 
+The adapter also retains the ordered `agent_message_chunk` text as one observed
+public text stream per prompt in `AdapterInvocation.public_messages`. Successful
+text-only prompts are complete for that protocol stream. Non-text content and
+failed/unfinished prompts remain incomplete; earlier text is retained on failure.
+This does not establish execution/network completeness or invent native message
+IDs. Thought chunks, tools and stderr are excluded from public-message content.
+
 Terminal references and the advertised `terminal_output` metadata extension are
 resolved into tool evidence. See [ACP terminal evidence](../../observe/acp_evidence/README.md)
 for the source Protocol, extension registry, limits and offline acceptance.

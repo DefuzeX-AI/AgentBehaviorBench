@@ -10,8 +10,10 @@ def sanitize_result(result, secrets):
     """
     original = json_value(result)
     safe = redact(original, secrets)
-    fields = [key for key in ('output', 'raw_output', 'error')
+    fields = [key for key in ('output', 'raw_output', 'error', 'public_messages')
               if key in original and original[key] != safe[key]]
+    if 'public_messages' in fields and isinstance(safe['public_messages'], dict):
+        safe['public_messages'].update(complete=False, redacted=True)
     return safe, {'status': 'applied' if safe != original else 'unchanged',
                   'fields': fields, 'changed_field_count': len(fields),
                   'policy': 'runtime_credentials_and_credential_fields'}

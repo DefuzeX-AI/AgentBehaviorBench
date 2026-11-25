@@ -16,6 +16,7 @@ class ACPClient:
         self.parts = []
         self.output_bytes = 0
         self.error = None
+        self.public_text_complete = True
         self.terminals = Terminals(config, emit)
         self.pending_updates = []
         self.pending_bytes = 0
@@ -53,6 +54,9 @@ class ACPClient:
                     if self.output_bytes > self.config.max_output_bytes:
                         raise ACPError('ACP reply exceeds configured output limit', code='output_limit')
                     self.parts.append(text)
+                else:
+                    # Images/resources cannot be represented as captured public text.
+                    self.public_text_complete = False
         except Exception as exc:
             # Notification errors must fail the invocation, not disappear in SDK logs.
             self.error = exc
