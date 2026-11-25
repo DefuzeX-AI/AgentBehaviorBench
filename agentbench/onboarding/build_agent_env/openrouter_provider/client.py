@@ -14,7 +14,7 @@ from agentbench.runtime.interception.config import InterceptionConfigurationErro
 
 from .settings import ASSETS, BuildSettings
 from .http_errors import describe_http_error
-from .request_schema import build_request_schema
+from .request_schema import build_request_schema, restore_optional_fields
 from ..common.errors import BuildError, ProviderResponseError
 from ..common.diagnostics import json_type
 from .response_metadata import response_metadata, content_contains_secret, decode_location
@@ -54,6 +54,7 @@ class OpenRouterClient:
         """
         self.last_response_metadata = {}
         # The caller retains the full schema for validation and repair feedback.
+        local_schema = schema
         schema = build_request_schema(schema)
         paths = [item["path"] for item in payload.get("context", {}).get("files", [])]
         if paths:
@@ -75,7 +76,7 @@ class OpenRouterClient:
             try:
                 with self.opener.open(request, timeout=self.settings.timeout_seconds) as response:
                     raw = response.read(self.settings.max_response_bytes + 1)
-                return self._decode(raw)
+                return restore_optional_fields(self._decode(raw), local_schema)
             except HTTPError as exc:
                 retry = exc.code == 429 or 500 <= exc.code <= 599
                 try:

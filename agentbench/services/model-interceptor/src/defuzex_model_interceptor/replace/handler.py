@@ -48,12 +48,23 @@ class ReplaceInterceptor(CommonInterceptor):
         except TargetRoutingError as exc:
             self._error(flow, str(exc), 422, code=ErrorCode.REQUEST_PREPARATION_FAILED)
             return
-        if route is None and self.policy.permits_tool(flow.request):
+        metadata_route = next((r for r in self.config.tool_routes
+                               if r.purpose == 'metadata' and self.policy.matches(r, flow.request)), None)
+        shared_metadata = metadata_route is not None and 'shared' in self.credentials
+        if route is None and (self.policy.permits_tool(flow.request) or shared_metadata):
             # Bind tool egress to the approved Host, not a possibly different
             # transparent destination IP/SNI supplied by the caller.
             flow.request.host = flow.request.pretty_host.rstrip(".").lower()
-            tool = next(r for r in self.config.tool_routes if self.policy.matches(r, flow.request))
+            tool = metadata_route if shared_metadata else next(
+                r for r in self.config.tool_routes if self.policy.matches(r, flow.request))
             flow.metadata.update(abb_tool=True, purpose=tool.purpose, required=tool.required)
+            if tool.purpose == 'metadata':
+                from .metadata import authorize_shared_metadata
+                try:
+                    authorize_shared_metadata(flow.request, self.config, self.authentication)
+                except InterceptorAuthenticationError as exc:
+                    self._error(flow, str(exc), 401, code=ErrorCode.AUTHENTICATION_FAILED)
+                    return
             events.emit('tool_request', **self._tool_fields(flow), **self._body(flow.request))
             return
         if route is None:

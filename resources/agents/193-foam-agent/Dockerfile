@@ -1,0 +1,69 @@
+# Build from the repository root with hydrated target corpus files.
+FROM openfoam/openfoam10-paraview510:latest AS builder
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates python3 && rm -rf /var/lib/apt/lists/*
+ENV CONDA_DIR=/opt/conda
+ENV FoamAgent_PATH=/home/openfoam/Foam-Agent
+WORKDIR /home/openfoam/Foam-Agent
+COPY agent/scripts/verify_target_corpus.py /tmp/verify_target_corpus.py
+COPY agent/database/foundation-v10/ database/foundation-v10/
+RUN python3 /tmp/verify_target_corpus.py --target foundation-v10 --database-path /home/openfoam/Foam-Agent/database/foundation-v10
+COPY agent/environment.yml agent/pyproject.toml agent/constraints.txt ./
+COPY agent/docker/install-python.sh /tmp/install-python.sh
+RUN sed -i 's/\r$//' /tmp/install-python.sh && bash /tmp/install-python.sh
+# Prepare client tokenizers too, so the first LLM request needs no asset download.
+ENV TIKTOKEN_CACHE_DIR=/opt/foamagent-tokenizers \
+    HF_HOME=/opt/foamagent-hf-cache
+RUN /opt/conda/envs/FoamAgent/bin/python -c "import tiktoken; tiktoken.get_encoding('cl100k_base'); tiktoken.get_encoding('o200k_base'); from langchain_core.language_models.base import get_tokenizer; get_tokenizer()"
+
+# Pin model assets independently of the location used to load them.
+ARG EMBEDDING_REVISION=97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+RUN /opt/conda/envs/FoamAgent/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('Qwen/Qwen3-Embedding-0.6B', revision='$EMBEDDING_REVISION', local_dir='/opt/foamagent-model', allow_patterns=['*.json', '*.safetensors', '*.txt', 'README.md'])" && \
+    rm -rf /opt/foamagent-model/.cache
+
+COPY agent/src/ src/
+COPY agent/scripts/ scripts/
+COPY agent/examples/ examples/
+COPY agent/foambench_main.py agent/user_requirement.txt agent/LICENSE agent/README.md ./
+RUN /opt/conda/envs/FoamAgent/bin/python -m pip install --no-cache-dir --no-deps -e .
+
+FROM openfoam/openfoam10-paraview510:latest AS dependencies
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates xvfb libgl1 libglu1-mesa libgomp1 && rm -rf /var/lib/apt/lists/*
+ENV CONDA_DIR=/opt/conda \
+    HOME=/root \
+    FoamAgent_PATH=/home/openfoam/Foam-Agent \
+    TIKTOKEN_CACHE_DIR=/opt/foamagent-tokenizers \
+    HF_HOME=/opt/foamagent-hf-cache \
+    PATH=/opt/conda/envs/FoamAgent/bin:/opt/conda/bin:$PATH \
+    FOAMAGENT_IMAGE_OPENFOAM_TARGET=foundation-v10 \
+    FOAMAGENT_BUNDLED_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B \
+    FOAMAGENT_BUNDLED_EMBEDDING_MODEL_PATH=/opt/foamagent-model
+COPY --from=builder /opt/conda /opt/conda
+COPY --from=builder /opt/foamagent-model /opt/foamagent-model
+COPY --from=builder /opt/foamagent-tokenizers /opt/foamagent-tokenizers
+COPY --from=builder /opt/foamagent-hf-cache/hub /opt/foamagent-hf-cache/hub
+COPY --from=builder /home/openfoam/Foam-Agent /opt/agent/agent
+RUN ln -s /opt/agent/agent /home/openfoam/Foam-Agent
+COPY agent/docker/foamagent-entrypoint.sh /usr/local/bin/foamagent-entrypoint.sh
+ARG VCS_REF=local
+ARG VERSION=local
+ENV FOAMAGENT_IMAGE_REVISION=$VCS_REF
+LABEL org.opencontainers.image.source="https://github.com/csml-rpi/Foam-Agent" \
+      org.opencontainers.image.revision=$VCS_REF \
+      org.opencontainers.image.version=$VERSION
+RUN sed -i 's/\r$//' /usr/local/bin/foamagent-entrypoint.sh && \
+    chmod +x /usr/local/bin/foamagent-entrypoint.sh && \
+    printf '\nsource /opt/conda/etc/profile.d/conda.sh\nconda activate FoamAgent\nsource /opt/openfoam10/etc/bashrc\ncd /home/openfoam/Foam-Agent\n' >> /root/.bashrc
+WORKDIR /home/openfoam/Foam-Agent
+
+RUN python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' \
+    && useradd --create-home --uid 10001 agent
+ENV HOME=/home/agent PYTHONPATH=/opt/abb-runtime
+FROM dependencies
+WORKDIR /opt/agent
+COPY .abb-runtime/ /opt/abb-runtime/
+COPY bindings/ ./bindings/
+COPY agent.toml ./agent.toml
+ENTRYPOINT []
+USER agent

@@ -9,13 +9,13 @@ from jsonschema import Draft202012Validator
 import pytest
 
 from agentbench.onboarding.build_agent_env.common.errors import BuildError
-from agentbench.onboarding.build_agent_env.openrouter_provider.request_schema import build_request_schema
+from agentbench.onboarding.build_agent_env.openrouter_provider.request_schema import build_request_schema, restore_optional_fields
 from tests.agent_build_fixtures import source, plan, Client, build
 from tests.test_agent_build_client import client, response
 
 ROOT = Path(__file__).resolve().parents[1] / "agentbench/onboarding/build_agent_env"
 SCHEMAS = ["frameworks/langgraph/assets/planning/response.schema.json", "frameworks/langgraph/assets/manifest/analysis.schema.json",
-           "openrouter_provider/assets/file-response.schema.json"]
+           "openrouter_provider/assets/file-response.schema.json", "frameworks/acp/assets/manifest/analysis.schema.json"]
 
 
 @pytest.mark.parametrize("path", SCHEMAS)
@@ -34,7 +34,7 @@ def test_all_stage_schemas_can_be_sent_without_mutating_the_local_contract(path)
     wire = structured["schema"]
     Draft202012Validator.check_schema(wire)
     assert structured["strict"] is True
-    assert wire["required"] == schema["required"]
+    assert set(wire["required"]) == set(wire["properties"])
     assert wire["additionalProperties"] is False
     assert wire["properties"]["evidence"]["items"]["enum"] == ["README.md"]
     assert schema == before
@@ -43,6 +43,37 @@ def test_all_stage_schemas_can_be_sent_without_mutating_the_local_contract(path)
         assert f'"{keyword}":' not in json.dumps(wire)
     if "facts" in wire["properties"]:
         assert wire["properties"]["facts"]["anyOf"][1] == {"type": "null"}
+
+
+@pytest.mark.parametrize("path", SCHEMAS)
+def test_every_wire_object_lists_all_properties_as_required(path):
+    def check(node):
+        if isinstance(node, dict):
+            if "properties" in node:
+                assert set(node["required"]) == set(node["properties"])
+            for child in node.values():
+                check(child)
+        elif isinstance(node, list):
+            for child in node:
+                check(child)
+    check(build_request_schema(json.loads((ROOT / path).read_text(encoding="utf-8"))))
+
+
+def test_wire_nulls_restore_only_optional_nonnullable_fields():
+    schema = {"type": "object", "additionalProperties": False, "required": ["required"],
+              "properties": {"required": {"type": "string"}, "optional": {"type": "string"},
+                             "nullable": {"type": ["string", "null"]},
+                             "nested": {"anyOf": [{"type": "null"}, {"type": "object",
+                                 "additionalProperties": False, "properties": {"provider": {"type": "string"}}}]}}}
+    value = {"required": "ok", "optional": None, "nullable": None, "nested": {"provider": None}}
+    assert Draft202012Validator(build_request_schema(schema)).is_valid(value)
+    restored = restore_optional_fields(value, schema)
+    assert restored == {"required": "ok", "nullable": None, "nested": {}}
+    assert Draft202012Validator(schema).is_valid(restored)
+    assert value["optional"] is None
+    invalid = restore_optional_fields({**value, "required": None}, schema)
+    assert invalid["required"] is None
+    assert not Draft202012Validator(schema).is_valid(invalid)
 
 
 def test_projection_walks_schema_positions_not_property_names_or_literal_values():
@@ -85,6 +116,9 @@ def test_real_client_responses_require_local_validation_and_bounded_repairs(sour
         payload = json.loads(body["messages"][1]["content"])
         wire = body["response_format"]["json_schema"]["schema"]
         result = fixtures.generate(payload, prompt="", schema=wire)
+        if isinstance(result.get("facts"), dict):
+            # Strict-provider replies include wire placeholders for omissions.
+            result["facts"].setdefault("model", None)
         selected = (stage == "plan" and "target_path" not in payload or
                     stage == "facts" and payload.get("response_kind") == "configuration_facts")
         if selected:

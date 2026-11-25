@@ -91,9 +91,16 @@ class InterceptionConfig:
 
         from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
         mode = DEFAULT_ADAPTER_FACTORY.network_mode(manifest.get('framework', 'langgraph'))
+        shared_acp = (manifest.get('framework') == 'acp'
+                      and manifest.get('model', {}).get('source') != 'native')
+        if shared_acp:
+            from .policy import acp_model_mode
+            mode = acp_model_mode()
         environment = _string_mapping(section.get("environment", {}), "environment")
-        credentials = (() if mode == 'observe' and not section.get('credentials')
+        credentials = (() if (mode == 'observe' or shared_acp) and not section.get('credentials')
                        else _credentials(section.get("credentials")))
+        if shared_acp and mode == 'replace' and not credentials:
+            credentials = (CredentialConfig('shared', 'ABB_AGENT_MODEL_API_KEY', 'bearer-token'),)
         routes = _routes(section.get("routes", []), credentials, require_credentials=mode == 'replace')
         agent_envs = [item.agent_env for item in credentials]
         if len(set(agent_envs)) != len(agent_envs):

@@ -29,7 +29,9 @@ def agent_model_configuration(registrations, *, environ, model):
             manifest = tomllib.load(stream)
         interception = InterceptionConfig.from_agent_dir(agent.path)
         mode = interception.mode if interception is not None else 'direct'
-        if interception is not None and mode == 'replace':
+        from agentbench.runtime.interception.native_model import resolve_shared_model
+        shared = resolve_shared_model(manifest, environ)
+        if interception is not None and mode == 'replace' and shared is None:
             from agentbench.runtime.interception.native_model import select_model_provider
             resolved = resolve_target_routing(environ, select_model_provider(manifest, environ))
             secrets = (*environment_secrets(environ),
@@ -45,8 +47,6 @@ def agent_model_configuration(registrations, *, environ, model):
             }, secrets)
             result[agent.agent_id] = {'mode': mode, 'routing': routing}
             continue
-        from agentbench.runtime.interception.native_model import resolve_shared_model
-        shared = resolve_shared_model(manifest, environ)
         runtime = manifest.get('runtime', {})
         private = set(runtime.get('secret_env_keys', ())) | set(runtime.get('optional_secret_env_keys', ()))
         if interception is not None:

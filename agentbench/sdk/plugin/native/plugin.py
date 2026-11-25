@@ -11,5 +11,18 @@ class NativePlugin(ContainerSDKPlugin):
         return NativeRunner(self, context=context, options=options)
 
 
-plugin = NativePlugin(create_run='agentbench.sdk.plugin.native.backend:create_run',
+class NativeOnboardingPlugin(NativePlugin):
+    def onboarding_requirements(self):
+        from .onboarding import REQUIREMENTS
+        return REQUIREMENTS
+
+    def onboarding_input_types(self):
+        return ('text',)
+
+    def validate_onboarding(self, directory):
+        from .onboarding import validate
+        validate(directory)
+
+
+plugin = NativeOnboardingPlugin(create_run='agentbench.sdk.plugin.native.backend:create_run',
                       requirements=Path(__file__).with_name('requirements.txt'))

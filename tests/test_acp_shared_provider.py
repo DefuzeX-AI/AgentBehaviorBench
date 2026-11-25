@@ -199,3 +199,10 @@ def test_hermes_metadata_route_follows_selected_service(provider,key_name,model_
     assert metadata[0].host_patterns == (parsed.hostname,)
     assert metadata[0].methods == ('GET',)
     assert metadata[0].path_patterns == (parsed.path + '/models',)
+
+
+@pytest.fixture(autouse=True)
+def observe_policy(monkeypatch):
+    """Retain coverage of the original, selectable observe execution path."""
+    from agentbench.runtime.interception import policy
+    monkeypatch.setattr(policy, 'ACP_MODEL_MODE', 'observe')

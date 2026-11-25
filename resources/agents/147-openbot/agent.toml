@@ -1,0 +1,51 @@
+# Integration of the upstream Python LangGraph AG-UI Bot.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "openbot"
+display_name = "OpenBot (native LangGraph Bot)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/CopilotKit/OpenBot"
+revision = "e3ccd5f6130559a2790d3971c25fb5bfdd72c0c2"
+downloaded_on = "2026-11-22"
+method = "git"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 300
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "message"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"

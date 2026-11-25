@@ -24,7 +24,8 @@ FILE_PATTERNS = (
     ".python-version", "runtime.txt", ".nvmrc", ".tool-versions",
     # Non-Python build inputs: a Node front end or MCP server, a Go or Rust component, make targets.
     "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock",
-    "*acp*.ts", "cli.ts", "index.ts", "tsconfig*.json",
+    "*acp*.ts", "*acp*.py", "*acp*.rs", "*acp*.go", "cli.ts", "index.ts", "tsconfig*.json",
+    "main.rs", "main.go",
     "go.mod", "cargo.toml", "makefile",
     "application.py", "app.py", "main.py", "__main__.py",
 )

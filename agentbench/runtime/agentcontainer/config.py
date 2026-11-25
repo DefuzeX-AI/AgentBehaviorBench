@@ -81,6 +81,10 @@ class AgentContainerConfig:
         target = resolve_shared_model(manifest, values, model_provider) if resolve_model else None
         if target is not None:
             environment.update(model_environment(target, secret_resolver))
+            from agentbench.runtime.interception.policy import acp_model_mode
+            from agentbench.runtime.interception.providers import StaticModelTargetProvider
+            if acp_model_mode() == 'replace':
+                replacement_provider = StaticModelTargetProvider(target)
 
         timeout = runtime.get("timeout_sec", 60)
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:

@@ -1,0 +1,32 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "webqa-agent"
+display_name = "WebQA native browser testing"
+framework = "acp"
+[evaluation]
+replay_safe = false
+[source]
+repository = "https://github.com/MigoXLab/webqa-agent"
+revision = "aa156d4ab8b2a4658b13eb33073c686be843d3e4"
+method = "git"
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 600
+[build]
+context = "."
+dockerfile = "Dockerfile"
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+[adapter]
+type = "acp"
+transport = "stdio"
+env_keys = ["PUPPETEER_EXECUTABLE_PATH", "PLAYWRIGHT_BROWSERS_PATH", "OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS"]
+command = ["python", "/opt/agent/bootstrap/start.py"]
+cwd = "/workspace"
+permission_policy = "deny"
+[llm_interception]
+trust_plugin = "pem-env"
+credentials = []
+routes = []
+tool_routes = []

@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 from .config import InterceptionConfigurationError, RouteConfig, ToolRouteConfig
 from .providers import resolve_model_provider, DeferredModelTargetProvider
 from .target_routing import _validate_target
+from .policy import acp_model_mode
 
 KEY_ENV = 'ABB_AGENT_MODEL_API_KEY'
 BASE_ENV = 'ABB_AGENT_MODEL_BASE_URL'
@@ -93,18 +94,23 @@ def resolve_shared_model(manifest, environ, model_provider=None):
 
 
 def model_environment(target, secret_resolver):
-    return {KEY_ENV: secret_resolver.require(target.credential_env),
-            BASE_ENV: target.base_url, MODEL_ENV: target.model, PROVIDER_ENV: target.provider_id}
+    # Fail early for missing credentials, but replacement keys stay host-side.
+    key = secret_resolver.require(target.credential_env)
+    environment = {BASE_ENV: target.base_url, MODEL_ENV: target.model, PROVIDER_ENV: target.provider_id}
+    if acp_model_mode() == 'observe':
+        environment[KEY_ENV] = key
+    return environment
 
 
 def bind_model_routes(interception, target, metadata_paths=()):
     if target is None:
         return interception
-    if interception is None or interception.mode != 'observe':
-        raise InterceptionConfigurationError('Shared native models must remain in observe mode')
+    if interception is None:
+        raise InterceptionConfigurationError('Shared models require interception')
+    credential = 'shared' if interception.mode == 'replace' else ''
     parsed = urlsplit(target.base_url)
     route = RouteConfig('shared-openai-chat', (parsed.hostname,), (parsed.port or 443,),
-                        ('POST',), (parsed.path.rstrip('/') + '/chat/completions',), 'openai-chat', '')
+                        ('POST',), (parsed.path.rstrip('/') + '/chat/completions',), 'openai-chat', credential)
     metadata = tuple(ToolRouteConfig((parsed.hostname,), (parsed.port or 443,), ('GET',),
                                     (parsed.path.rstrip('/') + path,), 'metadata') for path in metadata_paths)
     return replace(interception, routes=(route,), tool_routes=interception.tool_routes + metadata)

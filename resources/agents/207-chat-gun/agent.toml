@@ -1,0 +1,51 @@
+# Integration of the native Chat-Gun MCP graph and authenticated BFF.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "chat-gun"
+display_name = "Chat-Gun native MCP agent"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/HsienW/chat-gun"
+revision = "a22b0a0020dd71571b6bbd5ecaf42618c4645dd0"
+downloaded_on = "2026-11-22"
+method = "git"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 600
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "message"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"

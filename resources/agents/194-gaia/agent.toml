@@ -1,0 +1,51 @@
+# Integration of the complete upstream research workflow.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "gaia"
+display_name = "GAIA native self-host runtime"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/theexperiencecompany/gaia"
+revision = "9087e03db3ad71a483e4c839c9a50b04ef81c5e3"
+downloaded_on = "2026-11-22"
+method = "git"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "message"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENROUTER_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["openrouter.ai"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/api/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"

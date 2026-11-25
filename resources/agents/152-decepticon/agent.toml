@@ -1,0 +1,51 @@
+# Integration of the upstream Python LangGraph AG-UI Bot.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "decepticon"
+display_name = "Decepticon native orchestrator"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/BitterSecurity/Decepticon"
+revision = "6b15092d2e0b41f2ef5af79a16333582cc3fb353"
+downloaded_on = "2026-11-22"
+method = "bundled"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 300
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "message"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "DECEPTICON_LLM__PROXY_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
