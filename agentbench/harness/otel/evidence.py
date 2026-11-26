@@ -1,11 +1,20 @@
-"""Preserve OTLP span fields with their resource, scope and evidence origin."""
+"""Preserve OTLP span fields with their resource, scope and evidence origin.
+
+Every received export is archived byte for byte under raw/ before any span row
+is derived from it. The archive is unredacted and stays local to the attempt.
+"""
 from collections import Counter
 from datetime import datetime, timezone
+import hashlib
 import json
+import os
 import re
 from threading import Lock
 
 from agentbench.observe.store import atomic_json, environment_secrets, redact
+
+RAW_DIRECTORY = "raw"
+_EXTENSIONS = {"application/x-protobuf": ".pb", "application/grpc+proto": ".pb", "application/json": ".json"}
 
 
 def _identifier(value, length):
@@ -90,15 +99,50 @@ class EvidenceWriter:
         self.context = {}
         self.error = None
         self.rejected_batches = 0
+        self.raw_batches = 0
         self.observation_note = None
         self.secrets = environment_secrets()
         directory.mkdir(parents=True, exist_ok=True)
         self.status("running")
 
-    def reject(self, reason):
+    def archive(self, body, *, transport, content_type=None, content_encoding=None, name=None):
+        """Store one export exactly as received and return the pointer its span rows carry."""
         with self.lock:
-            self.rejected_batches += 1
-            self.error = reason
+            self.raw_batches += 1
+            batch = self.raw_batches
+            raw = self.directory / RAW_DIRECTORY
+            raw.mkdir(mode=0o700, exist_ok=True)
+            if name:
+                filename = f"{batch:06d}-{os.path.basename(name)}"
+            else:
+                filename = f"{batch:06d}{_EXTENSIONS.get(content_type, '.bin')}"
+                if content_encoding == "gzip":
+                    filename += ".gz"
+            # Unredacted Agent exports: owner-only, never replaced.
+            descriptor = os.open(raw / filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(body)
+            source = {"file": f"otel/{RAW_DIRECTORY}/{filename}", "batch": batch}
+            self._index({"event": "received", **source, "sha256": hashlib.sha256(body).hexdigest(),
+                         "bytes": len(body), "transport": transport, "content_type": content_type,
+                         "content_encoding": content_encoding,
+                         "received_at": datetime.now(timezone.utc).isoformat()})
+            self.status("running")
+        return source
+
+    def _index(self, entry):
+        path = self.directory / RAW_DIRECTORY / "index.jsonl"
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with os.fdopen(descriptor, "a", encoding="utf-8") as stream:
+            stream.write(json.dumps(entry, ensure_ascii=False, allow_nan=False) + "\n")
+
+    def reject(self, reason, source=None, count=True):
+        with self.lock:
+            if count:
+                self.rejected_batches += 1
+                self.error = reason
+            if source is not None:
+                self._index({"event": "rejected", "batch": source["batch"], "reason": reason})
             self.status("running")
 
     def status(self, state):
@@ -108,9 +152,10 @@ class EvidenceWriter:
         atomic_json(self.directory / "status.json", {"schema": "abb.agent-otel.v1", "profile": self.config.profile,
                     "status": state, "span_count": self.count, "protocol": self.config.protocol if self.config.profile != "file-export" else self.config.file_format,
                     "record_count": sum(self.by_origin.values()), "origin_counts": dict(self.by_origin),
-                    "rejected_batches": self.rejected_batches, "reason": reason or None})
+                    "rejected_batches": self.rejected_batches, "raw_batches": self.raw_batches,
+                    "raw_redacted": False, "reason": reason or None})
 
-    def accept_json(self, batch, *, transport, file_record=None):
+    def accept_json(self, batch, *, transport, file_record=None, source=None):
         rows = []
         if not isinstance(batch, dict):
             raise ValueError("Expected an OTLP request object")
@@ -130,11 +175,17 @@ class EvidenceWriter:
                         rows[-1]["file_record"] = file_record
         rows = [redact(_redact_attributes(row, self.secrets), self.secrets) for row in rows]
         with self.lock:
-            for n, row in enumerate(rows, sum(self.by_origin.values()) + 1):
+            first = sum(self.by_origin.values()) + 1
+            for n, row in enumerate(rows, first):
                 row["ref"] = {"file": "otel/spans.jsonl", "line": n}
+                if source is not None:
+                    row["archive"] = source
             lines = [json.dumps(row, ensure_ascii=False, allow_nan=False) + "\n" for row in rows]
             with (self.directory / "spans.jsonl").open("a", encoding="utf-8") as stream:
                 stream.writelines(lines)
+            if source is not None:
+                self._index({"event": "accepted", "batch": source["batch"],
+                             "span_lines": [first, first + len(rows) - 1] if rows else []})
             self.by_origin.update(row["origin"] for row in rows)
             self.count = self.by_origin["agent_native"] + self.by_origin["auto_instrumented"]
             self.status("running")
@@ -151,4 +202,16 @@ def publish_capture(source, destination):
         staged = Path(temp) / "otel"
         staged.mkdir()
         collect_response(source, staged)
+        restrict_raw(staged)
         staged.rename(destination)
+
+
+def restrict_raw(directory):
+    """Copies do not keep modes; the unredacted archive stays owner-only."""
+    raw = directory / RAW_DIRECTORY
+    if not raw.is_dir() or raw.is_symlink():
+        return
+    raw.chmod(0o700)
+    for path in raw.iterdir():
+        if path.is_file() and not path.is_symlink():
+            path.chmod(0o600)

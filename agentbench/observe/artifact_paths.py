@@ -10,6 +10,12 @@ from pathlib import Path, PurePosixPath
 SESSION_OUTPUT = 'session/output'
 
 
+def is_raw_trace(relative):
+    """Unredacted OTLP exports under any otel/raw/ stay on disk; readers never serve them."""
+    parts = PurePosixPath(str(relative).replace('\\', '/')).parts
+    return any(a == 'otel' and b == 'raw' for a, b in zip(parts, parts[1:]))
+
+
 def _safe(root, relative):
     rel = PurePosixPath(str(relative).replace('\\', '/'))
     if rel.is_absolute() or '..' in rel.parts or ':' in str(rel):
@@ -59,6 +65,8 @@ def legacy_relative(relative):
 
 def artifact_file(directory, relative):
     root = Path(directory).resolve()
+    if is_raw_trace(relative):
+        raise ValueError('Raw trace exports are not served')
     _safe(root, relative)
     canonical = canonical_relative(relative)
     for name in dict.fromkeys((canonical, str(relative), legacy_relative(canonical))):
