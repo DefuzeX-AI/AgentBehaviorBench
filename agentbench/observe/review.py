@@ -7,6 +7,8 @@ def read_events(directory: Path):
     for path in sorted(directory.rglob("*.jsonl")):
         if path.is_symlink():
             continue
+        if path.parent.name == "raw" and path.parent.parent.name == "otel":
+            continue  # The raw export archive and its index are not event logs.
         for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
             if not line:
                 continue

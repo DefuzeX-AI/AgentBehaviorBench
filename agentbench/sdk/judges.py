@@ -36,7 +36,7 @@ def resolve_judge(reference):
 
 def build_request(directory, registration, document):
     root = Path(directory)
-    from agentbench.observe.artifact_paths import artifact_file
+    from agentbench.observe.artifact_paths import artifact_file, is_raw_trace
     read = lambda name: json.loads(artifact_file(root, name).read_bytes())
     manifest = read('manifest.json')
     files, steps = {}, []
@@ -52,6 +52,8 @@ def build_request(directory, registration, document):
             relative = path.relative_to(root).as_posix()
             if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
                 raise ValueError('Evidence attachment escapes execution directory')
+            if is_raw_trace(relative):
+                continue  # Unredacted exports never leave the attempt directory.
             if path.is_file():
                 files[relative] = {'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                                    'size_bytes': path.stat().st_size}

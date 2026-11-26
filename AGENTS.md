@@ -125,6 +125,10 @@ for stage ordering, checkpoints and extension points.
   interception, credential checks or evidence collection to make one Agent pass.
 - Never send `.env` contents or actual credentials as source evidence, commit them,
   or expose them in errors. Keep API diagnostics useful and sanitized.
+- The one unredacted record is `otel/raw/`, the byte-exact archive of each Agent
+  trace export. It stays owner-only in the attempt directory. Artifact readers,
+  viewers and Judge attachments must keep refusing it; derive redacted evidence
+  from it instead of exposing it.
 
 ## Verify the changed behavior
 

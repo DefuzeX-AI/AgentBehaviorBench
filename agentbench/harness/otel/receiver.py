@@ -66,17 +66,26 @@ class Receiver:
         self.protocol = protocol
         if protocol == "grpc":
             import grpc
-            from opentelemetry.proto.collector.trace.v1 import trace_service_pb2 as messages, trace_service_pb2_grpc as service
-            class Traces(service.TraceServiceServicer):
-                def Export(self, request, context):
-                    try:
-                        sink.accept_json(protobuf_batch(request), transport="grpc")
-                    except (ValueError, KeyError, TypeError) as exc:
-                        sink.reject("Invalid OTLP trace export")
-                        context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
-                    return messages.ExportTraceServiceResponse()
+            from google.protobuf.message import DecodeError
+            from opentelemetry.proto.collector.trace.v1 import trace_service_pb2 as messages
+
+            # No request deserializer: the handler receives the message bytes as sent,
+            # after gRPC's own framing and compression, so they can be archived unchanged.
+            def export(body, context):
+                source = sink.archive(body, transport="grpc", content_type="application/grpc+proto")
+                try:
+                    request = messages.ExportTraceServiceRequest.FromString(body)
+                    sink.accept_json(protobuf_batch(request), transport="grpc", source=source)
+                except (DecodeError, ValueError, KeyError, TypeError) as exc:
+                    sink.reject("Invalid OTLP trace export", source)
+                    context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+                return messages.ExportTraceServiceResponse()
+
+            handler = grpc.method_handlers_generic_handler("opentelemetry.proto.collector.trace.v1.TraceService", {
+                "Export": grpc.unary_unary_rpc_method_handler(
+                    export, response_serializer=messages.ExportTraceServiceResponse.SerializeToString)})
             self.server = grpc.server(ThreadPoolExecutor(max_workers=2), options=[("grpc.max_receive_message_length", MAX_BATCH)])
-            service.add_TraceServiceServicer_to_server(Traces(), self.server)
+            self.server.add_generic_rpc_handlers((handler,))
             port = self.server.add_insecure_port("127.0.0.1:0")
             self.server.start()
         else:
@@ -85,14 +94,18 @@ class Receiver:
                     if self.path != "/v1/traces":
                         self.send_error(404)
                         return
+                    source = None
                     try:
                         body = _body(self)
-                        if self.headers.get("Content-Encoding") == "gzip":
+                        kind = self.headers.get_content_type()
+                        encoding = self.headers.get("Content-Encoding")
+                        # Archive the body as sent, before decompression or parsing.
+                        source = sink.archive(body, transport="http", content_type=kind, content_encoding=encoding)
+                        if encoding == "gzip":
                             with gzip.GzipFile(fileobj=io.BytesIO(body)) as compressed:
                                 body = compressed.read(MAX_BATCH + 1)
                             if len(body) > MAX_BATCH:
                                 raise BatchTooLarge()
-                        kind = self.headers.get_content_type()
                         if kind == "application/json":
                             doc = json.loads(body)
                             response = b"{}"
@@ -105,15 +118,16 @@ class Receiver:
                                 raise ValueError("Invalid OTLP protobuf") from exc
                             response = b""
                         else:
+                            sink.reject("Unsupported OTLP content type", source, count=False)
                             self.send_error(415)
                             return
-                        sink.accept_json(doc, transport=kind)
+                        sink.accept_json(doc, transport=kind, source=source)
                     except BatchTooLarge:
-                        sink.reject("OTLP request exceeds the batch size limit")
+                        sink.reject("OTLP request exceeds the batch size limit", source)
                         self.send_error(413)
                         return
                     except (ValueError, KeyError, TypeError, EOFError, gzip.BadGzipFile):
-                        sink.reject("Invalid OTLP trace export")
+                        sink.reject("Invalid OTLP trace export", source)
                         self.send_error(400)
                         return
                     self.send_response(200)
