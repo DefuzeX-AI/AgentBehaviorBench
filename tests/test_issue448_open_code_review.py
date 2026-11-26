@@ -7,7 +7,7 @@ from agentbench.harness.registry import load_registry, tomllib
 from kuma.repository.agent_profiles import parse_agent_profile
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT_DIR = ROOT / "resources" / "agents" / "122-open-code-review"
+UNIT_DIR = ROOT / "resources" / "agents" / "58-open-code-review"
 
 
 def test_registry_contract():
@@ -19,7 +19,7 @@ def test_registry_contract():
     assert entry["enabled"] is False, "status='adapting' must have enabled=false"
     assert entry["status"] == "adapting"
     assert entry["framework"] == "acp"
-    assert entry["path"] == "resources/agents/122-open-code-review"
+    assert entry["path"] == "resources/agents/58-open-code-review"
 
 
 def test_agent_toml_contract():

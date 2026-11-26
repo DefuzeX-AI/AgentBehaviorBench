@@ -363,14 +363,14 @@ Docker 需要安装真实依赖，把 binding 复制到选定 Agent root 旁边�
 | [Streamlit Template](../../resources/agents/06-langchain-streamlit-template/bindings/bridge.py) | 提取原生工厂而不启动 UI；需复核私有 thread 配置。 |
 | [Curiosity](../../resources/agents/58-curiosity/bindings/bridge.py) | SQLite 路径和原生 thread；需复核私有 thread 配置。 |
 | [Readwren](../../resources/agents/07-readwren/bindings/bridge.py) | 先启动访谈再传输入；公开方法没有 config 参数。 |
-| [TableGPT](../../resources/agents/08-tablegpt-agent/bindings/bridge.py) | Sandbox、日期与 parent ID；当前文字输入未转换附件。 |
+| [TableGPT](../../resources/agents/02-tablegpt-agent/bindings/bridge.py) | Sandbox、日期与 parent ID；当前文字输入未转换附件。 |
 | [Open Notebook](../../resources/agents/30-open-notebook/bindings/bridge.py) | 异步服务和会话初始化，及拥有的进程清理。 |
-| [AI Data Science Team](../../resources/agents/31-ai-data-science-team/bindings/bridge.py) | 固定 CSV、公开 `invoke_agent` 和结果读取。 |
-| [Local Deep Research](../../resources/agents/32-local-deep-research/bindings/ldr_bridge.py) | Settings snapshot 和原生 API 的主线程限制。 |
+| [AI Data Science Team](../../resources/agents/18-ai-data-science-team/bindings/bridge.py) | 固定 CSV、公开 `invoke_agent` 和结果读取。 |
+| [Local Deep Research](../../resources/agents/19-local-deep-research/bindings/ldr_bridge.py) | Settings snapshot 和原生 API 的主线程限制。 |
 | [Article Explainer](../../resources/agents/34-article-explainer/bindings/bridge.py) | 严格的当前消息输入；实际已启用 checkpoint，文字说明仍有相反描述。 |
-| [GPT Researcher](../../resources/agents/59-gpt-researcher/bindings/gpt_researcher_bridge.py) | 包含 `publish_formats` 的完整 task 和异步研究图。 |
-| [TradingAgents](../../resources/agents/35-tradingagents/bindings/tradingagents_bridge.py) | 显式 ticker/日期解析与公开生命周期外的配置上下文。 |
-| [EvoScientist](../../resources/agents/36-evoscientist/bindings/bridge.py) | Workspace 准备和明确的无人值守部署配置。 |
+| [GPT Researcher](../../resources/agents/23-gpt-researcher/bindings/gpt_researcher_bridge.py) | 包含 `publish_formats` 的完整 task 和异步研究图。 |
+| [TradingAgents](../../resources/agents/20-tradingagents/bindings/tradingagents_bridge.py) | 显式 ticker/日期解析与公开生命周期外的配置上下文。 |
+| [EvoScientist](../../resources/agents/21-evoscientist/bindings/bridge.py) | Workspace 准备和明确的无人值守部署配置。 |
 
 ## 审核和验证
 

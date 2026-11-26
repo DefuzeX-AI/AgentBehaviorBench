@@ -64,7 +64,7 @@ def test_labscript_native_attempts_and_run_config(monkeypatch, config, override)
 @pytest.mark.parametrize('override', [False, True])
 def test_evoscientist_reads_effective_native_limit(monkeypatch, config, override):
     modules(monkeypatch, **{'EvoScientist.cli._constants':dict(build_metadata=lambda *a: {})})
-    cls = load('36-evoscientist').EvoScientistGraph
+    cls = load('21-evoscientist').EvoScientistGraph
     graph = cls.__new__(cls)
     graph._workspace = 'workspace'
     graph._config = SimpleNamespace(recursion_limit=9021, model='native')
@@ -87,7 +87,7 @@ def test_local_deep_research_native_settings_and_explicit_snapshot(monkeypatch, 
     modules(monkeypatch, **{'local_deep_research.api':dict(quick_summary=summary),
         'local_deep_research.api.settings_utils':dict(create_settings_snapshot=snapshot)})
     monkeypatch.setenv('OPENAI_API_KEY', 'test-only')
-    graph=load('32-local-deep-research','ldr_bridge.py').create_graph()
+    graph=load('19-local-deep-research','ldr_bridge.py').create_graph()
     graph.invoke({'query':'research'}, config=config)
     assert not any(k.endswith(('max_iterations','max_sub_iterations','max_results','max_subagent_workers')) for k in seen[-1])
     config['configurable']['settings_snapshot']={'langgraph_agent.max_iterations': 123}
@@ -171,7 +171,7 @@ def test_csgo_does_not_truncate_native_item_list(monkeypatch):
 
 @pytest.mark.parametrize('override',[False,True])
 def test_lambchat_preserves_explicit_limit_and_native_default(monkeypatch,config,override):
-    mod=load('84-lambchat');seen=[]
+    mod=load('36-lambchat');seen=[]
     async def invoke(value,config=None):seen.append(config);return {'output':'done'}
     native=SimpleNamespace(_initialized=True,recursion_limit=492,_graph=SimpleNamespace(ainvoke=invoke))
     graph=mod._LambChatQuickAgent.__new__(mod._LambChatQuickAgent)
