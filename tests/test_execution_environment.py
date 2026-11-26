@@ -19,7 +19,8 @@ def test_description_uses_effective_flags_and_never_includes_host_paths_or_secre
     assert value['limits'] == {'cpus': '2', 'memory': '2g', 'pids-limit': '64', 'timeout_seconds': 123}
     assert value['filesystem']['mounts'][-1] == {'path': '/run/abb-input', 'kind': 'bind', 'read_only': True}
     assert value['filesystem']['mounts'][-2]['read_only'] is False
-    assert value['network']['other_egress'] == 'observe'
+    assert value['network']['other_egress'] == 'open'
+    assert value['network']['allow_rules'] == []
     assert value['network']['loopback'] == 'native_unobserved'
     assert value['network']['external_non_dns_udp'] == 'blocked'
     assert value['filesystem']['root_read_only'] is False

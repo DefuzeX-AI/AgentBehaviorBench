@@ -10,7 +10,8 @@ EGRESS_ALLOW_ENV = "ABB_EGRESS_ALLOW"
 DEFAULT_EGRESS_PORTS = (80, 443)
 
 # Package registries an Agent's own tool calls reach when a task needs a missing
-# dependency (pip, npm, apt, Maven, cargo, go). Other destinations stay refused.
+# dependency (pip, npm, apt, Maven, cargo, go). In ``observe`` mode other
+# destinations are refused; the default ``open`` mode forwards every destination.
 DEFAULT_EGRESS_ALLOW = (
     "pypi.org", "files.pythonhosted.org",
     "registry.npmjs.org", "registry.yarnpkg.com",
@@ -26,16 +27,16 @@ DEFAULT_EGRESS_ALLOW = (
 class EgressSettings:
     """What happens to Agent traffic that is neither a model nor a tool route.
 
-    ``observe`` hands it to the egress observer, which admits the allowlist and
-    records every attempt as behavior (issue #137). ``open`` also goes through the
-    observer and is recorded the same way, but forwards every destination: for
-    evaluating Agents whose real tools (web fetch, git, browsers) reach hosts that
-    cannot be listed in advance. ``deny`` keeps the previous in-interceptor refusal.
+    ``open`` (the default) hands it to the egress observer, which forwards every
+    destination and records every attempt as behavior (issue #137): Agents' real
+    tools (web fetch, git, browsers) reach hosts that cannot be listed in advance.
+    ``observe`` goes through the same observer but admits only the allowlist and
+    refuses the rest. ``deny`` keeps the previous in-interceptor refusal.
     Entries are ``host`` or ``*.suffix``, optionally ``:port``; without a port 80 and
     443 are admitted.
     """
 
-    mode: str = "observe"
+    mode: str = "open"
     allow: tuple[str, ...] = DEFAULT_EGRESS_ALLOW
 
     def __post_init__(self) -> None:
