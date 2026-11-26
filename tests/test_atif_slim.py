@@ -107,18 +107,19 @@ def test_children_and_delegation_facts_keep_pointers(tmp_path):
     assert all(set(pointer) == {"file", "line"} for fact in facts for pointer in fact["evidence"])
 
 
-def test_unassigned_record_keeps_a_summary_and_pointer(tmp_path):
-    # The root spawns a child; the child's own inference names no session and stays unassigned.
+def test_a_step_of_unknown_owner_keeps_its_mark_and_pointer(tmp_path):
+    # The root spawns a child; the child's own inference names no session and no execution owns it.
     acp_attempt(tmp_path, [call_span(11, text="", calls=[("call-spawn", "sessions_spawn", {"task": "read"})], parent=10),
                            spawn_span(12, "call-spawn", "run-1", parent=10), call_span(21, text="77", parent=20)],
                 sessions=([reported("root-session", "call-spawn")],))
     result, _ = build_export(tmp_path, adapters=["openclaw"])
     stored = stored_document(result.document, tmp_path)
-    record, = stored["extra"]["abb"]["unassigned_records"]
-    assert record == {"kind": "model", "source": "agent_native", "timestamp": record["timestamp"],
-                      "evidence": [{"file": "otel/spans.jsonl", "line": 3}]}
+    assert stored["extra"]["abb"]["unassigned_records"] == []
+    step, = [step for step in stored["steps"] if step["extra"]["abb"].get("owner") == "unknown"]
+    assert step["extra"]["abb"] == {"owner": "unknown", "sources": ["trace"], "turn_evidence": "isolated_single_input_case",
+                                    "evidence": [{"file": "otel/spans.jsonl", "line": 3}]}
     issue = next(i for i in stored["extra"]["abb"]["issues"] if i["code"] == "unassigned_record")
-    assert issue["evidence"] == record["evidence"] and "subjects" not in issue
+    assert issue["evidence"] == step["extra"]["abb"]["evidence"] and "subjects" not in issue
 
 
 def test_an_unlisted_key_fails_instead_of_being_stored_or_lost(tmp_path):

@@ -19,13 +19,16 @@ def validate_export(bundle, graph, document, *, evidence_resolver=None):
     for doc in walk(document):
         children = {c.trajectory_id for c in doc.subagent_trajectories or []}
         for step in doc.steps:
-            for rid in (step.extra or {}).get("abb", {}).get("record_ids", []):
+            abb = (step.extra or {}).get("abb", {})
+            # A step marked as unknown stands in the root without being owned by it.
+            unknown = abb.get("owner") == "unknown"
+            for rid in abb.get("record_ids", []):
                 counts[rid] += 1
-                locations[rid] = doc.trajectory_id
+                locations[rid] = None if unknown else doc.trajectory_id
             for result in step.observation.results if step.observation else []:
                 for rid in (result.extra or {}).get("abb", {}).get("record_ids", []):
                     counts[rid] += 1
-                    locations[rid] = doc.trajectory_id
+                    locations[rid] = None if unknown else doc.trajectory_id
                 for ref in result.subagent_trajectory_ref or []:
                     if ref.trajectory_id not in children:
                         raise ValueError("Child reference does not resolve in its parent")

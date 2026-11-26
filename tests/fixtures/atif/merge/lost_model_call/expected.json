@@ -1,0 +1,54 @@
+{
+ "status": "partial",
+ "agent": "openclaw",
+ "steps": [
+  {
+   "source": "user",
+   "message": "请访问 https://example.com ，告诉我这个页面的标题和第一段文字。",
+   "sources": [
+    "acp"
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "tool_calls": [
+    [
+     "web_fetch",
+     [
+      "trace",
+      "acp"
+     ]
+    ]
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network"
+   ],
+   "tool_calls": [
+    [
+     "exec",
+     [
+      "acp"
+     ]
+    ]
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "[OpenClaw interruption] The Gateway disconnected after accep",
+   "sources": [
+    "acp"
+   ],
+   "kind": "acp_reply"
+  }
+ ],
+ "subagent_trajectories": []
+}

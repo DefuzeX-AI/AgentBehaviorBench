@@ -21,6 +21,7 @@ class StepSource(Protocol):
     name: str
     reply_steps: bool      # the delivered result becomes a step of its own
     exported_steps: bool   # Agent-exported spans are the step record
+    reads_network: bool    # the source reads the interceptor's wire record itself (``read_network``)
 
     def recorded(self, index, *, include_network, issues) -> Recorded: ...
 

@@ -1,14 +1,17 @@
-"""An ACP Agent's own OTel export is the step record.
+"""An ACP Agent's own OTel export is the step record, completed by two more.
 
 Model steps come from its inference spans and tool results from its tool
-spans. The records ABB writes while relaying ACP (``framework.jsonl``) are not
-read. The Agent's ACP messages are used for one thing only: they name the
-session that reported a tool call id, which an exported span does not carry.
+spans. The interceptor's wire record and the Agent's ACP messages recorded the
+same run on their own clocks: an operation they share with a span is merged
+into that span's record, and one only they recorded becomes a record of its
+own (``merge.py``). The records ABB writes while relaying ACP
+(``framework.jsonl``) are not read.
 """
 from collections import defaultdict
 
 from ..contracts import EvidenceIssue
 from .base import Recorded, otel_model, otel_tool
+from .merge import merge, network_models
 
 
 class AcpOtelSource:
@@ -16,9 +19,17 @@ class AcpOtelSource:
     # The last model step of a turn is the reply; the delivered result is not repeated.
     reply_steps = False
     exported_steps = True
+    reads_network = True
+
+    def __init__(self):
+        self.network = []
 
     def recorded(self, index, *, include_network, issues):
         return Recorded([], [], {}, [])
+
+    def read_network(self, index):
+        """Keep the wire calls until the spans are read; ``complete`` merges them."""
+        self.network = network_models(index)
 
     def adopt(self, item, issues):
         if item["kind"] == "tool":
@@ -29,16 +40,21 @@ class AcpOtelSource:
         if not models:
             issues.append(EvidenceIssue("agent_otel_models_missing",
                 "The Agent exported no inference span with message content; the trajectory has no model step"))
+        exported = models + tools
         # A span is exported when it ends, its parent last. An operation whose
         # parent never arrived means the export stopped before the run did, so
         # later operations of that run, such as its final reply, may be absent.
-        received = {(ref["trace_id"], ref["span_id"]) for record in models + tools for ref in record.get("agent_otel", [])}
+        received = {(ref["trace_id"], ref["span_id"]) for record in exported for ref in record.get("agent_otel", [])}
         received |= {(span["trace_id"], span["span_id"]) for span in other_spans}
-        cut = [record["id"] for record in models + tools for ref in record.get("agent_otel", [])
+        cut = [record["id"] for record in exported for ref in record.get("agent_otel", [])
                if ref.get("parent_span_id") and (ref["trace_id"], ref["parent_span_id"]) not in received]
         if cut:
             issues.append(EvidenceIssue("agent_otel_export_incomplete",
                 "Operations name a parent span that was never received; the run's export is incomplete", cut))
+        merge(models, tools, self.network, native)
+        for record in models:
+            if record["source"] == "wire" and record["status"] != "complete":
+                issues.append(EvidenceIssue("unfinished_or_failed_model", record["status"], [record["id"]]))
         _inherit_sessions(models, tools)
 
 

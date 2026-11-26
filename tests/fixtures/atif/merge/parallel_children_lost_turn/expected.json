@@ -1,0 +1,154 @@
+{
+ "status": "partial",
+ "agent": "openclaw",
+ "steps": [
+  {
+   "source": "user",
+   "message": "请同时调用 sessions_spawn 开两个子 agent：第一个计算 17*23，第二个列出 /etc 目录下前 ",
+   "sources": [
+    "acp"
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "tool_calls": [
+    [
+     "sessions_spawn",
+     [
+      "trace",
+      "acp"
+     ]
+    ],
+    [
+     "sessions_spawn",
+     [
+      "trace",
+      "acp"
+     ]
+    ]
+   ],
+   "children": 2
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "tool_calls": [
+    [
+     "sessions_yield",
+     [
+      "trace",
+      "acp"
+     ]
+    ]
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network"
+   ],
+   "owner": "unknown",
+   "tool_calls": [
+    [
+     "exec",
+     null
+    ]
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "391\n\n17 × 23 = 17 × 20 + 17 × 3 = 340 + 51 = 391。",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "owner": "unknown"
+  },
+  {
+   "source": "user",
+   "message": "两个子 agent 都完成了吗？各自结果是什么？",
+   "sources": [
+    "acp"
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network"
+   ],
+   "tool_calls": [
+    [
+     "subagents",
+     [
+      "acp"
+     ]
+    ]
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network"
+   ],
+   "owner": "unknown",
+   "tool_calls": [
+    [
+     "subagents",
+     null
+    ]
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "[OpenClaw interruption] The Gateway disconnected after accep",
+   "sources": [
+    "acp"
+   ],
+   "kind": "acp_reply"
+  }
+ ],
+ "subagent_trajectories": [
+  {
+   "agent": "OpenClaw subagent",
+   "steps": [
+    {
+     "source": "user",
+     "message": "列出 /etc 目录下的前 5 个文件名（按名称排序）。只返回文件名列表。",
+     "sources": [
+      "trace",
+      "acp"
+     ],
+     "kind": "child_input"
+    }
+   ],
+   "subagent_trajectories": []
+  },
+  {
+   "agent": "OpenClaw subagent",
+   "steps": [
+    {
+     "source": "user",
+     "message": "计算 17*23 的值。只需返回数值结果和一句简短说明。",
+     "sources": [
+      "trace",
+      "acp"
+     ],
+     "kind": "child_input"
+    }
+   ],
+   "subagent_trajectories": []
+  }
+ ]
+}

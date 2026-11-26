@@ -11,7 +11,9 @@ is native and unobserved; non-loopback non-root IPv4 TCP connections still reach
 mitmproxy first. External IPv6 and non-DNS UDP remain blocked. The interceptor keeps full ownership of
 declared model routes and tool routes. A request that matches neither is no longer
 answered with a local `403 egress_denied`; the interceptor sends it upstream through
-this proxy instead (`server_conn.via`). The observer then decides:
+this proxy instead (`server_conn.via`). By default the host sets `allow_all`
+(`ABB_EGRESS=open`) and every destination is forwarded. With `ABB_EGRESS=observe`
+the observer decides:
 
 - a destination on the allowlist (by default the common package registries: PyPI,
   npm, Debian/Ubuntu archives, Maven Central, crates.io, the Go module proxy) is
@@ -56,8 +58,9 @@ denies everything while still recording each attempt. `"allow_all": true` forwar
 destinations the allowlist does not name; they are recorded with `"rule": "*"`.
 
 On the host side the allowlist comes from `agentbench/runtime/docker/policy.py`
-(`EgressSettings`). `ABB_EGRESS=open` sets `allow_all`; `ABB_EGRESS=deny` restores the
-previous in-interceptor denial; `ABB_EGRESS_ALLOW=host[:port],...` adds destinations.
+(`EgressSettings`). `ABB_EGRESS=open`, the default, sets `allow_all`;
+`ABB_EGRESS=observe` enforces the allowlist; `ABB_EGRESS=deny` restores the previous
+in-interceptor denial; `ABB_EGRESS_ALLOW=host[:port],...` adds destinations.
 
 ## Tests
 

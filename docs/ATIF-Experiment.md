@@ -53,7 +53,7 @@ from the unit frozen in `request/target.json`, never from an Agent's name:
 | `[adapter] type` | Source | Model steps | Tool results | Reply |
 | --- | --- | --- | --- | --- |
 | `langgraph` | `langgraph` | LangChain callbacks in `framework.jsonl` | LangChain callbacks | The delivered result is its own `invocation_result` step unless a model step carries it by provider response id. |
-| `acp` | `acp_otel` | Inference spans the Agent exported to `otel/spans.jsonl` | Tool spans the Agent exported | The last model step of the turn; the delivered result is not repeated. |
+| `acp` | `acp_otel` | Inference spans the Agent exported to `otel/spans.jsonl`, merged with the interceptor's model calls | Tool spans the Agent exported, merged with the tool calls reported over ACP | The last model step of the turn; the delivered result is not repeated. |
 
 A unit overrides the default with `[atif] source = "<name>"`. An adapter type
 without a source, or an unknown source name, fails the derivation with that
@@ -61,11 +61,54 @@ reason. Without a frozen adapter type (a standalone observe run) the
 `framework` recorded in the invocation requests decides; an attempt that
 recorded neither is read with `langgraph`. A format that needs its own reading adds a module to `sources/`
 and registers it in `sources/__init__.py`; the shared reader, ownership,
-assembly, validation and stored form do not change. Interceptor records in
-`logs/network.jsonl` are not converted by either source.
+assembly, validation and stored form do not change. Only `acp_otel` converts
+the interceptor records in `logs/network.jsonl`.
 
 `acp_otel` reads nothing ABB wrote while relaying ACP: the tool spans and ACP
 message copies in `framework.jsonl` are not a step source.
+
+#### Three records, one timeline
+
+An ACP Agent's run is recorded three times, each on its own clock:
+
+| Record | File | Holds |
+| --- | --- | --- |
+| `trace` | `otel/spans.jsonl` | Model calls and tool executions the Agent exported |
+| `network` | `logs/network.jsonl` | Every model call, as the interceptor saw it on the wire |
+| `acp` | `steps/NNNN/acp-events.jsonl` | Each prompt's start, tool call reports, reply text |
+
+`sources/merge.py` folds them into one set of records. An operation several
+records hold becomes one step that names them in `extra.abb.sources`; an
+operation only one of them holds is kept and names that one.
+
+| Operation | Same operation when | Compared records |
+| --- | --- | --- |
+| Model call | The emitted tool call ids are equal, or the text when no tool call was emitted. Equal outputs pair in recorded order. | `network`, `trace` |
+| Tool execution | The tool call id is equal and one ACP session reported it. | `trace`, `acp` |
+| Reply text | The text a session sent, cut at tool calls and prompt boundaries, equals a model call's text. | `acp`, model call |
+| User message | Only ACP records when a prompt was sent. | `acp` |
+
+Time never pairs two records. It only orders the merged ones:
+
+- a step is dated by its span start; without a span by its ACP report; with
+  only a wire record by the request time minus 140 ms, the median lead of a
+  span over its wire request in the recorded runs (`NETWORK_LEAD`);
+- a user step is dated by the ACP `prompt_started` report of its Input;
+- `timeline.py` sorts the root's steps by these clocks, so a step that started
+  after the last prompt ended stands last. A child trajectory is sorted the
+  same way and numbered from 1;
+- when an Input has no `prompt_started` report, the user steps cannot be
+  dated and the turn placement by identifier described below stands.
+
+A step whose model call both `trace` and `network` hold takes its content from
+the span. A model call only the wire holds takes its content from the wire
+record; a tool call only ACP reported takes its title as tool name and its
+`rawInput`, `rawOutput` or `content`.
+
+Reply text of the root session that no model call carries is a step of its own
+(`kind: acp_reply`), for example the ACP bridge's interruption notice.
+
+The exported spans are read and assigned as follows:
 
 - An inference span qualifies when `gen_ai.operation.name` marks an inference
   and `gen_ai.output.messages` holds an assistant message. The step takes its
@@ -82,15 +125,21 @@ message copies in `framework.jsonl` are not a step source.
   stopped before the run did, so later operations of that run, such as its
   final reply, may be absent from the trajectory.
 - An exported span names no session and no Input. The Agent's ACP messages in
-  `steps/NNNN/acp-events.jsonl` name the session that reported a tool call id;
-  that is the only use of ACP records. An inference takes the session of the
+  `steps/NNNN/acp-events.jsonl` name the session that reported a tool call
+  id. An inference takes the session of the
   tool calls it emitted, and an operation without one takes the only session
   known among the operations exported under the same parent span. The session
   and the folder of those messages place the step in its turn.
 - The root execution owns a record that names a root session, or names none
   when no delegation was proposed. A delegation adapter may claim records for
-  a child (see below). Any other record is listed under `unassigned_records`
-  with an `unassigned_record` issue.
+  a child (see below).
+- Reply text that exactly one model call carries gives that call the session
+  that sent it. A model call only the wire holds runs in the execution that
+  executed the tool calls it emitted, when they all ran in one.
+- A record no rule assigns still becomes a step: it stands in the root
+  trajectory with `extra.abb.owner: "unknown"` and an `unassigned_record`
+  issue, and the document is `partial`. `unassigned_records` stays empty for
+  this source; the `langgraph` source lists such records there instead.
 - A record with neither session nor Input joins the turn only when the attempt
   has one Input and the unit declares `evaluation.single_input_model_scope =
   true`; the step then records `turn_evidence: isolated_single_input_case`.
@@ -125,7 +174,7 @@ one of two ways, both from recorded identifiers:
    operations form the child trajectory. The delegation fact records
    `attribution: run_structure` and cites the child's run and harness spans.
    Any other count pairs nothing: the children keep their task step only, the
-   operations stay under `unassigned_records`, and the document reports
+   operations stand in the root with `owner: "unknown"`, and the document reports
    `openclaw_child_run_ambiguous`. A child run that spawns again is resolved
    the same way, one level down.
 
@@ -149,7 +198,8 @@ fails.
 | Position | Stored under `extra.abb` | Not stored (read the attempt directory) |
 | --- | --- | --- |
 | Trajectory | `source`, `execution` (key and status), `provenance` (builder and Harbor versions), `issues`, `unassigned_records` (summary), `delegation_facts`, `version_missing_reason` | `raw_records`, `invocations`, `native_events`, `unassigned_agent_spans`, `auxiliary_artifacts` |
-| Step | `evidence`, `input_id`, `kind`, `association`, `turn_evidence`, `result_source`, `execution_started_at` | `model_record`, `invocation`, `record_ids` |
+| Step | `evidence`, `input_id`, `kind`, `association`, `turn_evidence`, `result_source`, `execution_started_at`, `sources`, `owner` | `model_record`, `invocation`, `record_ids` |
+| Tool call | `sources` (the records that hold its execution) | |
 | Observation result | `evidence`, `execution_status`, `started_at`, `ended_at` | `tool_execution`, `record_ids` |
 | Metrics | nothing | `recorded_usage` |
 | Final metrics | `metrics_scope`, `unknown_model_usage` | |
@@ -161,11 +211,21 @@ validated on the complete document before it is reduced.
 
 Known gaps of the automatic document:
 
-- User and `invocation_result` steps have no timestamp, and neither does a
-  callback step without one linked Agent-exported span. The per-Input OTel
-  files that used to supply those clocks are no longer written.
-- With `acp_otel`, an ACP Agent that exports no OTel has no model or tool
-  step. Several OpenClaw children spawned by one run cannot be told apart.
+- With `langgraph`, user and `invocation_result` steps have no timestamp, and
+  neither does a callback step without one linked Agent-exported span. The
+  per-Input OTel files that used to supply those clocks are no longer written.
+- With `acp_otel`, an ACP Agent that exports no OTel still reports
+  `agent_otel_models_missing`; its steps then come from the wire and ACP alone.
+  Several OpenClaw children spawned by one run cannot be told apart: their
+  operations stand in the root with `owner: "unknown"`.
+- A step marked `owner: "unknown"` may belong to a child. A reader of the root
+  trajectory must not take it for an action of the root Agent.
+- `NETWORK_LEAD` is one constant. The recorded leads ranged from 43 to 800 ms,
+  so a step only the wire holds can stand slightly before or after a step
+  dated by another clock.
+- Two model calls with the same text and no tool call pair in recorded order.
+  Reply text that two model calls carry is merged into the earlier one and
+  gives neither a session.
 - OpenClaw's last export batch was lost in one recorded run when the Agent
   process group was killed after the default 3 s `cleanup_timeout`; the unit
   now sets 10 s. A lost batch removes the root run's final reply and its run
@@ -192,6 +252,8 @@ its actual `Agent`, `Step`, `ToolCall`, `ObservationResult`, and
 | `sources/__init__.py`, `sources/base.py` | Step-source factory, contract, and the record builders for exported spans. |
 | `sources/langgraph.py` | Callback step records: exact model/framework merging, interrupted streams, chain records. |
 | `sources/acp_otel.py` | Exported-span step records for ACP Agents and session inheritance. |
+| `sources/merge.py` | Wire model calls and ACP tool reports as records; pairing with the exported records; `sources` and clocks. |
+| `timeline.py` | Root steps of a merged source in clock order: user steps at `prompt_started`, unclaimed ACP reply text. |
 | `adapters/base.py`, `adapters/__init__.py` | Delegation protocol and explicitly selected Strategy registry. |
 | `adapters/deepagents.py` | Tool-to-named-agent graph boundaries using parent spans, actual entry metadata, and delegation arguments. |
 | `adapters/opencode.py` | Structured task/session metadata; optional explicit native turn/provider-response identity. Missing internals remain a reported gap. |

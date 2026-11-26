@@ -26,6 +26,7 @@ agent is a command group with the required subcommand add. sdk requires list or 
 | `agentbench agent delete` | Remove one Agent's registry entry and move its whole folder, including ground_truth/, to cache/agent-trash. Nothing is permanently erased. Preview with --dry-run; stop runs and viewers that use the Agent first. |
 | `agentbench certify` | Execute the registered Case budget of one enabled adapting Agent and promote it to ready when all requested Cases complete without invocation errors. A Judge finding does not by itself prevent promotion; already-ready Agents are not rerun. |
 | `agentbench observe` | Execute one native input and save outputs and traces without SDK Case generation or Judge. Currently requires Docker with oneshot execution. --list and --show provide read-only inspection. |
+| `agentbench chat` | Converse with one enabled Agent in a single Agent session, without SDK Case generation or Judge. Each line you type is one turn. Ends on /exit, /quit or end of input, then prints the saved record paths. Requires Docker with oneshot execution. |
 | `agentbench view` | Serve saved results in the local web viewer. Build the web assets first. Open the printed full View URL and keep the command running; Ctrl+C stops it. |
 | `agentbench sdk list` | List SDK plugin names found in the SDK directory. This checks discovery, not whether all runtime dependencies are installed. |
 | `agentbench sdk show` | Load one SDK plugin and show its source, execution mode, and whether it allows implicit selection. |
@@ -230,6 +231,40 @@ agentbench observe [AGENT] [OPTIONS]
 agentbench observe --list
 agentbench observe react-agent --input native-input.json --output results/observe --timeout 300
 agentbench observe --show results/observe/RUN_ID
+```
+
+## `chat`
+
+Converse with one enabled Agent in a single Agent session, without SDK Case generation or Judge. The Agent's worker image starts once and keeps one Agent session open, so the Agent owns its conversation history. Each line you type is delivered unchanged as one turn. /exit, /quit, end of input or Ctrl+C at the prompt ends the chat; Ctrl+C while the Agent answers stops the container and records the run as interrupted. Requires Docker with oneshot execution.
+
+```text
+agentbench chat AGENT [OPTIONS]
+```
+
+| Argument | Purpose and default | Example |
+| --- | --- | --- |
+| `-h, --help` | Show help for this command and exit. | `--help` |
+| `AGENT` | Required enabled Agent ID or `observe --list` number. | `openclaw` |
+| `--registry PATH` | Choose the Agent registry. Default: project resources/registry.toml. | `--registry resources/registry.toml` |
+| `--output DIR` | Chat artifact root; each chat creates a subdirectory named by its 8-character run ID. Default: results/chat. | `--output results/chat` |
+| `--env-file PATH` | Load another environment file. Default: project .env. Exported shell variables take precedence. | `--env-file .env.testing` |
+| `--model MODEL` | Override ABB's replacement target model. Default: the selected provider's configuration. | `--model deepseek-flash` |
+| `--timeout SECONDS` | Per-turn answer timeout in positive finite seconds. Default: the Agent's runtime configuration. | `--timeout 300` |
+| `--view` | Chat in a local web page instead of the terminal. The page opens once the Agent container has started. Requires the built viewer (`cd web && npm ci && npm run build`). Default: off. | `--view` |
+| `--host HOST` | With --view: viewer host. Default: 127.0.0.1. | `--host 127.0.0.1` |
+| `--port PORT` | With --view: viewer port; a busy port falls back to a free one, 0 picks one. Default: 8765. | `--port 0` |
+| `--no-open` | With --view: print the page URL without opening a browser. Default: off. | `--no-open` |
+
+After the container stops and host trace validation ran, the chat derives `trajectory.atif.json` and prints the paths it saved: `run.json` (status and per-turn results), the trajectory, `request/turns/` (the delivered turns), `steps/NNNN/` (each turn's request, result and framework/ACP events), `otel/spans.jsonl` (Agent-native spans), `logs/network.jsonl` (model and tool interception), `diagnostics.json` (container output) and the Docker build logs. A chat without turns derives no trajectory.
+
+With `--view`, the page shows the conversation on the left and the trajectory on the right. While the chat runs the trajectory is a live preview derived from the evidence recorded so far; it is never saved. End chat (top right) stops the container, saves the trajectory and shows the paths of `trajectory.atif.json` and the run directory, which holds every other record; Record paths (top right) shows them again. Ctrl+C in the terminal does the same and prints every record path. Once the chat has ended and `trajectory.atif.json` is saved, each step shows which of the run's three records hold it (`network`, `trace`, `acp`; see [the ATIF document](ATIF-Experiment.md#three-records-one-timeline)), and a step no Agent could be shown to own is tagged Owner unknown. Right-click a trajectory step to mark it with a reason: the mark (`reason` and `created_at`) is added at once to that step's `extra.abb.marks` in `trajectory.atif.json`, and `run.json` records the file's new SHA-256. The trajectory file is the only record of its marks, so deriving it again drops them. The live preview during the chat cannot be marked. The page stays available after the chat ends until you press Ctrl+C.
+
+### Examples
+
+```bash
+agentbench chat openclaw
+agentbench chat openclaw --timeout 300 --output results/chat
+agentbench chat openclaw --view
 ```
 
 ## `view`

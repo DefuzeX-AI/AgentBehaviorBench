@@ -21,6 +21,7 @@ import EvaluationSourceBadge from './suite/EvaluationSourceBadge.jsx';
 const RawRunView = lazy(() => import('./RawRunView.jsx'));
 const FlowPrototype = lazy(() => import('./flow-prototype/FlowPrototype.jsx'));
 const CaseReplay = lazy(() => import('./cases/CaseReplay.jsx'));
+const ChatApp = lazy(() => import('./chat/ChatApp.jsx'));
 const PAGE_SIZE = 100;
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -159,7 +160,13 @@ function TraceExplorer() {
 export default function App() {
   const injected = document.querySelector('meta[name="abb-result-api"]')?.content || null;
   const catalogEndpoint = document.querySelector('meta[name="abb-suites-api"]')?.content || null;
+  const chatApi = document.querySelector('meta[name="abb-chat-api"]')?.content || null;
   const endpoint = injected ? suiteEndpoint(window.location.pathname, injected) : null;
+  if (chatApi) {
+    const token = document.querySelector('meta[name="abb-chat-token"]')?.content || '';
+    return <ConfigProvider theme={{ token: { colorPrimary: '#1a1a1a', borderRadius: 6, fontSize: 13 } }}>
+      <Suspense fallback={null}><ChatApp api={chatApi} token={token} /></Suspense></ConfigProvider>;
+  }
   return <ConfigProvider theme={{ token: { colorPrimary: '#244d3d', borderRadius: 6, fontSize: 13, colorText: '#202623', colorBgLayout: '#fafbf9' }, components: { Table: { headerBg: '#f0f3ef', headerColor: '#58655c' } } }}>
     {catalogEndpoint && window.location.pathname === '/' ? <BenchmarkOverview catalogEndpoint={catalogEndpoint} />
       : endpoint ? <BoundSuiteApp endpoint={endpoint} catalogEndpoint={catalogEndpoint} /> : <TraceExplorer />}

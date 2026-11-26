@@ -12,9 +12,15 @@ from agentbench.runtime.interception.service_config import prepare_service_confi
 from agentbench.runtime.interception.trace import TraceEvent
 
 
-def test_default_policy_observes_egress_and_admits_package_registries():
+def test_default_policy_forwards_every_destination_through_the_observer():
     settings = DockerPolicy().egress
-    assert settings.mode == "observe"
+    assert settings.mode == "open" and settings.uses_observer
+    assert json.loads(observer_configuration("agent", settings))["allow_all"] is True
+
+
+def test_observe_mode_admits_only_package_registries():
+    settings = EgressSettings.from_environment({"ABB_EGRESS": "observe"})
+    assert settings.mode == "observe" and settings.uses_observer
     rules = {rule["host"]: rule["ports"] for rule in settings.rules()}
     assert set(rules) == set(DEFAULT_EGRESS_ALLOW)
     assert rules["pypi.org"] == [80, 443] and "example.com" not in rules
@@ -42,11 +48,11 @@ def test_open_mode_uses_the_observer_and_forwards_everything():
     assert not EgressSettings.from_environment({"ABB_EGRESS": "deny"}).uses_observer
     config = json.loads(observer_configuration("agent", settings))
     assert config["allow_all"] is True and config["allow"] == settings.rules()
-    assert "allow_all" not in json.loads(observer_configuration("agent", EgressSettings()))
+    assert "allow_all" not in json.loads(observer_configuration("agent", EgressSettings(mode="observe")))
 
 
 def test_observer_configuration_and_interceptor_handoff_address(tmp_path):
-    config = json.loads(observer_configuration("agent", EgressSettings(allow=("pypi.org",))))
+    config = json.loads(observer_configuration("agent", EgressSettings(mode="observe", allow=("pypi.org",))))
     assert config == {"agent_id": "agent", "listen_port": OBSERVER_PORT,
                       "allow": [{"host": "pypi.org", "ports": [80, 443]}]}
     interception = SimpleNamespace(mode="observe", observation_headers={}, observation_tool_purposes={},

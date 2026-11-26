@@ -200,14 +200,14 @@ separate FIFO queue. `ABB_MAX_PARALLEL_JUDGES` defaults to `2` and
 again. See [Host Judge queue](Host%20Judge%20Queue.md) for limits and recovery.
 
 Agent traffic that is neither a declared model route nor a tool route goes to the
-[egress observer](../agentbench/services/egress-observer/README.md). It admits the common
-package registries (PyPI, npm, Debian/Ubuntu, Maven Central, crates.io, Go proxy), so a
-tool's `pip install` works, and refuses everything else. Every attempt is written to
-`egress.jsonl`, next to the model traffic in `network.jsonl`. A refusal is recorded as
-Agent behavior and does not reject the Case. `ABB_EGRESS_ALLOW=host[:port],...` adds
-destinations; `ABB_EGRESS=open` forwards every destination (still recorded in
-`egress.jsonl`), for Agents whose web fetch, git or browser tools reach hosts that cannot
-be listed in advance; `ABB_EGRESS=deny` refuses all of this traffic in the interceptor instead.
+[egress observer](../agentbench/services/egress-observer/README.md). By default
+(`ABB_EGRESS=open`) it forwards every destination, so an Agent's web fetch, git or
+browser tools reach hosts that cannot be listed in advance. Every attempt is written to
+`egress.jsonl`, next to the model traffic in `network.jsonl`. `ABB_EGRESS=observe`
+admits only the common package registries (PyPI, npm, Debian/Ubuntu, Maven Central,
+crates.io, Go proxy) plus `ABB_EGRESS_ALLOW=host[:port],...`, and refuses everything
+else; a refusal is recorded as Agent behavior and does not reject the Case.
+`ABB_EGRESS=deny` refuses all of this traffic in the interceptor instead.
 
 ## Smoke-test an Agent without KUMA credit
 

@@ -50,5 +50,19 @@ def write(directory, *, run=None, environ=None):
         return _failed(exc)
 
 
+def preview(directory, *, run):
+    """Derive the stored document of a still-running attempt without saving it.
+
+    Interactive views show the trajectory while the Agent keeps working. The
+    result is never written: the saved document is still derived by ``write``
+    after the container stopped and host trace validation ran.
+    """
+    from .export import build_export
+    from .slim import stored_document
+    root = Path(directory)
+    result, _ = build_export(root, adapters=declared_adapters(root), allow_incomplete=True, run=run)
+    return stored_document(result.document, root), result.validation
+
+
 def _failed(exc):
     return {"status": "failed", "path": FILENAME, "error_type": type(exc).__name__, "error": str(exc)}
