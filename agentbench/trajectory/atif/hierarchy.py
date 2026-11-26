@@ -75,8 +75,9 @@ def resolve_hierarchy(bundle, *, adapters=()):
         when it names a root session, or names none and no delegation was
         proposed. Where callbacks are the step record, an exported span that
         matched none stays unowned unless a delegation adapter claims it."""
+        # The wire and ACP records such a source merges in have no span either.
         if (not bundle.exported_steps or record.get("span") or record.get("identity_conflicts")
-                or record.get("source") not in ("agent_native", "auto_instrumented")):
+                or record.get("source") not in ("agent_native", "auto_instrumented", "wire", "acp")):
             return False
         session = record.get("native_session_id")
         return session in root_sessions if session else not links
@@ -155,6 +156,20 @@ def resolve_hierarchy(bundle, *, adapters=()):
     for rid, anchor in continues.items():
         if rid in owners and owners[rid] is None and owners.get(anchor) and not recorded[rid].get("identity_conflicts"):
             owners[rid] = owners[anchor]
+    # A model call only the wire recorded names no execution. It ran where the
+    # tool calls it emitted were executed, when they all ran in one execution.
+    if bundle.exported_steps:
+        executed = {}
+        for tool in bundle.tools:
+            if tool.get("tool_call_id"):
+                executed.setdefault(tool["tool_call_id"], set()).add(owners[tool["id"]])
+        for model in bundle.models:
+            if owners[model["id"]] is not None or model.get("source") != "wire" or model.get("identity_conflicts"):
+                continue
+            output = model.get("client_output") or model["output"]
+            ran_in = set().union(*(executed.get(call.get("id"), set()) for call in output.get("tool_calls") or []))
+            if len(ran_in) == 1 and None not in ran_in:
+                owners[model["id"]] = ran_in.pop()
     nodes = {nid: node for nid, node in nodes.items() if nid in valid}
     for code, sid in sorted(bad):
         issues.append(EvidenceIssue(code, "Framework ancestry cannot be verified", [sid]))

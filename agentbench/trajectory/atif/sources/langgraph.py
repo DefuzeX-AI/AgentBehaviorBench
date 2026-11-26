@@ -18,6 +18,7 @@ class LangGraphSource:
     # The delivered result is projected as its own step unless a model step carries it.
     reply_steps = True
     exported_steps = False
+    reads_network = False
 
     def recorded(self, index, *, include_network, issues):
         return _recorded(index, include_network, issues)

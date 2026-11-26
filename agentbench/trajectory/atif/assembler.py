@@ -48,7 +48,8 @@ def assemble_atif(bundle, graph, provenance):
             return {**native[0], "unix_nano": int(native[0]["unix_nano"])}
         span = bundle.spans.get(record.get("span")) or {}
         native = span.get("native_id")
-        return clocks.start(record, native) if native else None
+        # A record merged in from the wire or ACP carries its own clock.
+        return clocks.start(record, native) if native else record.get("clock")
 
     def unassigned(record):
         timing = operation_time(record)
@@ -66,6 +67,17 @@ def assemble_atif(bundle, graph, provenance):
     for link in graph.delegations:
         delegation_by_tool.setdefault(link.tool_id, []).append(link)
 
+    def placed(record):
+        """Where a record's step goes, and what the step says about it.
+
+        A source that merges every record keeps the ones no execution could be
+        shown to own: they stand in the root trajectory, marked as unknown."""
+        owner = graph.owners[record["id"]]
+        noted = {"sources": list(record["sources"])} if record.get("sources") else {}
+        if owner is None and bundle.exported_steps:
+            return graph.root_id, {**noted, "owner": "unknown"}
+        return owner, noted
+
     def observed(tool, call_id=None):
         return ObservationResult(source_call_id=call_id, content=text(tool.get("outputs")),
             extra={"abb": {"record_ids": [tool["id"]], "tool_execution": tool}},
@@ -73,7 +85,7 @@ def assemble_atif(bundle, graph, provenance):
                 for link in delegation_by_tool.get(tool["id"], [])] or None)
 
     for model in bundle.models:
-        owner = graph.owners[model["id"]]
+        owner, noted = placed(model)
         if owner is None:
             continue
         output = model.get("client_output") or model["output"]
@@ -83,13 +95,17 @@ def assemble_atif(bundle, graph, provenance):
             if not call.get("id") or not call.get("name") or not isinstance(call.get("arguments"), dict):
                 issues.append(EvidenceIssue("incomplete_tool_call", "Tool call cannot be represented as complete ATIF arguments", [model["id"]]))
                 continue
-            calls.append(ToolCall(tool_call_id=call["id"], function_name=call["name"], arguments=call["arguments"]))
+            executed = []
             for relation in graph.tool_relations[model["id"]]:
                 if relation["tool_call_id"] == call["id"] and relation["status"] == "exact":
                     for tid in relation["interaction_ids"]:
-                        if graph.owners[tid] == owner and tid not in attached:
+                        if graph.owners[tid] == graph.owners[model["id"]] and tid not in attached:
                             observations.append(observed(tools[tid], call["id"]))
                             attached.add(tid)
+                            executed.extend(tools[tid].get("sources") or [])
+            # The records that saw this call executed.
+            calls.append(ToolCall(tool_call_id=call["id"], function_name=call["name"], arguments=call["arguments"],
+                                  extra={"abb": {"sources": list(dict.fromkeys(executed))}} if executed else None))
         reasoning = output.get("reasoning")
         timing = operation_time(model)
         step = Step(step_id=1, source="agent", timestamp=timing["start_time"] if timing else None,
@@ -97,25 +113,36 @@ def assemble_atif(bundle, graph, provenance):
             model_name=model["output"].get("model") or model["input"].get("model"),
             tool_calls=calls or None, observation=Observation(results=observations) if observations else None,
             metrics=_metrics(model["output"]), llm_call_count=1,
-            extra={"abb": {"record_ids": [model["id"]], "model_record": model}})
+            extra={"abb": {"record_ids": [model["id"]], "model_record": model, **noted}})
         pending[owner].append((order(model, timing), model["id"], step))
     for tool in bundle.tools:
-        owner = graph.owners[tool["id"]]
+        owner, noted = placed(tool)
         if owner is None or tool["id"] in attached:
             continue
         timing = operation_time(tool)
         pending[owner].append((order(tool, timing), tool["id"],
             Step(step_id=1, source="agent", timestamp=timing["start_time"] if timing else None, message="",
                  observation=Observation(results=[observed(tool)]),
-                 extra={"abb": {"kind": "independent_tool", "association": "unlinked"}})))
+                 extra={"abb": {"kind": "independent_tool", "association": "unlinked", **noted}})))
 
     from .replies import root_steps
-    root_rows = root_steps(bundle, pending[graph.root_id], issues, clocks)
+    from .timeline import timeline_steps
+    # Merged records share one timeline; without every prompt's start the
+    # identifier-based turn placement stands.
+    root_rows = timeline_steps(bundle, pending[graph.root_id], issues) if bundle.exported_steps else None
+    if root_rows is None:
+        root_rows = root_steps(bundle, pending[graph.root_id], issues, clocks)
     pending[graph.root_id] = [((0, i, ()), "", step) for i, step in enumerate(root_rows)]
     for nid, node in graph.nodes.items():
         if nid != graph.root_id and node.input is not None:
+            # A merged record of the delegating call dates the task it handed over.
+            spawn = next((tools[link.tool_id] for link in graph.delegations
+                          if link.child_id == nid and tools.get(link.tool_id, {}).get("sources")), None)
+            timing = operation_time(spawn) if spawn else None
             pending[nid].append(((-1,), "!input", Step(step_id=1, source="user", message=text(node.input),
-                extra={"abb": {"kind": "child_input", "evidence": node.evidence}})))
+                timestamp=timing["start_time"] if timing else None,
+                extra={"abb": {"kind": "child_input", "evidence": node.evidence,
+                               **({"sources": list(spawn["sources"])} if spawn else {})}})))
         owned_models = sorted((m for m in bundle.models if graph.owners[m["id"]] == nid),
                               key=lambda m: order(m, operation_time(m)))
         if owned_models:
@@ -157,7 +184,7 @@ def assemble_atif(bundle, graph, provenance):
             extra["version_missing_reason"] = "No independent child Agent revision was recorded"
         if nid == graph.root_id:
             extra.update(source=bundle.source, provenance=provenance, invocations=bundle.inputs,
-                unassigned_records=[unassigned(r) for r in bundle.models + bundle.tools if graph.owners[r["id"]] is None],
+                unassigned_records=[unassigned(r) for r in bundle.models + bundle.tools if placed(r)[0] is None],
                 native_events=bundle.native_events, issues=[asdict(i) for i in issues])
             if bundle.unassigned_agent_spans:
                 extra["unassigned_agent_spans"] = bundle.unassigned_agent_spans

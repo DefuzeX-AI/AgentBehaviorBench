@@ -29,15 +29,27 @@ def read_evidence(directory, *, allow_incomplete=False, include_network=True, ru
     terminal = {"succeeded", "failed", "cancelled", "interrupted", "stopped", "completed", "degraded"}
     if run.get("status") not in terminal and not allow_incomplete:
         raise ValueError("Run is not known to be finished; use --allow-incomplete")
+    target = api.read("request/target.json") or {}
+    artifacts = [(folder, *read_input_artifacts(folder, api.read)) for folder in api.outputs()]
+    source = select(source if source is not None else declared(target, [{"request": request} for _, _, request in artifacts]))
+
+    def wire(name):
+        return canonical_relative(name) == canonical_relative("network.jsonl")
+
     # Exclude the interceptor at the input boundary, before any wire/callback
     # join. A framework span then contributes its own payload even on retries.
+    # A source that merges the wire record reads it apart from that join.
     def selected(name):
-        return include_network or canonical_relative(name) != canonical_relative("network.jsonl")
+        return include_network or source.reads_network or not wire(name)
 
-    index = InteractionIndex(root, [file for file in _files(root) if selected(file[0])])
-    for records in index.groups.values():
-        for record in records:
-            record["file"] = api.file(record["file"]).relative_to(root).as_posix()
+    def indexed(keep):
+        found = InteractionIndex(root, [file for file in _files(root) if keep(file[0])])
+        for records in found.groups.values():
+            for record in records:
+                record["file"] = api.file(record["file"]).relative_to(root).as_posix()
+        return found
+
+    index = indexed(lambda name: not wire(name) or include_network and not source.reads_network)
     issues = [EvidenceIssue("invalid_record", text) for text in index.warnings]
     if run.get("status") not in terminal:
         issues.append(EvidenceIssue("incomplete_run", "Snapshot of an unfinished or unknown run"))
@@ -51,16 +63,16 @@ def read_evidence(directory, *, allow_incomplete=False, include_network=True, ru
         for record in index.groups[row["id"]]:
             raw_records[(record["file"], record["line"])] = deepcopy(record)
     inputs = []
-    for folder in api.outputs():
-        record, request = read_input_artifacts(folder, api.read)
+    for folder, record, request in artifacts:
         inputs.append({"folder": folder, "record": record, "request": request,
                        "result": api.read(f"{folder}/result.json"),
                        "acp_summary": api.read(f"{folder}/acp-summary.json"),
                        "context": {k: v for k, v in index.contexts.get(folder, {}).items()
                                    if k in _scope({})}})
-    target = api.read("request/target.json") or {}
-    source = select(source if source is not None else declared(target, inputs))
     models, tools, spans, native = source.recorded(index, include_network=include_network, issues=issues)
+    if source.reads_network:
+        # Unparsed lines are reported below with the other raw records.
+        source.read_network(indexed(wire))
     for folder in api.evidence_outputs():
         try:
             path = api.file(f"{folder}/acp-events.jsonl")

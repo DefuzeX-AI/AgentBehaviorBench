@@ -27,34 +27,6 @@ do not add command-name branches to `cli/main.py`. Split substantial functionali
 by responsibility and reuse existing contracts instead of building parallel paths.
 Check nearby code and module documentation before changing an interface.
 
-## Keep the trajectory contract whole
-
-The ATIF document `trajectory.atif.json` (ATIF-v1.8, `trajectory/atif/`) is the
-only trajectory. The run flow derives it after the container stops and host
-trace validation ran, and records its status as `atif` in `run.json`. The raw
-OTel, framework, interceptor and file evidence stay the source of truth.
-
-- Derivation never changes the execution outcome. Without Harbor's models
-  (`agentbench/trajectory/atif/requirements.txt`) the status is `unavailable`;
-  a conversion error is `failed`. Neither writes a file.
-- The document keeps the official ATIF fields and, under `extra.abb`, only small
-  annotations and `{file, line}` pointers into the attempt directory, which keeps
-  the complete evidence. Do not embed copies of recorded evidence.
-  `trajectory/atif/slim.py` holds one rule per stored key; a key without a rule
-  fails the export.
-- One step source per attempt decides which records become steps
-  (`trajectory/atif/sources/`), chosen from the frozen `[adapter] type` or an
-  explicit `[atif] source`: `langgraph` reads callbacks; `acp_otel` reads only
-  the spans the Agent exported, never the records ABB writes while relaying
-  ACP. Add a source module for a new format instead of branching the reader.
-- Pair records by recorded identifiers (interceptor call id, framework span id,
-  emitted tool call id). Never infer relationships from timestamps.
-- Generic code produces the trajectory; whether a Judge consumes it is the SDK
-  plugin's decision. Native Judge requests attach `trajectory.atif.json`.
-- Reuse `observe/interactions.py` and `observe/tool_links.py` for grouping and
-  pairing instead of parsing traces again. See
-  [the ATIF document](docs/ATIF-Experiment.md#automatic-derivation).
-
 ## Preserve the onboarding flow
 
 ```text

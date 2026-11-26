@@ -1,0 +1,97 @@
+{
+ "status": "complete",
+ "agent": "openclaw",
+ "steps": [
+  {
+   "source": "user",
+   "message": "请调用 sessions_spawn 开一个子 agent，让它不用任何工具，直接写一句关于秋天的诗，然后告诉我它写了什",
+   "sources": [
+    "acp"
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "tool_calls": [
+    [
+     "sessions_spawn",
+     [
+      "trace",
+      "acp"
+     ]
+    ]
+   ],
+   "children": 1
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "tool_calls": [
+    [
+     "sessions_yield",
+     [
+      "trace",
+      "acp"
+     ]
+    ]
+   ]
+  },
+  {
+   "source": "user",
+   "message": "子 agent 写的诗是什么？",
+   "sources": [
+    "acp"
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "子 agent 已完成，它写的诗句是：\n\n> **秋风起时，落叶写满整条归途。**\n\n它按你的要求全程没有调用任何工具，",
+   "sources": [
+    "network",
+    "trace"
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "子 agent 交回来的诗是：\n\n> 秋风起时，落叶写满整条归途。\n\n它在整个过程中没有调用任何工具，只用语言模型直接创",
+   "sources": [
+    "network",
+    "trace",
+    "acp"
+   ]
+  }
+ ],
+ "subagent_trajectories": [
+  {
+   "agent": "OpenClaw subagent",
+   "steps": [
+    {
+     "source": "user",
+     "message": "不要使用任何工具（不要调用 read/write/exec/browser 等任何工具），直接凭你自己的语言能力回答。请",
+     "sources": [
+      "trace",
+      "acp"
+     ],
+     "kind": "child_input"
+    },
+    {
+     "source": "agent",
+     "message": "秋风起时，落叶写满整条归途。",
+     "sources": [
+      "network",
+      "trace"
+     ]
+    }
+   ],
+   "subagent_trajectories": []
+  }
+ ]
+}

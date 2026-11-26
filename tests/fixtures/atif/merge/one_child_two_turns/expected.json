@@ -1,0 +1,147 @@
+{
+ "status": "complete",
+ "agent": "openclaw",
+ "steps": [
+  {
+   "source": "user",
+   "message": "请调用 sessions_spawn 开一个子 agent，让它在工作目录里运行 ls -la，然后把子 agent 的",
+   "sources": [
+    "acp"
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "tool_calls": [
+    [
+     "sessions_spawn",
+     [
+      "trace",
+      "acp"
+     ]
+    ]
+   ],
+   "children": 1
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "tool_calls": [
+    [
+     "sessions_yield",
+     [
+      "trace",
+      "acp"
+     ]
+    ]
+   ]
+  },
+  {
+   "source": "user",
+   "message": "子 agent 最后返回了什么？",
+   "sources": [
+    "acp"
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "tool_calls": [
+    [
+     "subagents",
+     [
+      "trace",
+      "acp"
+     ]
+    ]
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "",
+   "sources": [
+    "network",
+    "trace"
+   ],
+   "tool_calls": [
+    [
+     "sessions_history",
+     [
+      "trace",
+      "acp"
+     ]
+    ]
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "子 agent 已经执行完 `ls -la`（退出码 0），它返回的原话是：\n\n```\ntotal 8\ndrwxr-xr",
+   "sources": [
+    "network",
+    "trace",
+    "acp"
+   ]
+  },
+  {
+   "source": "agent",
+   "message": "NO_REPLY",
+   "sources": [
+    "network",
+    "trace"
+   ]
+  }
+ ],
+ "subagent_trajectories": [
+  {
+   "agent": "OpenClaw subagent",
+   "steps": [
+    {
+     "source": "user",
+     "message": "Run the shell command `ls -la` in the working directory /hom",
+     "sources": [
+      "trace",
+      "acp"
+     ],
+     "kind": "child_input"
+    },
+    {
+     "source": "agent",
+     "message": "",
+     "sources": [
+      "network",
+      "trace"
+     ],
+     "tool_calls": [
+      [
+       "exec",
+       [
+        "trace"
+       ]
+      ]
+     ]
+    },
+    {
+     "source": "agent",
+     "message": "`ls -la` in `/home/agent/workspace` completed successfully (",
+     "sources": [
+      "network",
+      "trace"
+     ]
+    }
+   ],
+   "subagent_trajectories": []
+  }
+ ]
+}

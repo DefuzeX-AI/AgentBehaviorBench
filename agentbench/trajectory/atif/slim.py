@@ -131,6 +131,13 @@ STEP = {
     "association": keep,
     "turn_evidence": keep,
     "result_source": keep,
+    "marks": keep,                    # reviewer marks: reason and time (see marks.py)
+    "sources": keep,                  # which of network / trace / acp recorded the step
+    "owner": keep,                    # "unknown": no execution could be shown to own the step
+}
+
+TOOL_CALL = {
+    "sources": keep,                  # which of trace / acp recorded the call's execution
 }
 
 OBSERVATION_RESULT = {
@@ -164,7 +171,7 @@ def _positions(document):
             yield "step", step, STEP
             yield "metrics", step.get("metrics") or {}, METRICS
             for call in step.get("tool_calls") or []:
-                yield "tool_call", call, {}
+                yield "tool_call", call, TOOL_CALL
             for result in (step.get("observation") or {}).get("results") or []:
                 yield "observation_result", result, OBSERVATION_RESULT
                 for ref in result.get("subagent_trajectory_ref") or []:

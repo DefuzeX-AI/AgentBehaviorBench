@@ -210,15 +210,17 @@ def test_a_spawn_reported_by_the_root_session_embeds_its_child(tmp_path):
     attempt(tmp_path, [*root_run, *child_run], sessions=([reported("root-session", "call-spawn")],))
     result, _ = build_export(tmp_path, adapters=["openclaw"])
     document = result.document
-    assert [(step.source, step.message) for step in document.steps] == [("user", "hello"), ("agent", "")]
+    assert [(step.source, step.message) for step in document.steps] == [
+        ("user", "hello"), ("agent", ""), ("agent", ""), ("agent", "77")]
     child, = document.subagent_trajectories
     spawned, = document.steps[1].observation.results
     assert spawned.subagent_trajectory_ref[0].trajectory_id == child.trajectory_id
     assert [(step.source, step.message) for step in child.steps] == [("user", "read number.txt")]
-    # Never guessed into the child: its three operations stay listed as unassigned.
-    unassigned = document.extra["abb"]["unassigned_records"]
-    assert sorted(record["kind"] for record in unassigned) == ["model", "model", "tool"]
-    assert result.validation["status"] == "partial"
+    # Never guessed into the child: its operations stand in the root, marked as unknown.
+    assert unknown_steps(document) == ["", "77"] and "owner" not in document.steps[1].extra["abb"]
+    read, = document.steps[2].observation.results
+    assert read.content == "77" and not document.extra["abb"]["unassigned_records"]
+    assert result.validation["status"] == "partial" and result.validation["unassigned_records"] == 3
 
 
 def test_without_an_acp_report_a_delegation_leaves_exported_records_unowned(tmp_path):
@@ -226,7 +228,7 @@ def test_without_an_acp_report_a_delegation_leaves_exported_records_unowned(tmp_
                        spawn_span(2, "call-spawn", "run-1")])
     result, _ = build_export(tmp_path, adapters=["openclaw"])
     assert not result.document.subagent_trajectories
-    assert sorted(record["kind"] for record in result.document.extra["abb"]["unassigned_records"]) == ["model", "tool"]
+    assert unknown_steps(result.document) == [""] and result.validation["unassigned_records"] == 2
     assert "invalid_delegation" in [issue["code"] for issue in result.validation["issues"]]
 
 
@@ -244,6 +246,11 @@ def reading_child(run, harness, *, under, call_id="call-read", answer="77"):
 
 def trajectory_steps(trajectory):
     return [(step.source, step.message) for step in trajectory.steps]
+
+
+def unknown_steps(trajectory):
+    """Messages of the steps no execution could be shown to own."""
+    return [step.message for step in trajectory.steps if (step.extra or {}).get("abb", {}).get("owner") == "unknown"]
 
 
 def test_openclaw_run_structure_places_a_child_run_in_its_trajectory(tmp_path):
@@ -278,7 +285,8 @@ def test_two_spawns_in_one_run_are_never_paired_by_structure(tmp_path):
     result, _ = build_export(tmp_path, adapters=["openclaw"])
     children = result.document.subagent_trajectories
     assert sorted(trajectory_steps(child) for child in children) == [[("user", "read number.txt")]] * 2
-    assert len(result.document.extra["abb"]["unassigned_records"]) == 6
+    # Both children's operations stand in the root, marked as unknown.
+    assert unknown_steps(result.document) == ["", "77", "", "77"] and result.validation["unassigned_records"] == 6
     assert [issue["code"] for issue in result.validation["issues"]].count("openclaw_child_run_ambiguous") == 2
 
 
@@ -336,5 +344,5 @@ def test_a_child_that_inherits_the_conversation_cannot_be_told_from_a_notice(tmp
     result = delegating_attempt(tmp_path, context="fork")
     child, = result.document.subagent_trajectories
     assert trajectory_steps(child) == [("user", "read number.txt")]
-    assert len(result.document.extra["abb"]["unassigned_records"]) == 4
+    assert unknown_steps(result.document) == ["", "77", "NO_REPLY"] and result.validation["unassigned_records"] == 4
     assert "openclaw_child_run_ambiguous" in [issue["code"] for issue in result.validation["issues"]]
