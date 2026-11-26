@@ -368,14 +368,14 @@ These links identify useful implementation patterns. Review the source and manif
 | [Streamlit Template](../resources/agents/06-langchain-streamlit-template/bindings/bridge.py) | Extract the native factory without starting UI; review private thread config. |
 | [Curiosity](../resources/agents/58-curiosity/bindings/bridge.py) | SQLite path and native thread; review private thread config. |
 | [Readwren](../resources/agents/07-readwren/bindings/bridge.py) | Start interview before sending input; public method has no config parameter. |
-| [TableGPT](../resources/agents/08-tablegpt-agent/bindings/bridge.py) | Sandbox, date and parent ID; current text boundary does not translate attachments. |
+| [TableGPT](../resources/agents/02-tablegpt-agent/bindings/bridge.py) | Sandbox, date and parent ID; current text boundary does not translate attachments. |
 | [Open Notebook](../resources/agents/30-open-notebook/bindings/bridge.py) | Async service/session bootstrap and owned process cleanup. |
-| [AI Data Science Team](../resources/agents/31-ai-data-science-team/bindings/bridge.py) | Fixed CSV, public `invoke_agent` and response retrieval. |
-| [Local Deep Research](../resources/agents/32-local-deep-research/bindings/ldr_bridge.py) | Settings snapshot and main-thread native API restriction. |
+| [AI Data Science Team](../resources/agents/18-ai-data-science-team/bindings/bridge.py) | Fixed CSV, public `invoke_agent` and response retrieval. |
+| [Local Deep Research](../resources/agents/19-local-deep-research/bindings/ldr_bridge.py) | Settings snapshot and main-thread native API restriction. |
 | [Article Explainer](../resources/agents/34-article-explainer/bindings/bridge.py) | Strict current-message input; implementation enables a checkpoint although its descriptive text says otherwise. |
-| [GPT Researcher](../resources/agents/59-gpt-researcher/bindings/gpt_researcher_bridge.py) | Complete task with `publish_formats` and async research graph. |
-| [TradingAgents](../resources/agents/35-tradingagents/bindings/tradingagents_bridge.py) | Explicit ticker/date parsing and config context around a public lifecycle. |
-| [EvoScientist](../resources/agents/36-evoscientist/bindings/bridge.py) | Workspace setup and explicit unattended deployment configuration. |
+| [GPT Researcher](../resources/agents/23-gpt-researcher/bindings/gpt_researcher_bridge.py) | Complete task with `publish_formats` and async research graph. |
+| [TradingAgents](../resources/agents/20-tradingagents/bindings/tradingagents_bridge.py) | Explicit ticker/date parsing and config context around a public lifecycle. |
+| [EvoScientist](../resources/agents/21-evoscientist/bindings/bridge.py) | Workspace setup and explicit unattended deployment configuration. |
 
 ## Review and validate
 

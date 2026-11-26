@@ -40,10 +40,10 @@ Git acquisition implementation cannot reproduce their source:
 | --- | --- |
 | `10-claude-agent-acp` | The selected upstream checkout, including its documentation link handling. The pinned source contains a symbolic link; automatic Git extraction rejects symbolic links. |
 | `37-biomedical-aiq-research-agent` | The selected upstream checkout and required data assets. Its dataset ZIP files are Git LFS objects; automatic Git extraction does not materialize LFS. |
-| `86-fast-agent` | The pinned checkout with its optional, uninitialized skills submodule; follow the [unit instructions](../resources/agents/86-fast-agent/README.md#source-preparation). |
+| `37-fast-agent` | The pinned checkout with its optional, uninitialized skills submodule; follow the [unit instructions](../resources/agents/37-fast-agent/README.md#source-preparation). |
 | `112-alphastream` | The pinned checkout without the unavailable, unused TradingAgents submodule; follow the [unit instructions](../resources/agents/112-alphastream/README.md#restoring-source). |
-| `124-synergy` | The pinned checkout with its internal symbolic link preserved on a Linux filesystem; follow the [unit instructions](../resources/agents/124-synergy/README.md#manual-source-prerequisite). |
-| `132-whip` | The pinned checkout prepared with the unit helper to materialize its internal directory link; follow the [unit instructions](../resources/agents/132-whip/README.md#manual-source-prerequisite). |
+| `60-synergy` | The pinned checkout with its internal symbolic link preserved on a Linux filesystem; follow the [unit instructions](../resources/agents/60-synergy/README.md#manual-source-prerequisite). |
+| `66-whip` | The pinned checkout prepared with the unit helper to materialize its internal directory link; follow the [unit instructions](../resources/agents/66-whip/README.md#manual-source-prerequisite). |
 
 For GitHub sources, the repository and exact commit are recorded in each unit's
 `agent.toml` and `source-manifest.json`. Supply the matching source tree under that

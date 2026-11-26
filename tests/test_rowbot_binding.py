@@ -16,7 +16,7 @@ from agentbench.observe.store import TraceStore
 
 @pytest.fixture
 def bridge(monkeypatch, tmp_path):
-    relative = Path('resources/agents/134-row-bot/bindings/bridge.py')
+    relative = Path('resources/agents/67-row-bot/bindings/bridge.py')
     root = next(parent for parent in Path(__file__).parents if (parent / relative).is_file())
     spec = importlib.util.spec_from_file_location('rowbot_binding_under_test', root / relative)
     module = importlib.util.module_from_spec(spec)
