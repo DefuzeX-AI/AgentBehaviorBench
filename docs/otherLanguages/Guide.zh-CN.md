@@ -9,7 +9,7 @@
 | 安装在宿主机 | 用途与检查 |
 | --- | --- |
 | Git | 下载仓库和 Agent；`git --version`。 |
-| Python 3.10+、pip、venv | CLI 与 harness；`python3 --version`。 |
+| Python 3.11+、pip、venv | CLI 与 harness；`python3 --version`。 |
 | 已运行且当前用户可访问的 Docker | Docker Agent/正式评测；`docker info` 必须成功。 |
 | Node.js 20.x 至少 20.19，或 22.12+，以及 npm | 构建网页；`node --version`、`npm --version`。无界面运行可不安装。 |
 | 浏览器 | 打开终端输出的完整本地 URL。 |

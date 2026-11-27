@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img alt="Python 3.10 ou version ultérieure" src="https://img.shields.io/badge/Python-3.10%2B-8a008a">
+  <img alt="Python 3.11 ou version ultérieure" src="https://img.shields.io/badge/Python-3.11%2B-8a008a">
   <img alt="Licence MIT" src="https://img.shields.io/badge/License-MIT-0086c9">
   <img alt="Version du package 0.1.0" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
 </p>

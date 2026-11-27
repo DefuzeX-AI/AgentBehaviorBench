@@ -8,7 +8,7 @@ Depuis la racine du dépôt ABB, avec son environnement virtuel actif, préparez
 
 ## 1. Préparer l’environnement
 
-Installez Git et Python 3.10+, puis suivez le guide de démarrage ci-dessus. Docker doit être accessible à votre utilisateur pour exécuter et certifier l’Agent. Pour la génération ou validation KUMA, installez KUMA dans le même environnement virtuel qu’ABB :
+Installez Git et Python 3.11+, puis suivez le guide de démarrage ci-dessus. Docker doit être accessible à votre utilisateur pour exécuter et certifier l’Agent. Pour la génération ou validation KUMA, installez KUMA dans le même environnement virtuel qu’ABB :
 
 ```bash
 python -m pip install -e .

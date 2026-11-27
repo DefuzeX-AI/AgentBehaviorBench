@@ -10,7 +10,7 @@ Their credentials and quotas are separate.
 ## Prepare the host
 
 Use a source checkout with an editable installation; the standalone wheel does
-not include all Agent resources and built viewer assets. Install Git, Python 3.10+
+not include all Agent resources and built viewer assets. Install Git, Python 3.11+
 with pip/venv, and Docker accessible to your user for Docker Agent execution.
 
 - **macOS:** install and start [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/).

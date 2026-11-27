@@ -35,7 +35,7 @@
 - GitHub 账号
 - Git
 - 可以访问 DefuzeX、GitHub、PyPI、Docker Hub 和模型服务 API 的网络环境
-- Python 3.10 或更高版本
+- Python 3.11 或更高版本
 - Docker
 - 一个模型服务 API Key （deepseek glm 或者open router）
 - 一个可用于注册 DefuzeX 的邮箱
@@ -68,7 +68,7 @@
 
 ### Windows：PowerShell
 
-先安装 Git 和 Python 3.10+，确认 PowerShell 中可以运行 `git --version` 和 `python --version`。然后执行：
+先安装 Git 和 Python 3.11+，确认 PowerShell 中可以运行 `git --version` 和 `python --version`。然后执行：
 
 ```powershell
 git clone https://github.com/DefuzeX-AI/AgentBehaviorBench.git
@@ -98,7 +98,7 @@ Docker Agent 的认证和评测还需要启动 [Docker Desktop for Windows](http
 
 ### macOS：Terminal（zsh/bash）
 
-先安装 Git 和 Python 3.10+，确认 `git --version` 和 `python3 --version` 可用。然后执行：
+先安装 Git 和 Python 3.11+，确认 `git --version` 和 `python3 --version` 可用。然后执行：
 
 ```bash
 git clone https://github.com/DefuzeX-AI/AgentBehaviorBench.git
@@ -116,7 +116,7 @@ Docker Agent 的认证和评测还需要启动 [Docker Desktop for Mac](https://
 
 ### Linux：Terminal（bash/zsh）
 
-先安装 Git 和 Python 3.10+，并确认 Python 提供 `pip` 和 `venv`。如果创建虚拟环境时报缺少 `venv` 或 `ensurepip`，先通过发行版的软件包管理器安装与当前 Python 版本匹配的 venv 支持包，再重试。
+先安装 Git 和 Python 3.11+，并确认 Python 提供 `pip` 和 `venv`。如果创建虚拟环境时报缺少 `venv` 或 `ensurepip`，先通过发行版的软件包管理器安装与当前 Python 版本匹配的 venv 支持包，再重试。
 
 ```bash
 git clone https://github.com/DefuzeX-AI/AgentBehaviorBench.git

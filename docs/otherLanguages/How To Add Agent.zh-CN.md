@@ -8,7 +8,7 @@
 
 ## 1. 配置环境
 
-安装 Git 和 Python 3.10+，按上方启动指南安装 ABB。执行 Agent 和认证时，当前用户需要能使用 Docker。使用 KUMA 生成或校验配置时，在运行 ABB 的同一个虚拟环境中安装 KUMA：
+安装 Git 和 Python 3.11+，按上方启动指南安装 ABB。执行 Agent 和认证时，当前用户需要能使用 Docker。使用 KUMA 生成或校验配置时，在运行 ABB 的同一个虚拟环境中安装 KUMA：
 
 ```bash
 python -m pip install -e .

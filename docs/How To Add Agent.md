@@ -8,7 +8,7 @@ Follow these steps from the ABB checkout root with its virtual environment activ
 
 ## 1. Prepare the environment
 
-Install Git and Python 3.10+, then complete the startup guide linked above. Docker must be available to your user for Agent execution and certification. Install KUMA in the same virtual environment as ABB when using KUMA generation or validation:
+Install Git and Python 3.11+, then complete the startup guide linked above. Docker must be available to your user for Agent execution and certification. Install KUMA in the same virtual environment as ABB when using KUMA generation or validation:
 
 ```bash
 python -m pip install -e .

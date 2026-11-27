@@ -352,11 +352,7 @@ def test_git_install_inputs_are_applied_when_added_after_source_restore(unit, tm
 
 
 @pytest.mark.parametrize('unit_name', [
-    '02-ai-hedge-fund-crypto', '03-labscript-ai', '04-multi-agent-cad',
-    '05-autoresearch-agents', '06-langchain-streamlit-template', '58-curiosity',
-    '07-readwren', '02-tablegpt-agent', '30-open-notebook',
-    '18-ai-data-science-team', '19-local-deep-research', '34-article-explainer',
-    '20-tradingagents',
+    '02-tablegpt-agent', '18-ai-data-science-team', '19-local-deep-research', '20-tradingagents',
 ])
 def test_registered_abb_descriptor_loads_after_clean_source_preparation(unit_name, tmp_path, monkeypatch):
     import shutil

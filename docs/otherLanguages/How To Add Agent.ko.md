@@ -8,7 +8,7 @@ ABB 저장소 루트에서 가상 환경을 활성화한 후 환경 설정, 소�
 
 ## 1. 환경 설정
 
-Git과 Python 3.10+를 설치하고 위 시작 가이드에 따라 ABB를 설치하세요. Agent 실행 및 인증에는 현재 사용자가 접근할 수 있는 Docker가 필요합니다. KUMA 생성 또는 검증 시 ABB와 같은 가상 환경에 KUMA를 설치하세요.
+Git과 Python 3.11+를 설치하고 위 시작 가이드에 따라 ABB를 설치하세요. Agent 실행 및 인증에는 현재 사용자가 접근할 수 있는 Docker가 필요합니다. KUMA 생성 또는 검증 시 ABB와 같은 가상 환경에 KUMA를 설치하세요.
 
 ```bash
 python -m pip install -e .
