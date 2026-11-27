@@ -62,4 +62,20 @@ Use `profile = "file-export"`, `file = "trace.json"` and `file_format = "otlp-js
 
 Open `otel/status.json` in the attempt directory, then inspect `otel/spans.jsonl`. Each JSONL line retains the resource, instrumentation scope, OTLP IDs, original nanosecond timestamps, links, events and exported attributes after the benchmark's redaction rules. Cite the filename and one-based line number.
 
+### Raw exports
+
+Every export is archived exactly as received before any span row is derived from it. `otel/spans.jsonl` is derived from that archive. A row's `archive` names the archived file and its batch number.
+
+| Transport | Archived bytes | File |
+| --- | --- | --- |
+| HTTP | The request body as sent, before gzip decompression or parsing | `otel/raw/NNNNNN.pb`, `.json` or `.bin`, plus `.gz` for gzip |
+| gRPC | The `ExportTraceServiceRequest` message bytes, after gRPC framing and compression | `otel/raw/NNNNNN.pb` |
+| File export | The Agent's trace file, byte for byte | `otel/raw/NNNNNN-<original name>` |
+
+`otel/raw/index.jsonl` records one `received` event per archived file: batch number, file, SHA-256, size, transport, content type, content encoding and receive time. A later `accepted` event lists the derived `spans.jsonl` lines. A `rejected` event gives the reason. Rejected and unsupported requests are archived too. A request that exceeds the size limit while it is being read is not archived, because its body was never complete. `status.json` reports `raw_batches` and `raw_redacted: false`.
+
+A protobuf archive can be posted unchanged to any OTLP/HTTP trace endpoint with its recorded content type and encoding. For example, Langfuse accepts it at `/api/public/otel/v1/traces`.
+
+The archive is not redacted. It can contain credentials, prompts and other content the Agent exported. Files are owner-only (`0600`, directory `0700`). Viewers and artifact readers refuse `otel/raw/`, and Judge requests never attach it. Keep it on the machine that ran the attempt. Do not commit it, share it or upload it, except to an observability backend you control.
+
 `span_count` counts persisted Agent-native and auto-instrumented spans. `record_count` includes every received record. `zero_spans` means the configured window closed with zero Agent spans. `unconfigured` and `unsupported` describe profile selection. `incomplete` reports a collection error. Inspect the execution result independently. Per-Input `framework.jsonl` can exist even if the Agent exporter emitted nothing; ABB does not turn those records into OTel spans. A claim about tool output requires an actual result field or event. A claim about message delivery requires independent evidence of delivery.

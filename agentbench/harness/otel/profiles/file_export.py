@@ -64,16 +64,19 @@ def collect(config, workdir, sink):
         if not path.is_file():
             continue
         found = True
-        with path.open(encoding="utf-8") as stream:
-            if config.file_format == "llxprt-jsonl":
-                for line in stream:
-                    if line.strip():
-                        original = json.loads(line)
-                        batch = _llxprt_batch(original)
-                        if batch:
-                            sink.accept_json(batch, transport="llxprt-file", file_record=original)
-            else:
-                transport = "session-export" if config.file_format == "whip-session" else "file"
-                sink.accept_json(json.load(stream), transport=transport)
+        body = path.read_bytes()
+        transport = {"llxprt-jsonl": "llxprt-file", "whip-session": "session-export"}.get(config.file_format, "file")
+        # The Agent's own file is the original; archive it before deriving span rows.
+        archived = sink.archive(body, transport=transport, name=path.name)
+        text = body.decode("utf-8")
+        if config.file_format == "llxprt-jsonl":
+            for line in text.splitlines():
+                if line.strip():
+                    original = json.loads(line)
+                    batch = _llxprt_batch(original)
+                    if batch:
+                        sink.accept_json(batch, transport=transport, file_record=original, source=archived)
+        else:
+            sink.accept_json(json.loads(text), transport=transport, source=archived)
     if not sink.count:
         sink.observation_note = "Exporter file contained no spans" if found else "Agent did not create the configured trace file"

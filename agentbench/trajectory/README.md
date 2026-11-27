@@ -44,9 +44,11 @@ and [Stored form](../../docs/ATIF-Experiment.md#stored-form).
 ## Agent and framework evidence
 
 Case-level `otel/spans.jsonl` contains Agent exports. Each line carries its own
-resource, scope, trace identity and origin. `otel/status.json` describes that
-collection window. Per-Input `framework.jsonl` contains adapter callbacks.
-Historical rows without identifiable provenance have origin `unknown`.
+resource, scope, trace identity and origin. Lines are derived from the byte-exact
+exports archived under `otel/raw/`, and `archive` names the archived file. The
+archive is unredacted, so the trajectory never points into it. `otel/status.json`
+describes that collection window. Per-Input `framework.jsonl` contains adapter
+callbacks. Historical rows without identifiable provenance have origin `unknown`.
 
 An exact operation identifier can associate several independent evidence
 references with one action. For OpenClaw, an accepted spawn, a child tool result,

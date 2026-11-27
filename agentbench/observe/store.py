@@ -148,6 +148,8 @@ def summarize(directory: Path):
     for path in sorted(directory.rglob("*.jsonl")):
         if path.is_symlink():
             continue
+        if path.parent.name == "raw" and path.parent.parent.name == "otel":
+            continue  # The raw export archive and its index are not event logs.
         if path.parent.name == "otel" and path.name == "spans.jsonl":
             # Single-invocation transport spools and the published Case artifact
             # contain the same spans. Count the published copy only.
