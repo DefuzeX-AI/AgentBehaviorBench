@@ -1,5 +1,6 @@
 """Shared live observation lifecycle, independent of runtime and SDK."""
 from pathlib import Path
+from functools import cached_property
 from .store import TraceStore
 from .observers import DEFAULT_OBSERVERS
 
@@ -9,7 +10,11 @@ class InvocationObservation:
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
         self.store = TraceStore(self.directory / 'framework.jsonl', session_id, source='framework', context=context)
-        self.callbacks = DEFAULT_OBSERVERS.callbacks(framework, self.store)
+        self.framework = framework
+
+    @cached_property
+    def callbacks(self):
+        return DEFAULT_OBSERVERS.callbacks(self.framework, self.store)
 
     def config(self, value=None):
         # Do not deepcopy user callback objects (may own locks/resources).

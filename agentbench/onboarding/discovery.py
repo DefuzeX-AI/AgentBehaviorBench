@@ -256,6 +256,8 @@ def discover_otel(adapter, source, framework):
         if re.search(exporter, text, re.IGNORECASE):
             return {"profile": "native-otlp", "reason": f"OTLP trace exporter declared in {name}"}
     notes = []
+    if not acp:
+        return {"profile": "langfuse-auto"}
     if acp and runtime == "python" and not re.search(r"langchain|langgraph", "\n".join(declared.values()), re.IGNORECASE):
         notes.append("python-auto instruments LangChain only and none is declared")
     # Bun shares package.json with Node, so that pair is one runtime, never an alternative.

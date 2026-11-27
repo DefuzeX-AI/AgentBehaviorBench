@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { flattenTrajectory, ownerUnknown, parseComposer, recordSources, stepKind, stepSummary, trajectoryStats } from './chatModel.js';
+import { clarificationChoices, flattenTrajectory, ownerUnknown, parseComposer, recordSources, stepKind, stepSummary, trajectoryStats } from './chatModel.js';
+
+test('clarification buttons use the structured choice call from their own turn', () => {
+  const user = n => ({ source: 'user', extra: { abb: { evidence: [{ file: 'steps/000' + n + '/input.json' }] } } });
+  const args = { question: 'Which format?', options: ['PDF', 'Text', 'Slides', 'HTML'] };
+  const ask = { source: 'agent', llm_call_count: 1, tool_calls: [{ function_name: 'ask_clarification', arguments: args }] };
+  const result = { source: 'agent', message: '1. PDF  2. Text' };
+  const steps = [user(1), ask, result, user(2), result];
+  assert.deepEqual([...clarificationChoices({ steps })], [[1, { ...args, context: '' }]]);
+  assert.equal(clarificationChoices({ steps: [user(1), ask, { ...result, llm_call_count: 1 }] }).size, 0);
+  assert.equal(clarificationChoices({ steps: [ask] }).size, 0);
+});
 
 test('composer sends text as typed and parses JSON input on request', () => {
   assert.deepEqual(parseComposer('你好', false), { value: '你好' });

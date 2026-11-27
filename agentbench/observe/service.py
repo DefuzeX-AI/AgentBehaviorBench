@@ -21,6 +21,11 @@ def observe(agent, value, *, output: Path, environ, timeout=None):
     directory = output.resolve() / run_id
     directory.mkdir(parents=True, mode=0o700)
     print(f"Run: {run_id}\nArtifacts: {directory}", flush=True)
+    if (agent.path / "agent.toml").is_file():
+        from agentbench.trajectory.metadata import capture_target
+        request = directory / "request"
+        request.mkdir()
+        atomic_json(request / "target.json", capture_target(agent.path))
     store = TraceStore(directory / "network.jsonl", run_id, source="interceptor")
     runtime = DockerRuntime(environ=environ, trace_sink=store, artifact_root=directory,
                             timeout_sec=timeout, run_id=run_id)

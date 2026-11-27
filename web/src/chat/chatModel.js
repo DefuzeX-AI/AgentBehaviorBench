@@ -9,6 +9,30 @@ export function parseComposer(text, json) {
   }
 }
 
+// Match root user steps to the actual chat mailbox turn, even if either
+// polling endpoint is one refresh ahead of the other.
+export function clarificationChoices(document) {
+  const requests = new Map();
+  let turn;
+  for (const step of document?.steps || []) {
+    if (step.source === 'user') {
+      const file = step.extra?.abb?.evidence?.find(ref => /^steps\/\d+\/(input|request)\.json$/.test(ref.file));
+      turn = file ? Number(file.file.split('/')[1]) : null;
+    } else if (turn && step.source === 'agent' && step.llm_call_count) {
+      requests.delete(turn);
+      const calls = step.tool_calls || [];
+      const args = calls.find(call => call.function_name === 'ask_clarification')?.arguments;
+      if (calls.length === 1 && typeof args?.question === 'string' && args.question.trim()
+          && !args.fields?.length && Array.isArray(args.options) && args.options.length
+          && args.options.every(option => typeof option === 'string' && option.trim())) {
+        requests.set(turn, { question: args.question, context: typeof args.context === 'string' ? args.context : '',
+          options: [...new Set(args.options)] });
+      }
+    }
+  }
+  return requests;
+}
+
 export function stepKind(step) {
   if (step.source === 'user') return 'user';
   if (step.source === 'system') return 'system';

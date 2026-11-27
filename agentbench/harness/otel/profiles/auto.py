@@ -13,19 +13,3 @@ def environment(config, endpoint, agent_id):
     elif config.profile == "java-auto":
         env["JAVA_TOOL_OPTIONS"] = "-javaagent:/opt/abb-otel/javaagent.jar"
     return env
-
-
-def instrument_graph(endpoint, agent_id, capture_content=True):
-    from openinference.instrumentation import TraceConfig
-    from openinference.instrumentation.langchain import LangChainInstrumentor
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-
-    provider = TracerProvider(resource=Resource.create({"service.name": agent_id}))
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint + "/v1/traces")))
-    instrumentor = LangChainInstrumentor()
-    instrumentor.instrument(tracer_provider=provider, config=TraceConfig(
-        hide_inputs=not capture_content, hide_outputs=not capture_content))
-    return instrumentor, provider

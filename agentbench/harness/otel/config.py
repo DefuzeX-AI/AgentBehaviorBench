@@ -22,6 +22,8 @@ def parse_config(manifest):
     table = manifest.get("otel", {})
     if not isinstance(table, dict):
         raise ValueError("otel must be a table")
+    if manifest.get("framework") == "langgraph" and table.get("profile") in (None, "python-auto"):
+        table = {**table, "profile": "langfuse-auto"}
     config = CaptureConfig(**table)
     if type(config.capture_content) is not bool:
         raise ValueError("otel.capture_content must be a boolean")
@@ -29,7 +31,7 @@ def parse_config(manifest):
         raise ValueError(f"Unknown OTel profile: {config.profile}")
     if config.protocol not in ("http/protobuf", "http/json", "grpc"):
         raise ValueError("Unknown OTLP trace protocol")
-    if config.profile in ("openclaw", "opensoul", "python-auto") and config.protocol != "http/protobuf":
+    if config.profile in ("openclaw", "opensoul", "python-auto", "langfuse-auto") and config.protocol != "http/protobuf":
         raise ValueError(f"{config.profile} exports OTLP traces using http/protobuf")
     if not isinstance(config.enable_env, dict) or not all(
         isinstance(k, str) and k.isidentifier() and k.isupper() and isinstance(v, str)

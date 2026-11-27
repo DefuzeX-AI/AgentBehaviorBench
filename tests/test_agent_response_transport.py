@@ -51,7 +51,6 @@ def test_invalid_response_budget_is_rejected(value):
         ResponseLimits.from_environ({'ABB_AGENT_RESPONSE_MAX_BYTES': value})
 
 
-@pytest.mark.skipif(os.name == 'nt', reason='Descriptor-relative transport runs in Linux containers')
 def test_small_explicit_budget_fails_without_publishing_a_truncated_file(tmp_path):
     from agentbench.sdk.integration.channel import collect_response
     from agentbench.sdk.integration.context import ResponseLimits
@@ -65,7 +64,6 @@ def test_small_explicit_budget_fails_without_publishing_a_truncated_file(tmp_pat
     assert (source / 'framework.jsonl').read_bytes() == b'full original evidence'
 
 
-@pytest.mark.skipif(os.name == 'nt', reason='Descriptor-relative transport runs in Linux containers')
 def test_response_budget_counts_all_files_in_nested_directories(tmp_path):
     from agentbench.sdk.integration.channel import collect_response
     from agentbench.sdk.integration.context import ResponseLimits

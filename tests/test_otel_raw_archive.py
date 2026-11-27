@@ -2,6 +2,7 @@
 import gzip
 import hashlib
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.error import HTTPError
@@ -43,6 +44,29 @@ def index(directory):
 
 
 def assert_owner_only(directory):
+    if os.name == "nt":
+        # Windows stat fabricates POSIX permission bits. Inspect the DACL on
+        # the directory and its files, including any inherited permissions.
+        import subprocess
+        script = """
+        $ErrorActionPreference = 'Stop'
+        $root = Get-Item -LiteralPath $env:ABB_TEST_RAW_DIR
+        foreach ($item in @($root) + @(Get-ChildItem -LiteralPath $root.FullName)) {
+            $acl = $item.GetAccessControl()
+            $allowed = @($acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value,
+                         'S-1-3-4', 'S-1-5-18', 'S-1-5-32-544')
+            $rules = $acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
+            if (-not $rules.Count) { throw 'Missing access rules' }
+            foreach ($rule in $rules) {
+                if ($rule.AccessControlType -eq 'Allow' -and $rule.IdentityReference.Value -notin $allowed) {
+                    throw 'Archive grants access outside its owner and system administrators'
+                }
+            }
+        }
+        """
+        subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], check=True,
+                       env={**os.environ, "ABB_TEST_RAW_DIR": str(directory / "raw")})
+        return
     assert (directory / "raw").stat().st_mode & 0o777 == 0o700
     assert all(path.stat().st_mode & 0o777 == 0o600 for path in (directory / "raw").iterdir())
 

@@ -8,9 +8,10 @@ Agent's name. A format that needs its own reading adds a module here and
 registers it below.
 """
 from .acp_otel import AcpOtelSource
+from .langfuse import LangfuseSource
 from .langgraph import LangGraphSource
 
-_FACTORIES = {"langgraph": LangGraphSource, "acp_otel": AcpOtelSource}
+_FACTORIES = {"langfuse": LangfuseSource, "langgraph": LangGraphSource, "acp_otel": AcpOtelSource}
 # [adapter] type -> source. An attempt that recorded no adapter type at all
 # predates these records and is read from its framework records.
 _DEFAULTS = {"langgraph": "langgraph", "acp": "acp_otel", None: "langgraph"}

@@ -52,7 +52,8 @@ from the unit frozen in `request/target.json`, never from an Agent's name:
 
 | `[adapter] type` | Source | Model steps | Tool results | Reply |
 | --- | --- | --- | --- | --- |
-| `langgraph` | `langgraph` | LangChain callbacks in `framework.jsonl` | LangChain callbacks | The delivered result is its own `invocation_result` step unless a model step carries it by provider response id. |
+| `langgraph` with `langfuse-auto` | `langfuse` | Langfuse generation spans in `otel/spans.jsonl` | Langfuse tool spans | The delivered result follows the LangGraph reply rule below. |
+| `langgraph` with legacy callback evidence | `langgraph` | LangChain callbacks in `framework.jsonl` | LangChain callbacks | When the final root model step of the same turn has no tool calls and its message exactly equals the delivered text, its `extra.abb.result_source` points to the result file. Other delivered text gets its own `invocation_result` step. |
 | `acp` | `acp_otel` | Inference spans the Agent exported to `otel/spans.jsonl`, merged with the interceptor's model calls | Tool spans the Agent exported, merged with the tool calls reported over ACP | The last model step of the turn; the delivered result is not repeated. |
 
 A unit overrides the default with `[atif] source = "<name>"`. An adapter type

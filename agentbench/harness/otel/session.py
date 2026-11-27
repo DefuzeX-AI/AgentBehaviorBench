@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 from .evidence import EvidenceWriter
-from .profiles import PROFILES, auto, file_export, opensoul
+from .profiles import PROFILES, file_export, opensoul
 from .receiver import Receiver
 
 
@@ -11,7 +11,8 @@ class CaptureSession:
     def __init__(self, config, directory, agent_id):
         self.config = config
         self.sink = EvidenceWriter(directory, config)
-        self.receiver = self.instrumentation = None
+        self.langfuse = self.handler = None
+        self.receiver = None
         self.environment = {}
         self.previous = {}
         self.workdir = Path.cwd()
@@ -45,11 +46,13 @@ class CaptureSession:
         if framework == "acp":
             adapter.trace_environment = self.environment
         elif self.receiver:
-            if self.config.profile == "python-auto":
+            if self.config.profile == "langfuse-auto":
+                from .profiles.langfuse import local_client
                 try:
-                    self.instrumentation = auto.instrument_graph(self.receiver.endpoint, agent_id, self.config.capture_content)
+                    self.langfuse, self.handler = local_client(
+                        self.receiver.endpoint, agent_id, self.config.capture_content)
                 except Exception as exc:
-                    self.sink.error = type(exc).__name__
+                    self.sink.error = f"Langfuse initialization failed ({type(exc).__name__})"
             else:
                 self._export_environment()
         elif self.file_spool:
@@ -66,10 +69,8 @@ class CaptureSession:
             return
         self.finished = True
         try:
-            if self.instrumentation:
-                instrumentor, provider = self.instrumentation
-                instrumentor.uninstrument()
-                provider.shutdown()
+            if self.langfuse is not None:
+                self.langfuse.shutdown()
             elif self.previous:
                 # An in-process native binding can register its own global SDK provider.
                 from opentelemetry import trace

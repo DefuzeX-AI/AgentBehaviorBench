@@ -26,13 +26,13 @@ def pyproject(*dependencies, extra=""):
 
 @pytest.mark.parametrize("framework, adapter, files, profile, evidence", [
     # An in-process graph is always Python; only a declared exporter makes it native.
-    ("langgraph", BINDING, {"pyproject.toml": pyproject("langgraph")}, "python-auto", None),
+    ("langgraph", BINDING, {"pyproject.toml": pyproject("langgraph")}, "langfuse-auto", None),
     ("langgraph", BINDING, {"pyproject.toml": pyproject("langgraph", "opentelemetry-exporter-otlp-proto-http>=1")},
      "native-otlp", "pyproject.toml"),
     ("langgraph", BINDING, {"requirements.txt": "langgraph\nopentelemetry_exporter_otlp==1.30\n"},
      "native-otlp", "requirements.txt"),
     ("langgraph", BINDING, {"pyproject.toml": pyproject(
-        "langgraph", extra='[project.optional-dependencies]\notel=["opentelemetry-exporter-otlp"]\n')}, "python-auto", None),
+        "langgraph", extra='[project.optional-dependencies]\notel=["opentelemetry-exporter-otlp"]\n')}, "langfuse-auto", None),
     ("langgraph", BINDING, {"package.json": PACKAGE, "backend/pyproject.toml": pyproject("opentelemetry-exporter-otlp")},
      "native-otlp", "backend/pyproject.toml"),
     # An ACP launcher is a Python wrapper; the source's build file names the real runtime.
@@ -81,4 +81,4 @@ def test_known_product_keeps_its_enable_switch(tmp_path):
 def test_unreadable_declarations_never_select_native(tmp_path):
     root = source(tmp_path, {"package.json": "[1, 2", "pyproject.toml": "not = [toml"})
     assert discover_otel(LAUNCHER, root, "acp")["profile"] == "node-auto"
-    assert discover_otel(BINDING, root, "langgraph") == {"profile": "python-auto"}
+    assert discover_otel(BINDING, root, "langgraph") == {"profile": "langfuse-auto"}

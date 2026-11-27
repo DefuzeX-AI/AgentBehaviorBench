@@ -62,33 +62,6 @@ def record_turn(record, inputs, scopes):
     return matches[0] if len(matches) == 1 else None
 
 
-def final_response_id(item, message):
-    raw = item["result"].get("raw_output")
-    if not isinstance(raw, dict):
-        return None
-    # Some bindings retain the returned message sequence in the native state.
-    state = raw.get("native_state", raw)
-    messages = state.get("messages") if isinstance(state, dict) else None
-    last = messages[-1] if isinstance(messages, list) and messages else raw
-    if not isinstance(last, dict) or last.get("type", last.get("role")) not in ("ai", "assistant"):
-        return None
-    metadata = last.get("response_metadata")
-    if last.get("content") == message and isinstance(metadata, dict):
-        return metadata.get("id")
-    return None
-
-
-def framework_response_id(model):
-    output = (model.get("raw_response") or {}).get("output")
-    generations = output.get("generations") if isinstance(output, dict) else None
-    if not isinstance(generations, list) or len(generations) != 1 or not isinstance(generations[0], list) or len(generations[0]) != 1:
-        return None
-    generation = generations[0][0]
-    message = generation.get("message") if isinstance(generation, dict) else None
-    metadata = message.get("response_metadata") if isinstance(message, dict) else None
-    return metadata.get("id") if isinstance(metadata, dict) else None
-
-
 def recorded_acp_replies(bundle):
     """Recover delivered text from the bound ACP session when no final result exists."""
     inputs = bundle.inputs
@@ -175,16 +148,10 @@ def root_steps(bundle, rows, issues, clocks):
             issues.append(EvidenceIssue("result_identity_conflict", "Result identity conflicts with its input", [item["folder"]]))
         elif message is not None:
             source = item["folder"] + "/result.json"
-            provider_id = final_response_id(item, message)
-            candidates = []
-            if isinstance(provider_id, str) and provider_id:
-                for _, rid, step in group:
-                    model = records.get(rid)
-                    if model and model["kind"] == "model" and framework_response_id(model) == provider_id:
-                        candidates.append(step)
-            if (len(candidates) == 1 and candidates[0] is steps[-1]
-                    and candidates[0].message == message and not candidates[0].tool_calls):
-                candidates[0].extra["abb"]["result_source"] = source
+            last_model = next((step for _, _, step in reversed(group) if step.llm_call_count), None)
+            if (bundle.source in ("langgraph", "langfuse") and last_model is not None
+                    and not last_model.tool_calls and last_model.message == message):
+                last_model.extra["abb"]["result_source"] = source
             else:
                 steps.append(Step(step_id=1, source="agent", message=message,
                                   extra={"abb": {"kind": "invocation_result", "result_source": source}}))

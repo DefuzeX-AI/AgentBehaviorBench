@@ -13,6 +13,10 @@ def capture_target(unit):
     from agentbench.harness.registry import tomllib
     unit = Path(unit)
     manifest = tomllib.loads((unit / 'agent.toml').read_text(encoding='utf-8'))
+    if manifest.get('framework') == 'langgraph' and manifest.get('runtime', {}).get('type') == 'docker':
+        from agentbench.harness.otel.config import parse_config
+        if parse_config(manifest).profile == 'langfuse-auto':
+            manifest.setdefault('atif', {}).setdefault('source', 'langfuse')
     source = manifest.get('source') or {}
     architecture = {'source_revision': source.get('revision') or source.get('sha256')}
     for key, name in (('profile', 'requirement.md'), ('manifest', 'agent.toml')):

@@ -24,7 +24,7 @@ execution outcome. Native Judge requests attach the file (`sdk/judges.py`).
 | Module | Responsibility |
 | --- | --- |
 | `atif/reader.py` | Reads what every source shares: Inputs, ACP events, raw records and Agent-exported OTel. |
-| `atif/sources/` | Step sources chosen by a factory: `langgraph` takes model and tool steps from callbacks, `acp_otel` from the spans an ACP Agent exported. A special format adds a module here. |
+| `atif/sources/` | The `langfuse` source reads LangGraph generation and tool spans from the SDK's OTLP export. The `langgraph` source reads legacy callback evidence. The `acp_otel` source reads ACP Agent exports and interceptor evidence. |
 | `atif/hierarchy.py`, `atif/adapters/` | Resolves the root execution and explicitly declared delegation adapters. |
 | `atif/assembler.py`, `atif/replies.py` | Builds official Harbor `Step` objects and places them in turns. |
 | `atif/validation.py` | Validates the complete document: schema, record conservation, ownership. |

@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ReplayMessage from '../cases/ReplayMessage.jsx';
 import useLiveJson from '../useLiveJson.js';
 import {
-  flattenTrajectory, formatDateTime, formatTime, ownerUnknown, parseComposer, PHASE_LABELS, recordSources, SOURCE_TITLES,
+  clarificationChoices, flattenTrajectory, formatDateTime, formatTime, ownerUnknown, parseComposer, PHASE_LABELS, recordSources, SOURCE_TITLES,
   STEP_TITLES, stepKind, stepMarks, stepSummary, trajectoryStats,
 } from './chatModel.js';
 import './chat.css';
@@ -43,10 +43,27 @@ function RawData({ load, dark }) {
   </div>;
 }
 
-function Conversation({ state, api, onSend, sending }) {
+function AgentReply({ output, request, awaitingChoice, disabled, onChoose }) {
+  const hasText = output != null && (typeof output !== 'string' || !!output.trim());
+  return <div className="chat-agent-body">
+    {hasText && <ReplayMessage value={output} />}
+    {request ? <div className="chat-choice" role="group" aria-label={request.question}>
+      <p>{awaitingChoice ? 'Please choose an option.' : 'Options offered'}</p>
+      {request.context && <p>{request.context}</p>}
+      <strong>{request.question}</strong>
+      <div className="chat-choice-options">{request.options.map(option =>
+        <Button key={option} disabled={disabled} onClick={() => onChoose(option)}>{option}</Button>
+      )}</div>
+    </div> : !hasText && <p>The agent returned no text.</p>}
+  </div>;
+}
+
+function Conversation({ state, trajectory, api, onSend, sending }) {
   const [text, setText] = useState('');
   const [json, setJson] = useState(false);
   const [error, setError] = useState('');
+  const [selectedTurn, setSelectedTurn] = useState(null);
+  const choices = useMemo(() => clarificationChoices(trajectory?.document), [trajectory?.document]);
   const bottom = useRef(null);
   const turns = state?.turns || [];
   const canSend = state?.phase === 'ready' && !sending;
@@ -80,7 +97,13 @@ function Conversation({ state, api, onSend, sending }) {
         <div className="chat-agent">
           <div className="chat-agent-head"><RobotOutlined /><strong>Agent</strong><time>{formatTime(turn.answered_at)}</time></div>
           {turn.status === 'pending' ? <div className="chat-thinking"><Spin size="small" /> Replying…</div>
-            : turn.status === 'succeeded' ? <div className="chat-agent-body"><ReplayMessage value={turn.output ?? ''} /></div>
+            : turn.status === 'succeeded' ? <AgentReply output={turn.output} request={choices.get(turn.turn)}
+                awaitingChoice={turn === turns.at(-1) && state.phase === 'ready' && selectedTurn !== turn.turn}
+                disabled={!canSend || turn !== turns.at(-1) || selectedTurn === turn.turn}
+                onChoose={async option => {
+                  setSelectedTurn(turn.turn);
+                  if (!await onSend(option)) setSelectedTurn(null);
+                }} />
               : <div className="chat-agent-error">Reply failed ({turn.status}): {turn.error}</div>}
           {turn.status !== 'pending' && <RawData load={async () => (await loadRaw(turn.turn)()).result ?? {}} />}
         </div>
@@ -113,6 +136,8 @@ function Sources({ item }) {
 function StepCard({ row, canMark, onMark, onUnmark, onExpand }) {
   const { step } = row;
   const kind = stepKind(step);
+  const [systemOpen, setSystemOpen] = useState(false);
+  const Title = kind === 'system' ? 'button' : 'span';
   const marks = stepMarks(step);
   const unknown = ownerUnknown(step);
   // Marks are written into the saved trajectory, which exists once the chat has ended.
@@ -124,14 +149,19 @@ function StepCard({ row, canMark, onMark, onUnmark, onExpand }) {
   return <Dropdown menu={menu} trigger={['contextMenu']}>
     <article className={`step-card ${kind} ${marks.length ? 'marked' : ''} ${unknown ? 'owner-unknown' : ''}`} style={{ marginLeft: row.depth * 16 }}>
       <header>
-        <span className="step-title">{icon}<strong>{STEP_TITLES[kind]}</strong><span className="step-id">#{step.step_id}</span>
+        <Title className="step-title" {...(kind === 'system' && {
+          type: 'button', 'aria-expanded': systemOpen, onClick: () => setSystemOpen(open => !open),
+        })}>
+          {kind === 'system' && <RightOutlined rotate={systemOpen ? 90 : 0} aria-hidden />}
+          {icon}<strong>{STEP_TITLES[kind]}</strong><span className="step-id">#{step.step_id}</span>
           {row.depth > 0 && <Tag>{row.agent}</Tag>}
           {marks.length > 0 && <Tag color="orange" icon={<FlagFilled />}>Marked</Tag>}
           {unknown && <Tooltip title="No record shows which Agent made this step. It may belong to a subagent, not to the main Agent.">
             <Tag color="red" icon={<QuestionCircleOutlined />}>Owner unknown</Tag></Tooltip>}
-          <time>{formatTime(step.timestamp)}</time><Sources item={step} /></span>
+          <time>{formatTime(step.timestamp)}</time><Sources item={step} /></Title>
         <Tooltip title="View full step"><button type="button" className="step-expand" onClick={() => onExpand(step)}><ArrowsAltOutlined /></button></Tooltip>
       </header>
+      {(kind !== 'system' || systemOpen) && <>
       {step.model_name && <div className="step-model">{step.model_name}</div>}
       {step.reasoning_content && <details className="step-reasoning"><summary>Reasoning</summary><div>{step.reasoning_content}</div></details>}
       {typeof step.message === 'string' && step.message.trim() && <div className="step-message">{kind === 'user' || kind === 'system' ? step.message : <ReplayMessage value={step.message} />}</div>}
@@ -144,6 +174,7 @@ function StepCard({ row, canMark, onMark, onUnmark, onExpand }) {
         <pre>{typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2)}</pre>
       </details>)}
       {step.metrics && <div className="step-metrics">Input {step.metrics.prompt_tokens ?? '—'} · Output {step.metrics.completion_tokens ?? '—'}{step.metrics.cached_tokens ? ` · Cached ${step.metrics.cached_tokens}` : ''} tokens</div>}
+      </>}
       {marks.map(mark => <div className="step-mark" key={mark.created_at}><FlagFilled /><span className="step-mark-reason">{mark.reason}</span>
         {canMark && <Tooltip title="Remove mark"><button type="button" className="step-unmark" onClick={() => onUnmark(row, mark)}><DeleteOutlined /></button></Tooltip>}</div>)}
     </article>
@@ -283,7 +314,7 @@ function ChatPage({ api, token }) {
   };
 
   return <div className="chat-layout" style={{ gridTemplateColumns: `${width}% 8px minmax(0, 1fr)` }}>
-    <Conversation state={state} api={api} onSend={send} sending={sending} />
+    <Conversation state={state} trajectory={trajectory} api={api} onSend={send} sending={sending} />
     <div className="chat-divider" onMouseDown={drag} role="separator" aria-orientation="vertical" />
     <Workbench state={state} trajectory={trajectory} onEnd={end} onShowPaths={showPaths} onUnmark={unmark}
       onMark={row => { setMarking(row); setReason(''); }} />

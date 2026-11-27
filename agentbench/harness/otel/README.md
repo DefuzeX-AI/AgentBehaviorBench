@@ -9,7 +9,8 @@ Choose the profile in the registered unit's outer `agent.toml`. Inspect the pinn
 | Evidence | Selected profile |
 | --- | --- |
 | A direct dependency on an OTLP trace exporter | `native-otlp` |
-| Python graph binding, or a Python ACP source | `python-auto` |
+| Python graph binding | `langfuse-auto` |
+| Python ACP source | `python-auto` |
 | `package.json` | `node-auto` |
 | `pom.xml` or a Gradle build file | `java-auto` |
 | `Cargo.toml`, `go.mod` or a Bun lockfile, with no exporter | `unsupported` |
@@ -47,10 +48,10 @@ The image installs the matching official diagnostics plugin through OpenClaw's p
 
 ```toml
 [otel]
-profile = "python-auto"
+profile = "langfuse-auto"
 ```
 
-The LangChain instrumentor loads before the worker imports the target graph. Its provider exports to the Case receiver. For an ACP command that runs a verified Python LangChain Agent, the same profile launches it with `opentelemetry-instrument` before the target imports its libraries. The existing LangGraph callback still records framework events separately. Inspect the installed instrumentation's supported libraries whenever the pinned Agent runtime changes.
+The worker passes the official Langfuse `CallbackHandler` in the graph's runnable config. Langfuse SDK 5.2.0 uses an isolated OpenTelemetry provider and an HTTP/protobuf exporter pointed at the Case receiver. The local receiver archives the export and writes the redacted span inventory. This setup needs Python 3.11+ and a binding that propagates callbacks. Existing LangGraph units declaring `python-auto` select this profile at build and launch. Python ACP units using `python-auto` launch their command with `opentelemetry-instrument`. [Langfuse LangGraph tutorial](https://langfuse.com/integrations/frameworks/langgraph)
 
 The `node-auto` profile preloads Node instrumentation into the target command using `NODE_OPTIONS`. The `java-auto` profile sets the JVM's `JAVA_TOOL_OPTIONS` to load the checksum-pinned Java agent. Coverage depends on the libraries that execute inside that process. ACP terminal tools started by ABB have their own environment.
 

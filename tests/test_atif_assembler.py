@@ -1,4 +1,6 @@
-from tests.atif_fixtures import fixture, child_bundle, lines, event, call, response
+import pytest
+
+from tests.atif_fixtures import fixture, child_bundle, lines, event, call, response, save, span
 from agentbench.trajectory.atif.reader import read_evidence
 from agentbench.trajectory.atif.export import build_export
 from agentbench.trajectory.atif.hierarchy import resolve_hierarchy
@@ -111,7 +113,32 @@ def test_only_confirmed_reply_is_projected(tmp_path):
         assert all("result_source" not in s.extra["abb"] for s in exported.document.steps if s.extra)
 
 
-def test_final_provider_response_ref_reuses_root_model_step():
+@pytest.mark.parametrize("final_text,has_tool,merged", [
+    ("Blue", False, True),
+    ("Blue ", False, False),
+    ("Green", False, False),
+    ("Blue", True, False),
+])
+def test_only_the_last_plain_model_reply_can_carry_the_result(tmp_path, final_text, has_tool, merged):
+    folder = fixture(tmp_path, layout="steps", tool=False)
+    rows = [span("root")]
+    for sid, text in (("first", "Blue"), ("last", final_text)):
+        message = {"type": "ai", "content": text}
+        if sid == "last" and has_tool:
+            message["tool_calls"] = [{"id": "c1", "name": "echo", "args": {"value": text}}]
+        rows.extend([span(sid, "root", "llm", "model", input={}),
+                     event("span_end", span_id=sid, output={"generations": [[{"message": message}]]})])
+    lines(folder / "framework.jsonl", rows)
+    save(folder / "result.json", {"status": "succeeded", "output": "Blue"})
+    result, _ = build_export(tmp_path)
+    agent_steps = [step for step in result.document.steps if step.source == "agent"]
+    assert len(agent_steps) == (2 if merged else 3)
+    assert agent_steps[-1].extra["abb"]["result_source"] == "steps/0001/result.json"
+    assert all("result_source" not in step.extra["abb"] for step in agent_steps[:-1])
+    assert agent_steps[-1].llm_call_count == (1 if merged else None)
+
+
+def test_final_reply_reuses_root_model_step_with_children():
     from pathlib import Path
     exported, bundle = build_export(Path(__file__).parent / "fixtures/atif/two_children", adapters=["deepagents"])
     answer = bundle.inputs[0]["result"]["output"]

@@ -44,7 +44,9 @@ def stage_otel_dependencies(dockerfile, config):
                   f"RUN test \"$(npm view {spec} dist.integrity)\" = '{plugin['integrity']}'"
                   f" && HOME=/opt/abb-otel/openclaw openclaw plugins install npm:{spec} --pin --accept-capabilities",
                   "USER root"]
-    if profile == "python-auto":
+    if profile == "langfuse-auto":
+        lines += ["RUN python -m pip install --no-cache-dir langfuse==5.2.0"]
+    elif profile == "python-auto":
         lines += [f"COPY {base}/python/requirements.txt /opt/abb-otel/python.txt",
                   "RUN python -m pip install --no-cache-dir -r /opt/abb-otel/python.txt"]
     elif profile == "node-auto":

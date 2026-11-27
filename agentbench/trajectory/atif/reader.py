@@ -31,7 +31,13 @@ def read_evidence(directory, *, allow_incomplete=False, include_network=True, ru
         raise ValueError("Run is not known to be finished; use --allow-incomplete")
     target = api.read("request/target.json") or {}
     artifacts = [(folder, *read_input_artifacts(folder, api.read)) for folder in api.outputs()]
-    source = select(source if source is not None else declared(target, [{"request": request} for _, _, request in artifacts]))
+    if source is None:
+        source = declared(target, [{"request": request} for _, _, request in artifacts])
+        capture = api.read("otel/status.json") or {}
+        frozen = (target.get("runtime") or {}).get("atif") or {}
+        if not frozen.get("source") and source == "langgraph" and capture.get("profile") == "langfuse-auto":
+            source = "langfuse"
+    source = select(source)
 
     def wire(name):
         return canonical_relative(name) == canonical_relative("network.jsonl")

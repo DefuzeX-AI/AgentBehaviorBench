@@ -115,7 +115,6 @@ async def execute(root: Path, request: Path, output: Path, *, session=None):
         config = dict(envelope.get("config") or {})
         if "callbacks" in config:
             raise ValueError("Host callbacks cannot cross a JSON process boundary")
-        config = observed.config(config)
         session_id = envelope.get('session_id', run_id)
         configurable = dict(config.get("configurable") or {})
         if not owned_session and configurable.get("thread_id", session_id) != session_id:
@@ -126,6 +125,11 @@ async def execute(root: Path, request: Path, output: Path, *, session=None):
         store.record("execution_start", input=envelope["input"])
         with span('Load Agent adapter', kind='preparation'):
             adapter = session.load(root, envelope)
+        capture = getattr(session, "capture", None)
+        if capture and capture.config.profile == "langfuse-auto":
+            observed.callbacks = [capture.handler] if capture.handler is not None else []
+            config["metadata"].update({f"abb_{key}": value for key, value in context.items()})
+        config = observed.config(config)
         interception = InterceptionConfig.from_agent_dir(root)
         hosts = [host for route in (*interception.routes, *interception.tool_routes)
                  for host in route.host_patterns] if interception else []
