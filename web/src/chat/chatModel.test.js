@@ -1,6 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clarificationChoices, flattenTrajectory, ownerUnknown, parseComposer, recordSources, stepKind, stepSummary, trajectoryStats } from './chatModel.js';
+import { clarificationChoices, delegatedReplies, flattenTrajectory, ownerUnknown, parseComposer, recordSources, stepKind, stepSummary, trajectoryStats } from './chatModel.js';
+
+test('late subagent text follows the delegation back to its original mailbox turn', () => {
+  const user = n => ({ source: 'user', extra: { abb: { evidence: [{ file: 'steps/000' + n + '/input.json' }] } } });
+  const delegation = { source: 'agent', observation: { results: [{ subagent_trajectory_ref: [{ trajectory_id: 'child' }] }] } };
+  const child = { trajectory_id: 'child', agent: { name: 'Writer' }, steps: [
+    { source: 'agent', message: 'Writing…', tool_calls: [{ function_name: 'write' }] },
+  ] };
+  const document = { steps: [user(2), delegation, delegation, user(3)], subagent_trajectories: [child] };
+  assert.equal(delegatedReplies(document).get(2).get('child').message, '');
+  child.steps.push({ source: 'agent', message: '已完成。', timestamp: '2026-11-28T00:11:47Z' });
+  document.subagent_trajectories.push({ ...child, trajectory_id: 'unlinked' });
+  const replies = delegatedReplies(document);
+  assert.deepEqual([...replies.keys()], [2]);
+  assert.deepEqual([...replies.get(2).values()], [
+    { id: 'child', name: 'Writer', message: '已完成。', timestamp: '2026-11-28T00:11:47Z' },
+  ]);
+});
 
 test('clarification buttons use the structured choice call from their own turn', () => {
   const user = n => ({ source: 'user', extra: { abb: { evidence: [{ file: 'steps/000' + n + '/input.json' }] } } });

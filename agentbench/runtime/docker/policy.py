@@ -75,7 +75,7 @@ class EgressSettings:
 @dataclass(frozen=True, slots=True)
 class DockerPolicy:
     cpus: float = 1.0
-    memory: str = "1g"
+    memory: str = "2g"
     pids_limit: int = 128
     # Capacity limit, not a reservation; tmpfs usage also counts toward memory.
     tmpfs_size: str = "1g"

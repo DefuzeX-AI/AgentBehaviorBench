@@ -16,6 +16,9 @@ def load_provider_catalog(environ: Mapping[str, str]) -> dict:
     except (OSError, ValueError) as exc:
         raise InterceptionConfigurationError("Cannot read model provider configuration") from exc
     definitions, priority = catalog.get("providers"), catalog.get("priority")
+    if 'default' in catalog and (not isinstance(catalog['default'], str)
+                                 or catalog['default'] not in (definitions or {})):
+        raise InterceptionConfigurationError('Default model provider must name a configured provider')
     if not isinstance(definitions, dict) or not definitions:
         raise InterceptionConfigurationError("Model providers must be a non-empty table")
     if (not isinstance(priority, list) or not priority

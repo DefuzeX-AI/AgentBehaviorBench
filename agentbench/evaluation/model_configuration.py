@@ -1,4 +1,5 @@
 """Public model provenance for the selected Agent execution paths."""
+from dataclasses import asdict
 from agentbench.harness.session.plan import public_configuration
 from agentbench.observe.store import environment_secrets, is_secret_field
 from agentbench.runtime.interception.config import InterceptionConfig, tomllib
@@ -67,5 +68,7 @@ def agent_model_configuration(registrations, *, environ, model):
             result[agent.agent_id]['target'] = public_configuration({
                 'provider_id': shared.provider_id, 'model': shared.model,
                 'base_url': shared.base_url, 'target_plugin': shared.target_plugin,
+                'client': asdict(shared.client) if shared.client else None,
+                'endpoint_paths': dict(shared.endpoint_paths) if shared.endpoint_paths else None,
             }, (*secrets, environ.get(shared.credential_env, '')))
     return result

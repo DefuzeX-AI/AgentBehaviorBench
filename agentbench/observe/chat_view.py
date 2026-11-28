@@ -143,7 +143,7 @@ class ChatController:
         directory = self.chat.directory
         files = [path for name in ("steps", "otel") if (directory / name).is_dir()
                  for path in sorted((directory / name).rglob("*")) if path.is_file()]
-        files += [path for path in (directory / "trajectory.atif.json",) if path.is_file()]
+        files += [path for path in (directory / "logs/network.jsonl", directory / "trajectory.atif.json") if path.is_file()]
         return tuple((str(path), path.stat().st_size, path.stat().st_mtime_ns) for path in files)
 
     def trajectory(self):

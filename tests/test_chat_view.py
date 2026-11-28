@@ -145,6 +145,28 @@ def test_controller_answers_one_turn_at_a_time(tmp_path):
         chat.mark("root", 2, "too early: the trajectory is not saved yet")
 
 
+def test_live_preview_refreshes_when_only_late_model_evidence_changes(tmp_path):
+    calls = []
+
+    def preview(directory, run):
+        calls.append(directory)
+        return document(), {"status": "partial"}
+
+    chat = controller(tmp_path, preview)
+    chat.chat.release.set()
+    chat.submit("delegate")
+    wait_for(lambda: chat.state()["phase"] == "ready")
+    network = chat.directory / "logs" / "network.jsonl"
+    network.parent.mkdir(exist_ok=True)
+    network.touch()
+    chat.trajectory()
+    chat.trajectory()
+    assert len(calls) == 1
+    network.write_text('{"event":"llm_response"}\n', encoding="utf-8")
+    chat.trajectory()
+    assert len(calls) == 2
+
+
 def test_after_the_chat_ends_marks_edit_the_saved_trajectory(tmp_path):
     pytest.importorskip("harbor")
     chat = controller(tmp_path)

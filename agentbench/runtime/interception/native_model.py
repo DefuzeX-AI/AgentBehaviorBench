@@ -76,6 +76,10 @@ def resolve_shared_model(manifest, environ, model_provider=None):
         raise InterceptionConfigurationError('Shared native Agents use one model; multi-target routing is only supported in replacement mode')
     target = (select_model_provider(manifest, environ, model_provider) or resolve_model_provider(environ=environ)).resolve(environ)
     _validate_target(target)
+    if target.client is not None:
+        if acp_model_mode() != 'replace':
+            raise InterceptionConfigurationError('A separate upstream target requires replacement mode')
+        return target
     if target.target_plugin not in ('openrouter', 'compatible-json'):
         raise InterceptionConfigurationError('Shared native Agents require an OpenAI Chat Completions compatible provider')
     if target.headers:
@@ -96,7 +100,8 @@ def resolve_shared_model(manifest, environ, model_provider=None):
 def model_environment(target, secret_resolver):
     # Fail early for missing credentials, but replacement keys stay host-side.
     key = secret_resolver.require(target.credential_env)
-    environment = {BASE_ENV: target.base_url, MODEL_ENV: target.model, PROVIDER_ENV: target.provider_id}
+    client = target.client or target
+    environment = {BASE_ENV: client.base_url, MODEL_ENV: client.model, PROVIDER_ENV: client.provider_id}
     if acp_model_mode() == 'observe':
         environment[KEY_ENV] = key
     return environment
@@ -108,9 +113,16 @@ def bind_model_routes(interception, target, metadata_paths=()):
     if interception is None:
         raise InterceptionConfigurationError('Shared models require interception')
     credential = 'shared' if interception.mode == 'replace' else ''
-    parsed = urlsplit(target.base_url)
+    parsed = urlsplit((target.client or target).base_url)
     route = RouteConfig('shared-openai-chat', (parsed.hostname,), (parsed.port or 443,),
                         ('POST',), (parsed.path.rstrip('/') + '/chat/completions',), 'openai-chat', credential)
     metadata = tuple(ToolRouteConfig((parsed.hostname,), (parsed.port or 443,), ('GET',),
                                     (parsed.path.rstrip('/') + path,), 'metadata') for path in metadata_paths)
-    return replace(interception, routes=(route,), tool_routes=interception.tool_routes + metadata)
+    routes = (route,)
+    if target.client is not None:
+        routes += (replace(route, route_id='shared-openai-responses',
+                           path_patterns=(parsed.path.rstrip('/') + '/responses',),
+                           protocol_plugin='openai-responses'),)
+        if metadata_paths:
+            raise InterceptionConfigurationError('Separate model targets do not support native metadata forwarding')
+    return replace(interception, routes=routes, tool_routes=interception.tool_routes + metadata)

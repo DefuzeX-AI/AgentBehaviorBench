@@ -12,19 +12,22 @@ Model selection follows the Agent's declared integration constraints, not its fr
 
 ## Shared settings
 
-The supplied `.env.example` explicitly selects `ABB_MODEL_PROVIDER=deepseek`
-and `DEEPSEEK_MODEL=deepseek-flash`. Exp1 and Exp3 oracles read the same shared
-provider selection and provider-specific model from the loaded environment.
-Their model selection ignores target-only `--model` / `ABB_MODEL` overrides,
-Agent provider pins, and legacy Judge/GT overrides. Use the CLI's `--env-file`
-to choose another environment file; existing process environment variables retain
-the normal precedence over dotenv values.
+The bundled catalog and `.env.example` select `ABB_MODEL_PROVIDER=defuze_server`.
+Set `KUMA_API_KEY` to use the Defuze model gateway. The default family is `deepseek`
+and the actual model is `deepseek-flash`; `DEFUZE_MODEL_FAMILY=minimax` selects the
+default `minimax/minimax-m3` model instead. `KUMA_BASE_URL` defaults to
+`https://defuzex.ai/api/agentdefuze`. Missing keys and permission failures stop
+startup without fallback. Use `--env-file` to select another dotenv file; existing
+process environment variables take precedence over dotenv values.
 
-Without an explicit provider, ABB selects the first nonempty credential in this order:
-**OpenRouter -> DeepSeek -> GLM**. Configure that provider's key and model:
+Set `ABB_MODEL_PROVIDER` explicitly to use another service. A custom provider
+catalog without `default` retains legacy credential-priority selection.
+See the [Defuze target contract](../agentbench/services/model-interceptor/src/defuzex_model_interceptor/defuze_server/README.md)
+for permission checks, client settings and supported protocols.
 
 | Provider | Credential | Model | Optional base URL override |
 | --- | --- | --- | --- |
+| Defuze Server (default) | `KUMA_API_KEY` | `DEFUZE_MODEL` | `KUMA_BASE_URL` |
 | OpenRouter | `OPENROUTER_API_KEY` | `OPENROUTER_MODEL` | `OPENROUTER_BASE_URL` |
 | DeepSeek (DS) | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` | `DEEPSEEK_BASE_URL` |
 | GLM | `GLM_API_KEY` | `GLM_MODEL` | `GLM_API_BASE_URL` |
@@ -34,8 +37,8 @@ over `ABB_MODEL_PROVIDER` and the run-level provider object. Otherwise
 `ABB_MODEL_PROVIDER` selects the run default. `--model` overrides `ABB_MODEL`,
 which overrides the selected provider's model variable. No provider or model is silently
 substituted when the selected configuration is incomplete or a request fails.
-DeepSeek is supported but never mandatory for these deployments. Tool and SDK credentials,
-such as `TAVILY_API_KEY` and `KUMA_API_KEY`, remain separate.
+Tool credentials such as `TAVILY_API_KEY` remain separate. KUMA model-gateway access
+and KUMA evaluation are separate operations even when they use the same API key.
 
 For example, to select DeepSeek despite a configured OpenRouter key:
 
@@ -81,6 +84,15 @@ native requests and responses without substitution. Do not declare these interna
 variables in `.env` or runtime input lists. Upstream code and Agent tools remain
 unchanged. Run provenance includes the effective mode; switching modes requires a
 new run instead of resuming results collected under the other policy.
+
+Defuze uses separate source and target settings: ACP defaults to the native
+`deepseek` client with `deepseek-chat` at `https://api.deepseek.com`, while the
+interceptor forwards to the Defuze gateway with the actual selected model.
+`DEFUZE_CLIENT_PROVIDER`, `DEFUZE_CLIENT_MODEL` and `DEFUZE_CLIENT_BASE_URL` can
+select another supported client profile. Both configurations are recorded in
+provenance. Native catalogs and explicit provider pins remain authoritative;
+this does not make every ACP launcher compatible automatically. Separate-target
+observe mode and `/models` metadata forwarding are currently rejected.
 
 The runtime derives the exact HTTPS host, port and `/chat/completions` path from the
 selected base URL. It does not admit all provider hosts or wildcard paths. Hermes also

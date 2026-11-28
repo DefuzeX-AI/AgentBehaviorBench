@@ -21,6 +21,13 @@ DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 @dataclass(frozen=True, slots=True)
+class ModelClientConfig:
+    provider_id: str
+    model: str
+    base_url: str
+
+
+@dataclass(frozen=True, slots=True)
 class ModelTargetConfig:
     provider_id: str
     target_plugin: str
@@ -32,6 +39,7 @@ class ModelTargetConfig:
     )
 
     endpoint_paths: Mapping[str, str] | None = None
+    client: ModelClientConfig | None = None
 
 
 @runtime_checkable
@@ -106,8 +114,8 @@ def resolve_model_provider(
 ) -> ModelTargetProvider:
     """Construct the host model target provider selected by name.
 
-    Explicit names win; otherwise inspect non-empty keys in catalog priority order.
-    With no key, retain the first provider for the existing startup validation.
+    Explicit names win, followed by a catalog default (Defuze in the bundled catalog).
+    Catalogs without a default retain credential-priority selection.
     Entry-point plugins remain available by explicit name; configured names win.
     """
     values = os.environ if environ is None else environ
@@ -115,11 +123,15 @@ def resolve_model_provider(
     definitions, priority = catalog["providers"], catalog["priority"]
     selected = (name or values.get(MODEL_PROVIDER_ENV, "")).strip().lower()
     if not selected:
+        selected = catalog.get('default', '')
+    if not selected:
         selected = next((key for key in priority
                          if values.get(definitions[key]["credential_env"], "").strip()), priority[0])
     factories: dict[str, object] = {
         key: partial(ConfiguredModelProvider, key) for key in definitions
     }
+    from .defuze_server import DefuzeServerProvider
+    factories['defuze_server'] = DefuzeServerProvider
     # Preserve the public entry-point class for existing explicit OpenRouter callers.
     if DEFAULT_MODEL_PROVIDER in factories:
         factories[DEFAULT_MODEL_PROVIDER] = OpenRouterProvider

@@ -4,10 +4,10 @@ This standalone Linux container handles model HTTP traffic for one AgentBench
 Docker Agent. It owns netfilter and TLS termination; the Agent shares its network
 namespace. Adapter registration selects the behavior without a user mode switch:
 
-- **ACP / observe:** preserve native URL, model, credentials, payload and response.
+- **Explicit native ACP / observe:** preserve native URL, model, credentials, payload and response.
   The Agent receives its declared native credentials. The service needs no
   replacement provider or secret. Token counting also stays native.
-- **LangGraph / replace:** retain existing protocol recognition and credential
+- **Shared ACP and LangGraph / replace:** retain existing protocol recognition and credential
   substitution. The target plugin selects the configured provider URL, model and upstream
   key; the Agent receives an isolated temporary key.
 
@@ -57,8 +57,9 @@ stdout with the `DEFUZEX_TRACE ` prefix.
 
 The host [provider catalog](../../runtime/interception/model-providers.toml) declares
 provider priority, credential/model/base-URL environment variable names, default
-URLs, optional headers and endpoint paths. Defaults check **OpenRouter → DeepSeek
-→ GLM**, selecting the first non-empty API key. Whitespace-only keys are absent.
+URLs, optional headers and endpoint paths. The bundled default is **Defuze Server**,
+using `KUMA_API_KEY`; missing credentials do not fall back to another provider.
+Custom catalogs without `default` use credential-priority selection.
 `ABB_MODEL_PROVIDER` (or an explicit provider name in the host API) overrides this
 selection. This checks configuration presence, not remote key validity: request
 failures do not silently retry against another provider.
@@ -70,7 +71,8 @@ failures do not silently retry against another provider.
 | GLM | `GLM_API_KEY` | `GLM_MODEL` | `GLM_API_BASE_URL` |
 | Zhipu (explicit only) | `GLM_API_KEY` | `GLM_MODEL` | `ZHIPU_API_BASE_URL` |
 
-Models have no new built-in defaults. `--model` overrides `ABB_MODEL`, which
+Defuze defaults to the `deepseek` family and `deepseek-flash` model; other providers
+require an explicit model. `--model` overrides `ABB_MODEL`, which
 otherwise overrides the selected provider's model variable. An available key with
 missing model configuration fails startup instead of falling through to a different
 provider. With no key, the first configured provider is used for normal startup

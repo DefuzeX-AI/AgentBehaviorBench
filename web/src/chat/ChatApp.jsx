@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ReplayMessage from '../cases/ReplayMessage.jsx';
 import useLiveJson from '../useLiveJson.js';
 import {
-  clarificationChoices, flattenTrajectory, formatDateTime, formatTime, ownerUnknown, parseComposer, PHASE_LABELS, recordSources, SOURCE_TITLES,
+  clarificationChoices, delegatedReplies, flattenTrajectory, formatDateTime, formatTime, ownerUnknown, parseComposer, PHASE_LABELS, recordSources, SOURCE_TITLES,
   STEP_TITLES, stepKind, stepMarks, stepSummary, trajectoryStats,
 } from './chatModel.js';
 import './chat.css';
@@ -43,7 +43,7 @@ function RawData({ load, dark }) {
   </div>;
 }
 
-function AgentReply({ output, request, awaitingChoice, disabled, onChoose }) {
+function AgentReply({ output, request, delegated, awaitingChoice, disabled, onChoose }) {
   const hasText = output != null && (typeof output !== 'string' || !!output.trim());
   return <div className="chat-agent-body">
     {hasText && <ReplayMessage value={output} />}
@@ -54,7 +54,7 @@ function AgentReply({ output, request, awaitingChoice, disabled, onChoose }) {
       <div className="chat-choice-options">{request.options.map(option =>
         <Button key={option} disabled={disabled} onClick={() => onChoose(option)}>{option}</Button>
       )}</div>
-    </div> : !hasText && <p>The agent returned no text.</p>}
+    </div> : !hasText && <p>{delegated ? 'Handed off to a subagent.' : 'No direct reply recorded.'}</p>}
   </div>;
 }
 
@@ -64,11 +64,16 @@ function Conversation({ state, trajectory, api, onSend, sending }) {
   const [error, setError] = useState('');
   const [selectedTurn, setSelectedTurn] = useState(null);
   const choices = useMemo(() => clarificationChoices(trajectory?.document), [trajectory?.document]);
+  const replies = useMemo(() => delegatedReplies(trajectory?.document), [trajectory?.document]);
   const bottom = useRef(null);
+  const followReplies = useRef(true);
   const turns = state?.turns || [];
   const canSend = state?.phase === 'ready' && !sending;
   // Scroll only the message list; scrollIntoView would also move the page.
-  useEffect(() => { const list = bottom.current?.parentElement; if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' }); }, [turns.length, turns.at(-1)?.status]);
+  useEffect(() => {
+    const list = bottom.current?.parentElement;
+    if (list && followReplies.current) list.scrollTop = list.scrollHeight;
+  }, [turns.length, turns.at(-1)?.status, replies]);
   const loadRaw = turn => async () => {
     const response = await fetch(`${api}/turns/${turn}/raw`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Record unavailable (HTTP ${response.status})`);
@@ -78,13 +83,15 @@ function Conversation({ state, trajectory, api, onSend, sending }) {
     const parsed = parseComposer(text, json);
     if (parsed.error) { setError(parsed.error); return; }
     setError('');
-    if (await onSend(parsed.value)) setText('');
+    if (await onSend(parsed.value)) { setText(''); followReplies.current = true; }
   };
   return <section className="chat-pane">
     <header className="chat-pane-header"><MessageOutlined /><strong>Conversation</strong>
       <span className="chat-agent-id">{state?.agent_id}</span>
       <Tag className={`chat-phase ${state?.phase}`}>{PHASE_LABELS[state?.phase] || 'Connecting'}</Tag></header>
-    <div className="chat-messages">
+    <div className="chat-messages" onScroll={({ currentTarget: list }) => {
+      followReplies.current = list.scrollHeight - list.clientHeight - list.scrollTop < 40;
+    }}>
       {!turns.length && <div className="chat-empty">The Agent is running. Send a message to start the conversation.</div>}
       {turns.map(turn => <div className="chat-turn" key={turn.turn}>
         <div className="chat-user">
@@ -97,7 +104,7 @@ function Conversation({ state, trajectory, api, onSend, sending }) {
         <div className="chat-agent">
           <div className="chat-agent-head"><RobotOutlined /><strong>Agent</strong><time>{formatTime(turn.answered_at)}</time></div>
           {turn.status === 'pending' ? <div className="chat-thinking"><Spin size="small" /> Replying…</div>
-            : turn.status === 'succeeded' ? <AgentReply output={turn.output} request={choices.get(turn.turn)}
+            : turn.status === 'succeeded' ? <AgentReply output={turn.output} request={choices.get(turn.turn)} delegated={replies.has(turn.turn)}
                 awaitingChoice={turn === turns.at(-1) && state.phase === 'ready' && selectedTurn !== turn.turn}
                 disabled={!canSend || turn !== turns.at(-1) || selectedTurn === turn.turn}
                 onChoose={async option => {
@@ -107,6 +114,12 @@ function Conversation({ state, trajectory, api, onSend, sending }) {
               : <div className="chat-agent-error">Reply failed ({turn.status}): {turn.error}</div>}
           {turn.status !== 'pending' && <RawData load={async () => (await loadRaw(turn.turn)()).result ?? {}} />}
         </div>
+        {Array.from(replies.get(turn.turn)?.values() || [], reply =>
+          <div className="chat-agent chat-subagent" key={reply.id}>
+            <div className="chat-agent-head"><RobotOutlined /><strong>{reply.name}</strong><time>{formatTime(reply.timestamp)}</time></div>
+            <div className="chat-agent-body">{reply.message ? <ReplayMessage value={reply.message} />
+              : <span className="chat-thinking">No subagent reply recorded{state.phase === 'ended' ? '.' : ' yet.'}</span>}</div>
+          </div>)}
       </div>)}
       {state?.phase === 'stopped' && <div className="chat-agent-error">The chat stopped: {state.error}. End the chat to save its records.</div>}
       <div ref={bottom} />

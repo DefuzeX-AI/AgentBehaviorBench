@@ -9,15 +9,44 @@ export function parseComposer(text, json) {
   }
 }
 
-// Match root user steps to the actual chat mailbox turn, even if either
-// polling endpoint is one refresh ahead of the other.
+// Mailbox evidence identifies the turn even when state and trajectory poll separately.
+function mailboxTurn(step) {
+  const file = step.extra?.abb?.evidence?.find(ref => /^steps\/\d+\/(input|request)\.json$/.test(ref.file));
+  return file ? Number(file.file.split('/')[1]) : null;
+}
+
+// A child may finish after the parent has returned or another turn has started.
+// Follow the recorded delegation, so its reply stays with the originating prompt.
+export function delegatedReplies(document) {
+  const replies = new Map();
+  const children = new Map((document?.subagent_trajectories || []).map(child => [child.trajectory_id, child]));
+  let turn;
+  for (const step of document?.steps || []) {
+    if (step.source === 'user') turn = mailboxTurn(step);
+    if (!turn || step.source !== 'agent' || ownerUnknown(step)) continue;
+    for (const result of step.observation?.results || []) {
+      for (const ref of result.subagent_trajectory_ref || []) {
+        const child = children.get(ref.trajectory_id);
+        if (!child) continue;
+        const last = child.steps?.at(-1);
+        const message = last?.source === 'agent' && !ownerUnknown(last) && stepKind(last) === 'assistant'
+          && typeof last.message === 'string' ? last.message.trim() : '';
+        if (!replies.has(turn)) replies.set(turn, new Map());
+        replies.get(turn).set(child.trajectory_id, {
+          id: child.trajectory_id, name: child.agent?.name || 'Subagent', message, timestamp: message ? last.timestamp : null,
+        });
+      }
+    }
+  }
+  return replies;
+}
+
 export function clarificationChoices(document) {
   const requests = new Map();
   let turn;
   for (const step of document?.steps || []) {
     if (step.source === 'user') {
-      const file = step.extra?.abb?.evidence?.find(ref => /^steps\/\d+\/(input|request)\.json$/.test(ref.file));
-      turn = file ? Number(file.file.split('/')[1]) : null;
+      turn = mailboxTurn(step);
     } else if (turn && step.source === 'agent' && step.llm_call_count) {
       requests.delete(turn);
       const calls = step.tool_calls || [];

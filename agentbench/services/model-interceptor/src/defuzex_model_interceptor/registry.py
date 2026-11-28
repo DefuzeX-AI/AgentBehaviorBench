@@ -60,9 +60,14 @@ def create_compatible_json_target():
 
 
 def load_targets() -> dict[str, TargetProviderPlugin]:
-    targets = (create_openrouter_target(), create_compatible_json_target())
+    targets = (create_openrouter_target(), create_compatible_json_target(), create_defuze_server_target())
     plugins: dict[str, TargetProviderPlugin] = {target.name: target for target in targets}
     return _load(TARGET_GROUP, plugins)
+
+
+def create_defuze_server_target():
+    from .defuze_server.target import DefuzeServerTarget
+    return DefuzeServerTarget(load_wires())
 
 
 def _load(group: str, plugins: dict[str, object]) -> dict:  # type: ignore[type-arg]

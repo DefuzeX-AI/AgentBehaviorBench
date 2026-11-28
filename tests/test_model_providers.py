@@ -11,6 +11,18 @@ from agentbench.runtime.interception.providers import resolve_model_provider
 from agentbench.runtime.interception.service_config import prepare_service_config
 
 
+@pytest.fixture(autouse=True)
+def legacy_priority_catalog(tmp_path, monkeypatch):
+    """Exercise deployment-configured priority selection without a fixed default.
+
+    The bundled Defuze default is covered in test_defuze_server.py.
+    """
+    import agentbench.runtime.interception.provider_catalog as catalog
+    path = tmp_path / 'legacy-providers.toml'
+    path.write_text(DEFAULT_PROVIDER_CATALOG.read_text().replace('default = "defuze_server"\n', ''))
+    monkeypatch.setattr(catalog, 'DEFAULT_PROVIDER_CATALOG', path)
+
+
 @pytest.mark.parametrize('present', list(product((False, True), repeat=3)))
 def test_credential_priority(present):
     names = ('openrouter', 'deepseek', 'glm')
@@ -64,7 +76,7 @@ def test_missing_model_is_not_a_reason_to_skip_a_configured_key():
 
 def test_custom_catalog_controls_order_and_new_providers(tmp_path):
     catalog = tmp_path / 'providers.toml'
-    catalog.write_text(DEFAULT_PROVIDER_CATALOG.read_text().replace(
+    catalog.write_text(DEFAULT_PROVIDER_CATALOG.read_text().replace('default = "defuze_server"\n', '').replace(
         'priority = ["openrouter", "deepseek", "glm"]', 'priority = ["private", "glm", "deepseek", "openrouter"]') + '''
 [providers.private]
 credential_env = "PRIVATE_KEY"
@@ -139,7 +151,8 @@ def test_sdk_cli_model_override_applies_to_selected_provider(sdk_name):
         evaluation_plan(selection=resolve_sdk(sdk_name)), model='cli-model',
         trace_sink=None, trace_max_bytes=4096,
         environ={'DEEPSEEK_API_KEY': 'test-secret', 'DEEPSEEK_MODEL': 'env-model'})
-    target = resolve_model_provider(environ=runner.environ).resolve(runner.environ)
+    environment = runner.context.environ if sdk_name == 'local' else runner.environ
+    target = resolve_model_provider(environ=environment).resolve(environment)
     assert (target.provider_id, target.model) == ('deepseek', 'cli-model')
 
 
